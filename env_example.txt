@@ -1,0 +1,31 @@
+# 音高曲线比对系统环境变量配置示例
+# 请复制此文件为 .env 并填入真实的配置值
+
+# === Azure TTS配置 ===
+AZURE_SPEECH_KEY=your_azure_speech_key_here
+AZURE_SPEECH_REGION=eastasia
+
+# === 百度智能云TTS配置（推荐，性价比高）===
+BAIDU_API_KEY=your_baidu_api_key_here
+BAIDU_SECRET_KEY=your_baidu_secret_key_here
+BAIDU_VOICE_PER=0
+
+# === 腾讯云TTS配置（可选）===
+TENCENT_SECRET_ID=your_tencent_secret_id_here
+TENCENT_SECRET_KEY=your_tencent_secret_key_here
+TENCENT_VOICE_TYPE=101001
+
+# === 系统配置 ===
+SECRET_KEY=your_secret_key_here
+DEBUG=true
+PORT=5000
+
+# === 注意事项 ===
+# 1. 百度TTS（推荐）: https://cloud.baidu.com/product/speech
+#    - 免费额度大，性价比高
+#    - 申请流程简单，审核快
+# 2. 腾讯云TTS: https://cloud.tencent.com/product/tts
+#    - 音质自然，支持SSML
+# 3. Azure TTS: 需要国外信用卡，可选
+# 4. 将此文件复制为 .env 文件并填入真实配置值
+# 5. .env 文件已在 .gitignore 中，不会被提交到版本控制
