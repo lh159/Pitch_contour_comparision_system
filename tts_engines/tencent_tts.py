@@ -131,7 +131,8 @@ class TencentTTS:
                 return True
             else:
                 # 错误
-                error = result.get('Response', {}).get('Error', {})
+                response = result.get('Response', {}) or {}
+                error = response.get('Error', {})
                 logger.error(f"腾讯云TTS合成失败: {error}")
                 return False
                 

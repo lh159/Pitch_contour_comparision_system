@@ -137,7 +137,7 @@ class PitchComparisonSystem:
                 'standard_audio': standard_audio_path,
                 'user_audio': user_audio_path,
                 'chart_path': chart_path if chart_success else None,
-                'vad_processing': comparison_result.get('preprocessing_info', {}).get('vad_processing', False)
+                'vad_processing': (comparison_result.get('preprocessing_info') or {}).get('vad_processing', False)
             }
             
             self.session_history.append(session_record)
@@ -159,7 +159,7 @@ class PitchComparisonSystem:
                 'chart_path': chart_path if chart_success else None,
                 'standard_audio': standard_audio_path,
                 'session_id': len(self.session_history) - 1,
-                'vad_processing_used': comparison_result.get('preprocessing_info', {}).get('vad_processing', False)
+                'vad_processing_used': (comparison_result.get('preprocessing_info') or {}).get('vad_processing', False)
             }
             
         except Exception as e:

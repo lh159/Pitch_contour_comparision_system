@@ -444,7 +444,7 @@ class PitchComparator:
             print("🎯 执行VAD增强预处理...")
             vad_result = self.vad_comparator.align_speech_regions(standard_audio, user_audio)
             
-            if vad_result.get('success'):
+            if vad_result and vad_result.get('success'):
                 actual_standard_audio = vad_result['standard_speech_audio']
                 actual_user_audio = vad_result['user_speech_audio']
                 print(f"✓ VAD处理完成，对齐质量: {vad_result['alignment_quality']['quality_level']}")
@@ -457,7 +457,8 @@ class PitchComparator:
                     )
                     # 将文本对齐结果合并到VAD结果中
                     vad_result.update(text_alignment_result)
-                    print(f"✓ 文本对齐完成，识别文本: {text_alignment_result.get('asr_result', {}).get('text', '无')}")
+                    asr_result = text_alignment_result.get('asr_result', {}) or {}
+                    print(f"✓ 文本对齐完成，识别文本: {asr_result.get('text', '无')}")
             else:
                 print("⚠️ VAD处理失败，使用原始音频")
         

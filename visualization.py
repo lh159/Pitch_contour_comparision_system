@@ -809,10 +809,10 @@ class PitchVisualization:
             ax1.set_ylim(0, 100)
             
             # 各项能力趋势
-            accuracy_scores = [score.get('component_scores', {}).get('accuracy', 0) for score in history_scores]
-            trend_scores = [score.get('component_scores', {}).get('trend', 0) for score in history_scores]
-            stability_scores = [score.get('component_scores', {}).get('stability', 0) for score in history_scores]
-            range_scores = [score.get('component_scores', {}).get('range', 0) for score in history_scores]
+            accuracy_scores = [(score.get('component_scores') or {}).get('accuracy', 0) for score in history_scores]
+            trend_scores = [(score.get('component_scores') or {}).get('trend', 0) for score in history_scores]
+            stability_scores = [(score.get('component_scores') or {}).get('stability', 0) for score in history_scores]
+            range_scores = [(score.get('component_scores') or {}).get('range', 0) for score in history_scores]
             
             ax2.plot(attempts, accuracy_scores, 'o-', label='音高准确性', linewidth=2)
             ax2.plot(attempts, trend_scores, 's-', label='音调变化', linewidth=2)

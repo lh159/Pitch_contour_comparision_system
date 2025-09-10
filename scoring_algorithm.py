@@ -264,7 +264,7 @@ class DetailedAnalyzer:
                 }
             },
             'quality_assessment': self._assess_quality(standard_pitch, user_pitch),
-            'alignment_info': comparison_result.get('aligned_data', {}).get('alignment_method', 'unknown')
+            'alignment_info': (comparison_result.get('aligned_data') or {}).get('alignment_method', 'unknown')
         }
         
         return analysis
