@@ -34,8 +34,8 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-repo/pitch-comparison-system.git
-cd pitch-comparison-system
+git clone https://github.com/lh159/Pitch_contour_comparision_system.git
+cd Pitch_contour_comparision_system
 
 # 运行自动安装脚本
 python install_dependencies.py
@@ -324,9 +324,9 @@ CMD ["python", "web_interface.py"]
 
 ## 📮 联系我们
 
-- 📧 Email: your-email@example.com
-- 🐛 Issues: [GitHub Issues](https://github.com/your-repo/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/your-repo/discussions)
+- 📧 Email: lh159@example.com
+- 🐛 Issues: [GitHub Issues](https://github.com/lh159/Pitch_contour_comparision_system/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/lh159/Pitch_contour_comparision_system/discussions)
 
 ---
 
@@ -334,6 +334,6 @@ CMD ["python", "web_interface.py"]
 
 **用智能科技，让发音更准确** 🎯
 
-Made with ❤️ by [Your Name]
+Made with ❤️ by lh159
 
 </div>
