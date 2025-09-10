@@ -27,6 +27,11 @@ class Config:
     TENCENT_SECRET_KEY = os.getenv('TENCENT_SECRET_KEY', '')
     TENCENT_VOICE_TYPE = int(os.getenv('TENCENT_VOICE_TYPE', '101001'))  # 音色
     
+    # === 阿里达摩院语音配置 ===
+    ALIBABA_PARAFORMER_API_KEY = os.getenv('ALIBABA_PARAFORMER_API_KEY', '')
+    ALIBABA_VAD_MODEL = 'fsmn-vad'  # VAD模型名称
+    ALIBABA_ASR_MODEL = 'paraformer-v2'  # ASR模型名称
+    
     # === 音频配置 ===
     SAMPLE_RATE = 16000  # 采样率
     AUDIO_FORMAT = 'wav'  # 音频格式
@@ -42,6 +47,12 @@ class Config:
     PITCH_MAX_FREQ = 600  # 最大基频 (Hz)
     PITCH_TIME_STEP = 0.01  # 时间步长 (秒)
     
+    # === VAD配置 ===
+    VAD_MIN_SPEECH_DURATION = 0.1  # 最小语音段长度 (秒)
+    VAD_MAX_SILENCE_DURATION = 0.5  # 最大静音段长度 (秒)
+    VAD_ENERGY_THRESHOLD = 0.01  # 能量阈值
+    VAD_ENABLED = True  # 是否启用VAD
+    
     # === 评分配置 ===
     SCORE_WEIGHTS = {
         'correlation': 0.4,    # 相关性权重
@@ -53,7 +64,7 @@ class Config:
     # === Web配置 ===
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev_secret_key_change_in_production')
     DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-    PORT = int(os.getenv('PORT', 5000))
+    PORT = int(os.getenv('PORT', 9999))
     
     @classmethod
     def create_directories(cls):

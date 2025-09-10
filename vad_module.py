@@ -1,0 +1,437 @@
+# -*- coding: utf-8 -*-
+"""
+语音活动检测(VAD)模块
+集成阿里达摩院paraformer-v2进行精确的语音活动区域检测
+用于改进音高曲线比对的时域对齐精度
+"""
+import os
+import numpy as np
+import librosa
+import soundfile as sf
+from typing import List, Tuple, Dict, Optional
+import tempfile
+import traceback
+
+from config import Config
+
+try:
+    import dashscope
+    from funasr import AutoModel
+    DASHSCOPE_AVAILABLE = True
+    FUNASR_AVAILABLE = True
+except ImportError as e:
+    print(f"警告: 阿里语音服务导入失败: {e}")
+    DASHSCOPE_AVAILABLE = False
+    FUNASR_AVAILABLE = False
+
+class VADProcessor:
+    """语音活动检测处理器"""
+    
+    def __init__(self):
+        self.api_key = Config.ALIBABA_PARAFORMER_API_KEY
+        self.vad_model_name = Config.ALIBABA_VAD_MODEL
+        self.asr_model_name = Config.ALIBABA_ASR_MODEL
+        
+        # 本地VAD模型
+        self.local_vad_model = None
+        self.vad_available = False
+        
+        # 初始化服务
+        self._initialize_services()
+    
+    def _initialize_services(self):
+        """初始化语音服务"""
+        try:
+            # 初始化DashScope (用于paraformer-v2)
+            if DASHSCOPE_AVAILABLE and self.api_key:
+                dashscope.api_key = self.api_key
+                print("✓ DashScope API已配置")
+            else:
+                print("⚠️ DashScope API未配置或不可用")
+            
+            # 初始化本地VAD模型 (FunASR)
+            if FUNASR_AVAILABLE:
+                try:
+                    print("正在加载本地VAD模型...")
+                    self.local_vad_model = AutoModel(
+                        model=self.vad_model_name,
+                        model_revision="v2.0.4"
+                    )
+                    self.vad_available = True
+                    print("✓ 本地VAD模型加载成功")
+                except Exception as e:
+                    print(f"⚠️ 本地VAD模型加载失败: {e}")
+                    print("将使用基础能量检测方法")
+            
+        except Exception as e:
+            print(f"VAD服务初始化失败: {e}")
+            traceback.print_exc()
+    
+    def detect_speech_segments(self, audio_path: str, method: str = 'auto') -> List[Tuple[float, float]]:
+        """
+        检测音频中的语音活动段
+        :param audio_path: 音频文件路径
+        :param method: 检测方法 ('funasr', 'energy', 'auto')
+        :return: 语音段列表 [(开始时间, 结束时间), ...]
+        """
+        if method == 'auto':
+            # 自动选择最佳方法
+            if self.vad_available:
+                method = 'funasr'
+            else:
+                method = 'energy'
+        
+        print(f"使用 {method} 方法进行VAD检测...")
+        
+        if method == 'funasr' and self.vad_available:
+            return self._detect_with_funasr(audio_path)
+        else:
+            return self._detect_with_energy(audio_path)
+    
+    def _detect_with_funasr(self, audio_path: str) -> List[Tuple[float, float]]:
+        """使用FunASR VAD模型检测语音段"""
+        try:
+            # 使用本地VAD模型
+            result = self.local_vad_model.generate(input=audio_path)
+            
+            # 解析结果
+            speech_segments = []
+            if isinstance(result, list) and len(result) > 0:
+                # result格式: [{'value': [[beg1, end1], [beg2, end2], ...]}]
+                if 'value' in result[0]:
+                    segments = result[0]['value']
+                    for segment in segments:
+                        if len(segment) >= 2:
+                            # 转换为秒 (FunASR返回毫秒)
+                            start_time = segment[0] / 1000.0
+                            end_time = segment[1] / 1000.0
+                            speech_segments.append((start_time, end_time))
+            
+            print(f"FunASR VAD检测到 {len(speech_segments)} 个语音段")
+            return speech_segments
+            
+        except Exception as e:
+            print(f"FunASR VAD检测失败: {e}")
+            # 降级到能量检测
+            return self._detect_with_energy(audio_path)
+    
+    def _detect_with_energy(self, audio_path: str) -> List[Tuple[float, float]]:
+        """使用能量阈值方法检测语音段"""
+        try:
+            # 加载音频
+            y, sr = librosa.load(audio_path, sr=None)
+            
+            # 计算短时能量
+            frame_length = int(0.025 * sr)  # 25ms帧
+            hop_length = int(0.010 * sr)    # 10ms跳跃
+            
+            # 计算RMS能量
+            rms = librosa.feature.rms(
+                y=y, 
+                frame_length=frame_length, 
+                hop_length=hop_length
+            )[0]
+            
+            # 动态阈值
+            energy_mean = np.mean(rms)
+            energy_std = np.std(rms)
+            threshold = max(Config.VAD_ENERGY_THRESHOLD, 
+                          energy_mean - 0.5 * energy_std)
+            
+            # 检测语音帧
+            speech_frames = rms > threshold
+            
+            # 转换为时间段
+            times = librosa.frames_to_time(
+                np.arange(len(speech_frames)), 
+                sr=sr, 
+                hop_length=hop_length
+            )
+            
+            # 合并连续的语音段
+            speech_segments = self._merge_segments(
+                times, speech_frames, 
+                min_duration=Config.VAD_MIN_SPEECH_DURATION,
+                max_gap=Config.VAD_MAX_SILENCE_DURATION
+            )
+            
+            print(f"能量VAD检测到 {len(speech_segments)} 个语音段")
+            return speech_segments
+            
+        except Exception as e:
+            print(f"能量VAD检测失败: {e}")
+            # 返回整个音频作为一个语音段
+            try:
+                duration = librosa.get_duration(filename=audio_path)
+                return [(0.0, duration)]
+            except:
+                return [(0.0, 10.0)]  # 默认10秒
+    
+    def _merge_segments(self, times: np.ndarray, speech_frames: np.ndarray, 
+                       min_duration: float = 0.1, max_gap: float = 0.5) -> List[Tuple[float, float]]:
+        """合并连续的语音段"""
+        segments = []
+        in_speech = False
+        start_time = None
+        
+        for i, (time, is_speech) in enumerate(zip(times, speech_frames)):
+            if is_speech and not in_speech:
+                # 语音开始
+                start_time = time
+                in_speech = True
+            elif not is_speech and in_speech:
+                # 语音结束
+                if start_time is not None:
+                    duration = time - start_time
+                    if duration >= min_duration:
+                        segments.append((start_time, time))
+                in_speech = False
+        
+        # 处理最后一个段
+        if in_speech and start_time is not None:
+            duration = times[-1] - start_time
+            if duration >= min_duration:
+                segments.append((start_time, times[-1]))
+        
+        # 合并间隔过小的段
+        merged_segments = []
+        for start, end in segments:
+            if not merged_segments:
+                merged_segments.append((start, end))
+            else:
+                last_start, last_end = merged_segments[-1]
+                gap = start - last_end
+                if gap <= max_gap:
+                    # 合并段
+                    merged_segments[-1] = (last_start, end)
+                else:
+                    merged_segments.append((start, end))
+        
+        return merged_segments
+    
+    def get_speech_regions_timestamps(self, audio_path: str) -> Dict:
+        """
+        获取语音区域的详细时间戳信息
+        :param audio_path: 音频文件路径
+        :return: 包含各种时间戳信息的字典
+        """
+        try:
+            # 检测语音段
+            speech_segments = self.detect_speech_segments(audio_path)
+            
+            # 加载音频获取总时长
+            duration = librosa.get_duration(filename=audio_path)
+            
+            # 计算统计信息
+            total_speech_duration = sum(end - start for start, end in speech_segments)
+            speech_ratio = total_speech_duration / duration if duration > 0 else 0
+            
+            # 如果使用paraformer-v2还可以获取更详细的时间戳信息
+            detailed_timestamps = None
+            if DASHSCOPE_AVAILABLE and self.api_key:
+                detailed_timestamps = self._get_detailed_timestamps(audio_path)
+            
+            return {
+                'speech_segments': speech_segments,
+                'total_duration': duration,
+                'speech_duration': total_speech_duration,
+                'silence_duration': duration - total_speech_duration,
+                'speech_ratio': speech_ratio,
+                'detailed_timestamps': detailed_timestamps,
+                'segment_count': len(speech_segments)
+            }
+            
+        except Exception as e:
+            print(f"获取语音时间戳失败: {e}")
+            return {
+                'speech_segments': [(0.0, 0.0)],
+                'total_duration': 0.0,
+                'speech_duration': 0.0,
+                'silence_duration': 0.0,
+                'speech_ratio': 0.0,
+                'detailed_timestamps': None,
+                'segment_count': 0
+            }
+    
+    def _get_detailed_timestamps(self, audio_path: str) -> Optional[Dict]:
+        """使用paraformer-v2获取详细的词级时间戳(需要上传到云端)"""
+        try:
+            # 注意: paraformer-v2需要音频文件可通过公网访问
+            # 这里仅作为示例，实际使用时需要先上传音频文件到OSS等服务
+            print("获取详细时间戳需要将音频上传到云端，当前跳过此功能")
+            return None
+            
+        except Exception as e:
+            print(f"获取详细时间戳失败: {e}")
+            return None
+    
+    def extract_speech_audio(self, audio_path: str, output_path: str = None) -> str:
+        """
+        提取纯语音音频（去除静音段）
+        :param audio_path: 输入音频路径
+        :param output_path: 输出音频路径
+        :return: 输出文件路径
+        """
+        try:
+            # 检测语音段
+            speech_segments = self.detect_speech_segments(audio_path)
+            
+            if not speech_segments:
+                print("未检测到语音段，返回原音频")
+                return audio_path
+            
+            # 加载音频
+            y, sr = librosa.load(audio_path, sr=None)
+            
+            # 提取语音段
+            speech_audio = []
+            for start_time, end_time in speech_segments:
+                start_sample = int(start_time * sr)
+                end_sample = int(end_time * sr)
+                segment = y[start_sample:end_sample]
+                speech_audio.append(segment)
+            
+            # 合并所有语音段
+            if speech_audio:
+                combined_audio = np.concatenate(speech_audio)
+            else:
+                combined_audio = y  # 如果没有检测到，使用原音频
+            
+            # 保存结果
+            if output_path is None:
+                output_path = audio_path.replace('.wav', '_speech_only.wav')
+            
+            sf.write(output_path, combined_audio, sr)
+            print(f"提取的纯语音音频已保存到: {output_path}")
+            
+            return output_path
+            
+        except Exception as e:
+            print(f"提取语音音频失败: {e}")
+            return audio_path  # 返回原文件
+
+class VADComparator:
+    """基于VAD的音高比对增强器"""
+    
+    def __init__(self):
+        self.vad_processor = VADProcessor()
+    
+    def align_speech_regions(self, standard_audio: str, user_audio: str) -> Dict:
+        """
+        基于VAD检测结果对齐两个音频的语音区域
+        :param standard_audio: 标准音频路径
+        :param user_audio: 用户音频路径
+        :return: 对齐结果
+        """
+        try:
+            print("🎯 开始VAD增强的音频对齐...")
+            
+            # 检测两个音频的语音区域
+            std_info = self.vad_processor.get_speech_regions_timestamps(standard_audio)
+            user_info = self.vad_processor.get_speech_regions_timestamps(user_audio)
+            
+            print(f"标准音频: {len(std_info['speech_segments'])} 个语音段, "
+                  f"语音比例: {std_info['speech_ratio']:.2%}")
+            print(f"用户音频: {len(user_info['speech_segments'])} 个语音段, "
+                  f"语音比例: {user_info['speech_ratio']:.2%}")
+            
+            # 提取纯语音音频用于更精确的音高比对
+            std_speech_path = self.vad_processor.extract_speech_audio(
+                standard_audio, 
+                standard_audio.replace('.wav', '_vad_speech.wav')
+            )
+            user_speech_path = self.vad_processor.extract_speech_audio(
+                user_audio,
+                user_audio.replace('.wav', '_vad_speech.wav')
+            )
+            
+            return {
+                'success': True,
+                'standard_info': std_info,
+                'user_info': user_info,
+                'standard_speech_audio': std_speech_path,
+                'user_speech_audio': user_speech_path,
+                'alignment_quality': self._calculate_alignment_quality(std_info, user_info)
+            }
+            
+        except Exception as e:
+            print(f"VAD对齐失败: {e}")
+            traceback.print_exc()
+            return {
+                'success': False,
+                'error': str(e),
+                'standard_speech_audio': standard_audio,
+                'user_speech_audio': user_audio
+            }
+    
+    def _calculate_alignment_quality(self, std_info: Dict, user_info: Dict) -> Dict:
+        """计算对齐质量指标"""
+        try:
+            # 语音比例差异
+            ratio_diff = abs(std_info['speech_ratio'] - user_info['speech_ratio'])
+            
+            # 段数差异
+            segment_diff = abs(std_info['segment_count'] - user_info['segment_count'])
+            
+            # 时长差异
+            duration_diff = abs(std_info['speech_duration'] - user_info['speech_duration'])
+            
+            # 计算质量评分 (0-1，越高越好)
+            ratio_score = max(0, 1 - ratio_diff * 2)  # 比例差异权重
+            segment_score = max(0, 1 - segment_diff * 0.1)  # 段数差异权重
+            duration_score = max(0, 1 - duration_diff * 0.1)  # 时长差异权重
+            
+            overall_score = (ratio_score + segment_score + duration_score) / 3
+            
+            return {
+                'overall_score': overall_score,
+                'ratio_difference': ratio_diff,
+                'segment_difference': segment_diff,
+                'duration_difference': duration_diff,
+                'quality_level': 'high' if overall_score > 0.8 else 
+                               'medium' if overall_score > 0.6 else 'low'
+            }
+            
+        except Exception as e:
+            return {
+                'overall_score': 0.5,
+                'quality_level': 'unknown',
+                'error': str(e)
+            }
+
+# 使用示例和测试
+if __name__ == '__main__':
+    import sys
+    
+    # 创建VAD处理器
+    vad = VADProcessor()
+    
+    print("=== VAD模块状态 ===")
+    print(f"DashScope可用: {DASHSCOPE_AVAILABLE}")
+    print(f"FunASR可用: {FUNASR_AVAILABLE}")
+    print(f"本地VAD模型: {'可用' if vad.vad_available else '不可用'}")
+    
+    # 如果提供了测试音频，进行测试
+    if len(sys.argv) > 1:
+        test_audio = sys.argv[1]
+        if os.path.exists(test_audio):
+            print(f"\n=== 测试VAD: {test_audio} ===")
+            
+            # 检测语音段
+            segments = vad.detect_speech_segments(test_audio)
+            print(f"检测到语音段: {segments}")
+            
+            # 获取详细信息
+            info = vad.get_speech_regions_timestamps(test_audio)
+            print(f"总时长: {info['total_duration']:.2f}s")
+            print(f"语音时长: {info['speech_duration']:.2f}s")
+            print(f"语音比例: {info['speech_ratio']:.2%}")
+            
+            # 提取纯语音
+            speech_path = vad.extract_speech_audio(test_audio)
+            print(f"纯语音文件: {speech_path}")
+        else:
+            print(f"测试音频文件不存在: {test_audio}")
+    else:
+        print("\n提示: 可以使用以下命令进行测试:")
+        print("python vad_module.py test_audio.wav")

@@ -58,7 +58,7 @@ def start_web_server():
         time.sleep(3)
         
         # 自动打开浏览器
-        url = "http://localhost:5000"
+        url = "http://localhost:9999"
         print(f"🌐 系统地址: {url}")
         
         try:

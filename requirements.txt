@@ -25,3 +25,7 @@ azure-cognitiveservices-speech>=1.19.0
 # 其他工具库
 requests>=2.25.0
 python-dotenv>=0.19.0
+
+# 阿里达摩院语音处理
+dashscope>=1.0.0
+funasr>=1.0.0

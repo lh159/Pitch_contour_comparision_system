@@ -105,6 +105,12 @@ class PitchComparisonSystem:
             print("  ├─ 计算评分...")
             score_result = self.scoring_system.calculate_score(comparison_result)
             
+            # 3.5 VAD增强评分（如果使用了VAD）
+            vad_enhanced_score = None
+            if comparison_result.get('vad_result'):
+                print("  ├─ 计算VAD增强评分...")
+                vad_enhanced_score = self.comparator.calculate_vad_enhanced_score(comparison_result)
+            
             # 4. 详细分析
             print("  ├─ 详细分析...")
             detailed_analysis = self.analyzer.analyze_pitch_details(comparison_result)
@@ -125,25 +131,34 @@ class PitchComparisonSystem:
                 'text': text,
                 'timestamp': datetime.now().isoformat(),
                 'score': score_result,
+                'vad_enhanced_score': vad_enhanced_score,
                 'analysis': detailed_analysis,
                 'standard_audio': standard_audio_path,
                 'user_audio': user_audio_path,
-                'chart_path': chart_path if chart_success else None
+                'chart_path': chart_path if chart_success else None,
+                'vad_processing': comparison_result.get('preprocessing_info', {}).get('vad_processing', False)
             }
             
             self.session_history.append(session_record)
             
             print(f"✅ 处理完成 - 得分: {score_result['total_score']}分")
             
+            # 显示VAD增强评分结果
+            if vad_enhanced_score:
+                enhancement = vad_enhanced_score.get('total_enhancement', 0.0) * 100
+                print(f"   VAD增强: +{enhancement:.1f}% (总分: {vad_enhanced_score.get('enhanced_score', 0)*100:.1f})")
+            
             return {
                 'success': True,
                 'text': text,
                 'score': score_result,
+                'vad_enhanced_score': vad_enhanced_score,
                 'analysis': detailed_analysis,
                 'comparison': comparison_result,
                 'chart_path': chart_path if chart_success else None,
                 'standard_audio': standard_audio_path,
-                'session_id': len(self.session_history) - 1
+                'session_id': len(self.session_history) - 1,
+                'vad_processing_used': comparison_result.get('preprocessing_info', {}).get('vad_processing', False)
             }
             
         except Exception as e:
@@ -184,6 +199,20 @@ class PitchComparisonSystem:
     
     def get_system_status(self) -> Dict:
         """获取系统状态信息"""
+        vad_status = {
+            'enabled': False,
+            'available': False,
+            'processor_ready': False
+        }
+        
+        if self.comparator:
+            vad_status = {
+                'enabled': self.comparator.use_vad,
+                'available': hasattr(self.comparator, 'vad_comparator') and self.comparator.vad_comparator is not None,
+                'processor_ready': (self.comparator.vad_comparator is not None and 
+                                  hasattr(self.comparator.vad_comparator, 'vad_processor'))
+            }
+        
         return {
             'initialized': self.initialized,
             'tts_available': self.tts_manager is not None,
@@ -195,6 +224,7 @@ class PitchComparisonSystem:
                 'analyzer': self.analyzer is not None,
                 'visualizer': self.visualizer is not None
             },
+            'vad_status': vad_status,
             'session_records': len(self.session_history)
         }
     

@@ -17,6 +17,13 @@ except ImportError:
     DTW_AVAILABLE = False
     print("警告: DTW库未安装，将使用简单线性对齐方法")
 
+try:
+    from vad_module import VADComparator
+    VAD_AVAILABLE = True
+except ImportError:
+    VAD_AVAILABLE = False
+    print("警告: VAD模块未可用，将使用传统音高比对方法")
+
 class PitchExtractor:
     """音高提取器"""
     
@@ -405,6 +412,18 @@ class PitchComparator:
     def __init__(self):
         self.extractor = PitchExtractor()
         self.aligner = PitchAligner()
+        
+        # 集成VAD功能
+        self.vad_comparator = None
+        self.use_vad = Config.VAD_ENABLED and VAD_AVAILABLE
+        
+        if self.use_vad:
+            try:
+                self.vad_comparator = VADComparator()
+                print("✓ VAD增强功能已启用")
+            except Exception as e:
+                print(f"⚠️ VAD功能初始化失败: {e}")
+                self.use_vad = False
     
     def compare_pitch_curves(self, standard_audio: str, user_audio: str) -> dict:
         """
@@ -413,13 +432,28 @@ class PitchComparator:
         :param user_audio: 用户发音音频路径
         :return: 比较结果
         """
+        vad_result = None
+        actual_standard_audio = standard_audio
+        actual_user_audio = user_audio
         
-        # 提取音高
+        # 1. VAD预处理（如果启用）
+        if self.use_vad and self.vad_comparator:
+            print("🎯 执行VAD增强预处理...")
+            vad_result = self.vad_comparator.align_speech_regions(standard_audio, user_audio)
+            
+            if vad_result.get('success'):
+                actual_standard_audio = vad_result['standard_speech_audio']
+                actual_user_audio = vad_result['user_speech_audio']
+                print(f"✓ VAD处理完成，对齐质量: {vad_result['alignment_quality']['quality_level']}")
+            else:
+                print("⚠️ VAD处理失败，使用原始音频")
+        
+        # 2. 提取音高
         print("提取标准发音音高...")
-        standard_pitch = self.extractor.extract_pitch(standard_audio)
+        standard_pitch = self.extractor.extract_pitch(actual_standard_audio)
         
         print("提取用户发音音高...")
-        user_pitch = self.extractor.extract_pitch(user_audio)
+        user_pitch = self.extractor.extract_pitch(actual_user_audio)
         
         # 检查提取结果
         if standard_pitch['valid_ratio'] < 0.1:
@@ -452,7 +486,14 @@ class PitchComparator:
                 'audio_normalized': True,
                 'quality_enhanced': True,
                 'pitch_baseline_aligned': True,
-                'alignment_method': aligned_data.get('alignment_method', 'unknown')
+                'alignment_method': aligned_data.get('alignment_method', 'unknown'),
+                'vad_enabled': self.use_vad,
+                'vad_processing': vad_result is not None
+            },
+            'vad_result': vad_result,
+            'processed_audio_paths': {
+                'standard': actual_standard_audio,
+                'user': actual_user_audio
             },
             'success': True
         }
@@ -539,6 +580,55 @@ class PitchComparator:
             return 1.0
         
         return same_direction / total_changes
+    
+    def calculate_vad_enhanced_score(self, comparison_result: dict) -> dict:
+        """
+        基于VAD结果计算增强评分
+        :param comparison_result: 比较结果
+        :return: 增强评分信息
+        """
+        base_metrics = comparison_result.get('metrics', {})
+        vad_result = comparison_result.get('vad_result')
+        
+        if not vad_result or not vad_result.get('success'):
+            return {
+                'enhanced_score': base_metrics.get('correlation', 0.0),
+                'vad_bonus': 0.0,
+                'alignment_quality_bonus': 0.0,
+                'total_enhancement': 0.0
+            }
+        
+        # 基础相关性分数
+        base_correlation = base_metrics.get('correlation', 0.0)
+        
+        # VAD质量加成
+        alignment_quality = vad_result.get('alignment_quality', {})
+        quality_score = alignment_quality.get('overall_score', 0.5)
+        
+        # 计算VAD加成 (最多增加20%的分数)
+        vad_bonus = min(0.2, quality_score * 0.2)
+        
+        # 语音比例一致性加成 (最多增加10%的分数)
+        std_info = vad_result.get('standard_info', {})
+        user_info = vad_result.get('user_info', {})
+        
+        std_ratio = std_info.get('speech_ratio', 0.5)
+        user_ratio = user_info.get('speech_ratio', 0.5)
+        ratio_diff = abs(std_ratio - user_ratio)
+        
+        ratio_bonus = max(0, (0.1 - ratio_diff)) if ratio_diff < 0.1 else 0
+        
+        # 总增强分数
+        total_enhancement = vad_bonus + ratio_bonus
+        enhanced_score = min(1.0, base_correlation + total_enhancement)
+        
+        return {
+            'enhanced_score': enhanced_score,
+            'vad_bonus': vad_bonus,
+            'alignment_quality_bonus': ratio_bonus,
+            'total_enhancement': total_enhancement,
+            'speech_ratio_consistency': 1.0 - ratio_diff if ratio_diff < 1.0 else 0.0
+        }
 
 # 使用示例
 if __name__ == '__main__':
