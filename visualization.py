@@ -139,35 +139,61 @@ class PitchVisualization:
             if len(standard_pitch) == 0 or len(user_pitch) == 0:
                 return self._plot_error_message("音高数据为空", output_path)
             
-            # 创建更清晰的布局：主图 + 侧边栏
-            fig = plt.figure(figsize=fig_size, facecolor='white')
-            gs = fig.add_gridspec(3, 3, height_ratios=[2.5, 1, 1], width_ratios=[2, 1, 1], 
-                                 hspace=0.3, wspace=0.3)
+            # 检查是否有VAD和文本对齐数据
+            has_text_alignment = (comparison_result.get('vad_result') and 
+                                comparison_result['vad_result'].get('text_alignment'))
             
-            # 1. 主要音高对比图 (占据左侧大部分空间)
-            ax_main = fig.add_subplot(gs[0, :2])
-            self._plot_enhanced_comparison(ax_main, times, standard_pitch, user_pitch, score_result)
+            # 创建更清晰的布局：主图 + 侧边栏
+            if has_text_alignment:
+                # 有文本对齐时，增加一行显示文本时域对齐
+                fig = plt.figure(figsize=(fig_size[0], fig_size[1] + 2), facecolor='white')
+                gs = fig.add_gridspec(4, 3, height_ratios=[2.5, 0.8, 1, 1], width_ratios=[2, 1, 1], 
+                                     hspace=0.3, wspace=0.3)
+                
+                # 1. 主要音高对比图 (占据左侧大部分空间)
+                ax_main = fig.add_subplot(gs[0, :2])
+                self._plot_enhanced_comparison_with_text(ax_main, times, standard_pitch, user_pitch, 
+                                                       score_result, comparison_result['vad_result'])
+                
+                # 2. 文本时域对齐图 (新增)
+                ax_text = fig.add_subplot(gs[1, :2])
+                self._plot_text_alignment(ax_text, comparison_result['vad_result'])
+                
+                # 调整其他子图位置
+                score_row, stats_row, components_row, feedback_row = 0, 2, 2, 3
+            else:
+                fig = plt.figure(figsize=fig_size, facecolor='white')
+                gs = fig.add_gridspec(3, 3, height_ratios=[2.5, 1, 1], width_ratios=[2, 1, 1], 
+                                     hspace=0.3, wspace=0.3)
+                
+                # 1. 主要音高对比图 (占据左侧大部分空间)
+                ax_main = fig.add_subplot(gs[0, :2])
+                self._plot_enhanced_comparison(ax_main, times, standard_pitch, user_pitch, score_result)
+                
+                score_row, stats_row, components_row, feedback_row = 0, 1, 1, 2
             
             # 2. 评分总览 (右上角)
-            ax_score = fig.add_subplot(gs[0, 2])
+            ax_score = fig.add_subplot(gs[score_row, 2])
             self._plot_score_overview(ax_score, score_result)
             
             # 3. 音高统计对比 (左下)
-            ax_stats = fig.add_subplot(gs[1, :2])
+            ax_stats = fig.add_subplot(gs[stats_row, :2])
             self._plot_pitch_statistics(ax_stats, comparison_result['metrics'])
             
             # 4. 各项能力评分 (右下)
-            ax_components = fig.add_subplot(gs[1, 2])
+            ax_components = fig.add_subplot(gs[components_row, 2])
             self._plot_component_scores(ax_components, score_result['component_scores'])
             
             # 5. 改进建议 (底部全宽)
-            ax_feedback = fig.add_subplot(gs[2, :])
+            ax_feedback = fig.add_subplot(gs[feedback_row, :])
             self._plot_enhanced_feedback(ax_feedback, score_result)
             
             # 设置整体标题
             total_score = score_result['total_score']
             level = score_result['level']
             title = f"🎵 音高曲线对比分析报告 - 总分: {total_score:.1f}分 ({level})"
+            if has_text_alignment:
+                title += " (含文本对齐分析)"
             fig.suptitle(title, fontsize=18, weight='bold', y=0.95, 
                         color=self._get_score_color(total_score))
             
@@ -261,6 +287,144 @@ class PitchVisualization:
         self._set_text_with_font(ax, 'text', 0.02, 0.98, info_text, transform=ax.transAxes,
                verticalalignment='top', fontsize=11,
                bbox=dict(boxstyle='round,pad=0.5', facecolor='lightblue', alpha=0.8))
+    
+    def _plot_enhanced_comparison_with_text(self, ax, times, standard_pitch, user_pitch, score_result, vad_result):
+        """绘制带文本标注的增强版音高对比曲线"""
+        
+        # 先绘制基础对比曲线
+        self._plot_enhanced_comparison(ax, times, standard_pitch, user_pitch, score_result)
+        
+        # 添加VAD区域标注
+        if vad_result and vad_result.get('vad_segments'):
+            y_min, y_max = ax.get_ylim()
+            
+            # 绘制VAD语音活动区域
+            for i, (start_time, end_time) in enumerate(vad_result['vad_segments']):
+                # 为每个VAD段添加背景色
+                ax.axvspan(start_time, end_time, alpha=0.15, color='green', 
+                          label='语音活动区域' if i == 0 else "")
+                
+                # 添加区域编号
+                mid_time = (start_time + end_time) / 2
+                self._set_text_with_font(ax, 'text', mid_time, y_max * 0.95, f'段{i+1}', 
+                       ha='center', va='top', fontsize=10, fontweight='bold',
+                       bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgreen', alpha=0.7))
+        
+        # 更新图例
+        handles, labels = ax.get_legend_handles_labels()
+        if any('语音活动区域' in label for label in labels):
+            ax.legend(handles, labels, fontsize=11, loc='upper right', 
+                     frameon=True, fancybox=True, shadow=True,
+                     prop=self._get_font_properties(11))
+    
+    def _plot_text_alignment(self, ax, vad_result):
+        """绘制文本时域对齐图"""
+        ax.clear()
+        
+        if not vad_result or not vad_result.get('vad_text_mapping'):
+            ax.text(0.5, 0.5, '暂无文本对齐数据', ha='center', va='center', 
+                   transform=ax.transAxes, fontsize=14, color='gray')
+            ax.set_title('📝 文本时域对齐分析', fontsize=14, fontweight='bold')
+            ax.axis('off')
+            return
+        
+        # 获取数据
+        text_mapping = vad_result['vad_text_mapping']
+        expected_text = vad_result.get('expected_text', '')
+        
+        # 设置图表
+        ax.set_xlim(0, max(mapping['vad_end'] for mapping in text_mapping) if text_mapping else 1)
+        ax.set_ylim(-0.5, len(text_mapping) + 0.5)
+        
+        # 绘制每个VAD段的文本对齐
+        for i, mapping in enumerate(text_mapping):
+            y_pos = len(text_mapping) - 1 - i  # 从上到下显示
+            
+            # VAD段时间范围
+            start_time = mapping['vad_start']
+            end_time = mapping['vad_end']
+            duration = end_time - start_time
+            
+            # 期望文本
+            expected = mapping.get('expected_text', '')
+            recognized = mapping.get('recognized_text', '')
+            match_quality = mapping.get('match_quality', 0.0)
+            
+            # 根据匹配质量选择颜色
+            if match_quality >= 0.8:
+                color = self.colors['good']
+                alpha = 0.8
+            elif match_quality >= 0.5:
+                color = self.colors['warning']
+                alpha = 0.7
+            else:
+                color = self.colors['error']
+                alpha = 0.6
+            
+            # 绘制时间段背景
+            rect = Rectangle((start_time, y_pos - 0.3), duration, 0.6, 
+                           facecolor=color, alpha=alpha, edgecolor='black', linewidth=1)
+            ax.add_patch(rect)
+            
+            # 添加文本标注
+            mid_time = (start_time + end_time) / 2
+            
+            # 期望文本（上方）
+            if expected:
+                self._set_text_with_font(ax, 'text', mid_time, y_pos + 0.1, f'标准: {expected}', 
+                       ha='center', va='bottom', fontsize=10, fontweight='bold',
+                       color='darkblue')
+            
+            # 识别文本（下方）
+            if recognized:
+                self._set_text_with_font(ax, 'text', mid_time, y_pos - 0.1, f'识别: {recognized}', 
+                       ha='center', va='top', fontsize=10, 
+                       color='darkred' if match_quality < 0.5 else 'darkgreen')
+            
+            # 时间标注
+            self._set_text_with_font(ax, 'text', start_time, y_pos - 0.35, f'{start_time:.2f}s', 
+                   ha='left', va='top', fontsize=8, color='gray')
+            self._set_text_with_font(ax, 'text', end_time, y_pos - 0.35, f'{end_time:.2f}s', 
+                   ha='right', va='top', fontsize=8, color='gray')
+            
+            # 匹配质量指示
+            quality_text = f'{match_quality:.1%}'
+            self._set_text_with_font(ax, 'text', end_time + 0.05, y_pos, quality_text, 
+                   ha='left', va='center', fontsize=9, fontweight='bold',
+                   color=color)
+        
+        # 设置标签
+        segment_labels = [f'段{i+1}' for i in range(len(text_mapping))]
+        ax.set_yticks(range(len(text_mapping)))
+        ax.set_yticklabels(reversed(segment_labels))  # 从上到下显示
+        
+        self._set_text_with_font(ax, 'xlabel', '时间 (秒)', fontsize=12, fontweight='bold')
+        self._set_text_with_font(ax, 'title', '📝 文本时域对齐分析 - 语音段与文字对应关系', 
+               fontsize=14, fontweight='bold')
+        
+        # 设置坐标轴刻度字体
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_fontproperties(self._get_font_properties(10))
+        
+        ax.grid(True, alpha=0.3, axis='x')
+        
+        # 添加图例
+        legend_elements = [
+            plt.Rectangle((0, 0), 1, 1, facecolor=self.colors['good'], alpha=0.8, label='匹配良好 (≥80%)'),
+            plt.Rectangle((0, 0), 1, 1, facecolor=self.colors['warning'], alpha=0.7, label='匹配一般 (≥50%)'),
+            plt.Rectangle((0, 0), 1, 1, facecolor=self.colors['error'], alpha=0.6, label='匹配较差 (<50%)')
+        ]
+        ax.legend(handles=legend_elements, loc='upper right', fontsize=10,
+                 prop=self._get_font_properties(10))
+        
+        # 添加统计信息
+        if text_mapping:
+            avg_quality = sum(m.get('match_quality', 0) for m in text_mapping) / len(text_mapping)
+            total_words = sum(m.get('word_count', 0) for m in text_mapping)
+            info_text = f'平均匹配度: {avg_quality:.1%}\n总词数: {total_words}'
+            self._set_text_with_font(ax, 'text', 0.02, 0.98, info_text, transform=ax.transAxes,
+                   verticalalignment='top', fontsize=10,
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow', alpha=0.8))
     
     def _plot_score_overview(self, ax, score_result):
         """绘制评分总览"""

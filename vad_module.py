@@ -24,6 +24,13 @@ except ImportError as e:
     DASHSCOPE_AVAILABLE = False
     FUNASR_AVAILABLE = False
 
+try:
+    import jieba
+    JIEBA_AVAILABLE = True
+except ImportError:
+    JIEBA_AVAILABLE = False
+    print("警告: jieba分词工具未安装，文本对齐功能将受限")
+
 class VADProcessor:
     """语音活动检测处理器"""
     
@@ -35,6 +42,10 @@ class VADProcessor:
         # 本地VAD模型
         self.local_vad_model = None
         self.vad_available = False
+        
+        # 本地ASR模型
+        self.local_asr_model = None
+        self.asr_available = False
         
         # 初始化服务
         self._initialize_services()
@@ -62,6 +73,19 @@ class VADProcessor:
                 except Exception as e:
                     print(f"⚠️ 本地VAD模型加载失败: {e}")
                     print("将使用基础能量检测方法")
+                
+                # 初始化本地ASR模型
+                try:
+                    print("正在加载本地ASR模型...")
+                    self.local_asr_model = AutoModel(
+                        model=self.asr_model_name,
+                        model_revision="v2.0.4"
+                    )
+                    self.asr_available = True
+                    print("✓ 本地ASR模型加载成功")
+                except Exception as e:
+                    print(f"⚠️ 本地ASR模型加载失败: {e}")
+                    print("文本时间戳功能将不可用")
             
         except Exception as e:
             print(f"VAD服务初始化失败: {e}")
@@ -264,6 +288,280 @@ class VADProcessor:
         except Exception as e:
             print(f"获取详细时间戳失败: {e}")
             return None
+    
+    def recognize_speech_with_timestamps(self, audio_path: str) -> Optional[Dict]:
+        """
+        使用ASR模型识别语音并获取时间戳
+        :param audio_path: 音频文件路径
+        :return: 识别结果和时间戳信息
+        """
+        if not self.asr_available:
+            print("ASR模型不可用，无法获取语音识别结果")
+            return None
+        
+        try:
+            print("正在进行语音识别...")
+            result = self.local_asr_model.generate(
+                input=audio_path,
+                batch_size_s=300,  # 批处理大小
+                hotword=""  # 热词
+            )
+            
+            if isinstance(result, list) and len(result) > 0:
+                # 处理识别结果
+                recognition_result = result[0]
+                
+                # 提取文本
+                recognized_text = recognition_result.get('text', '')
+                
+                # 提取时间戳 (如果可用)
+                timestamps = []
+                if 'timestamp' in recognition_result:
+                    timestamp_data = recognition_result['timestamp']
+                    if isinstance(timestamp_data, list):
+                        for ts_item in timestamp_data:
+                            if isinstance(ts_item, list) and len(ts_item) >= 3:
+                                # [word, start_time, end_time]
+                                word = ts_item[0]
+                                start_time = ts_item[1] / 1000.0  # 转换为秒
+                                end_time = ts_item[2] / 1000.0
+                                timestamps.append({
+                                    'word': word,
+                                    'start': start_time,
+                                    'end': end_time
+                                })
+                
+                print(f"识别文本: {recognized_text}")
+                print(f"时间戳数量: {len(timestamps)}")
+                
+                return {
+                    'text': recognized_text,
+                    'timestamps': timestamps,
+                    'confidence': recognition_result.get('confidence', 0.0),
+                    'raw_result': recognition_result
+                }
+            
+            return None
+            
+        except Exception as e:
+            print(f"语音识别失败: {e}")
+            traceback.print_exc()
+            return None
+    
+    def align_text_with_vad(self, expected_text: str, audio_path: str) -> Dict:
+        """
+        将期望文本与语音活动区域和识别结果进行对齐
+        :param expected_text: 期望的文本（如TTS的原文）
+        :param audio_path: 音频文件路径
+        :return: 对齐结果
+        """
+        try:
+            print(f"正在对齐文本: {expected_text}")
+            
+            # 1. 获取VAD结果
+            vad_segments = self.detect_speech_segments(audio_path)
+            
+            # 2. 获取ASR识别结果
+            asr_result = self.recognize_speech_with_timestamps(audio_path)
+            
+            # 3. 准备文本对齐
+            aligned_result = {
+                'expected_text': expected_text,
+                'vad_segments': vad_segments,
+                'asr_result': asr_result,
+                'text_alignment': []
+            }
+            
+            if asr_result and asr_result['timestamps']:
+                # 4. 执行文本对齐
+                alignment = self._align_expected_with_recognized(
+                    expected_text, 
+                    asr_result['text'],
+                    asr_result['timestamps']
+                )
+                aligned_result['text_alignment'] = alignment
+                
+                # 5. 将对齐结果映射到VAD段
+                aligned_result['vad_text_mapping'] = self._map_text_to_vad_segments(
+                    alignment, vad_segments
+                )
+            
+            return aligned_result
+            
+        except Exception as e:
+            print(f"文本对齐失败: {e}")
+            traceback.print_exc()
+            return {
+                'expected_text': expected_text,
+                'vad_segments': vad_segments if 'vad_segments' in locals() else [],
+                'asr_result': None,
+                'text_alignment': [],
+                'error': str(e)
+            }
+    
+    def _align_expected_with_recognized(self, expected: str, recognized: str, timestamps: List[Dict]) -> List[Dict]:
+        """
+        对齐期望文本和识别文本
+        :param expected: 期望文本
+        :param recognized: 识别文本  
+        :param timestamps: 识别结果的时间戳
+        :return: 对齐结果
+        """
+        try:
+            # 清理和分词
+            if JIEBA_AVAILABLE:
+                expected_words = list(jieba.cut(expected.strip()))
+                recognized_words = list(jieba.cut(recognized.strip()))
+            else:
+                # 简单按字符分割
+                expected_words = list(expected.strip())
+                recognized_words = list(recognized.strip())
+            
+            # 简单的对齐算法（可以改进为更复杂的算法）
+            alignment = []
+            expected_idx = 0
+            timestamp_idx = 0
+            
+            while expected_idx < len(expected_words) and timestamp_idx < len(timestamps):
+                expected_word = expected_words[expected_idx]
+                timestamp_item = timestamps[timestamp_idx]
+                recognized_word = timestamp_item['word']
+                
+                # 字符匹配
+                if expected_word == recognized_word or expected_word in recognized_word:
+                    # 完全匹配
+                    alignment.append({
+                        'expected_word': expected_word,
+                        'recognized_word': recognized_word,
+                        'start_time': timestamp_item['start'],
+                        'end_time': timestamp_item['end'],
+                        'match_type': 'exact'
+                    })
+                    expected_idx += 1
+                    timestamp_idx += 1
+                
+                elif recognized_word in expected_word:
+                    # 部分匹配
+                    alignment.append({
+                        'expected_word': expected_word,
+                        'recognized_word': recognized_word,
+                        'start_time': timestamp_item['start'],
+                        'end_time': timestamp_item['end'],
+                        'match_type': 'partial'
+                    })
+                    expected_idx += 1
+                    timestamp_idx += 1
+                
+                else:
+                    # 不匹配，可能是插入或删除
+                    if len(recognized_word) > len(expected_word):
+                        # 识别结果更长，可能是插入
+                        alignment.append({
+                            'expected_word': '',
+                            'recognized_word': recognized_word,
+                            'start_time': timestamp_item['start'],
+                            'end_time': timestamp_item['end'],
+                            'match_type': 'insertion'
+                        })
+                        timestamp_idx += 1
+                    else:
+                        # 期望文本更长，可能是删除
+                        alignment.append({
+                            'expected_word': expected_word,
+                            'recognized_word': '',
+                            'start_time': None,
+                            'end_time': None,
+                            'match_type': 'deletion'
+                        })
+                        expected_idx += 1
+            
+            # 处理剩余的期望词汇（删除）
+            while expected_idx < len(expected_words):
+                alignment.append({
+                    'expected_word': expected_words[expected_idx],
+                    'recognized_word': '',
+                    'start_time': None,
+                    'end_time': None,
+                    'match_type': 'deletion'
+                })
+                expected_idx += 1
+            
+            # 处理剩余的识别词汇（插入）
+            while timestamp_idx < len(timestamps):
+                timestamp_item = timestamps[timestamp_idx]
+                alignment.append({
+                    'expected_word': '',
+                    'recognized_word': timestamp_item['word'],
+                    'start_time': timestamp_item['start'],
+                    'end_time': timestamp_item['end'],
+                    'match_type': 'insertion'
+                })
+                timestamp_idx += 1
+            
+            return alignment
+            
+        except Exception as e:
+            print(f"文本对齐处理失败: {e}")
+            return []
+    
+    def _map_text_to_vad_segments(self, alignment: List[Dict], vad_segments: List[Tuple[float, float]]) -> List[Dict]:
+        """
+        将文本对齐结果映射到VAD段
+        :param alignment: 文本对齐结果
+        :param vad_segments: VAD语音段
+        :return: 映射结果
+        """
+        try:
+            vad_mapping = []
+            
+            for vad_start, vad_end in vad_segments:
+                # 找到该VAD段内的所有文本
+                segment_words = []
+                
+                for align_item in alignment:
+                    if (align_item['start_time'] is not None and 
+                        align_item['end_time'] is not None):
+                        word_start = align_item['start_time']
+                        word_end = align_item['end_time']
+                        
+                        # 检查词汇是否在当前VAD段内
+                        if (word_start >= vad_start and word_start <= vad_end) or \
+                           (word_end >= vad_start and word_end <= vad_end) or \
+                           (word_start <= vad_start and word_end >= vad_end):
+                            segment_words.append(align_item)
+                
+                # 构建该段的文本
+                expected_text = ''.join([w['expected_word'] for w in segment_words if w['expected_word']])
+                recognized_text = ''.join([w['recognized_word'] for w in segment_words if w['recognized_word']])
+                
+                vad_mapping.append({
+                    'vad_start': vad_start,
+                    'vad_end': vad_end,
+                    'expected_text': expected_text,
+                    'recognized_text': recognized_text,
+                    'words': segment_words,
+                    'word_count': len(segment_words),
+                    'match_quality': self._calculate_segment_match_quality(segment_words)
+                })
+            
+            return vad_mapping
+            
+        except Exception as e:
+            print(f"VAD文本映射失败: {e}")
+            return []
+    
+    def _calculate_segment_match_quality(self, words: List[Dict]) -> float:
+        """计算段落匹配质量"""
+        if not words:
+            return 0.0
+        
+        exact_matches = sum(1 for w in words if w['match_type'] == 'exact')
+        partial_matches = sum(1 for w in words if w['match_type'] == 'partial')
+        total_words = len(words)
+        
+        # 计算匹配质量分数
+        quality = (exact_matches + 0.5 * partial_matches) / total_words
+        return quality
     
     def extract_speech_audio(self, audio_path: str, output_path: str = None) -> str:
         """

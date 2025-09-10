@@ -425,11 +425,14 @@ class PitchComparator:
                 print(f"⚠️ VAD功能初始化失败: {e}")
                 self.use_vad = False
     
-    def compare_pitch_curves(self, standard_audio: str, user_audio: str) -> dict:
+    def compare_pitch_curves(self, standard_audio: str, user_audio: str, 
+                           expected_text: str = None, enable_text_alignment: bool = True) -> dict:
         """
         比较两个音频的音高曲线
         :param standard_audio: 标准发音音频路径
         :param user_audio: 用户发音音频路径
+        :param expected_text: 期望的文本（用于文本对齐）
+        :param enable_text_alignment: 是否启用文本对齐功能
         :return: 比较结果
         """
         vad_result = None
@@ -445,6 +448,16 @@ class PitchComparator:
                 actual_standard_audio = vad_result['standard_speech_audio']
                 actual_user_audio = vad_result['user_speech_audio']
                 print(f"✓ VAD处理完成，对齐质量: {vad_result['alignment_quality']['quality_level']}")
+                
+                # 1.5 文本对齐（如果启用且提供了期望文本）
+                if enable_text_alignment and expected_text and hasattr(self.vad_comparator, 'vad_processor'):
+                    print("🔤 执行文本时域对齐...")
+                    text_alignment_result = self.vad_comparator.vad_processor.align_text_with_vad(
+                        expected_text, user_audio
+                    )
+                    # 将文本对齐结果合并到VAD结果中
+                    vad_result.update(text_alignment_result)
+                    print(f"✓ 文本对齐完成，识别文本: {text_alignment_result.get('asr_result', {}).get('text', '无')}")
             else:
                 print("⚠️ VAD处理失败，使用原始音频")
         

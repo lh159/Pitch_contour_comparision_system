@@ -95,7 +95,8 @@ class PitchComparisonSystem:
             # 2. 比较音高曲线
             print("  ├─ 比较音高曲线...")
             comparison_result = self.comparator.compare_pitch_curves(
-                standard_audio_path, user_audio_path
+                standard_audio_path, user_audio_path, 
+                expected_text=text, enable_text_alignment=True
             )
             
             if 'error' in comparison_result:
