@@ -760,14 +760,12 @@
                 // 检查录音模式
                 const guidedMode = document.getElementById('guidedMode').checked;
                 
-                // 如果是指导模式，启动录音指导
+                // 如果是指导模式，尝试启动录音指导
                 if (guidedMode) {
                     const guideStarted = startRecordingGuide();
                     if (!guideStarted) {
-                        // 指导启动失败，切换到自由模式
-                        document.getElementById('freeMode').checked = true;
-                        handleRecordingModeChange({ target: { value: 'free' } });
-                        showAlert('已切换到自由录音模式', 'info');
+                        // 指导启动失败，显示提示但不切换模式
+                        showAlert('缺少时间戳数据，将以自由录音方式进行，录音完成后可进行音高比对', 'info');
                     }
                 }
                 
@@ -1247,26 +1245,29 @@
             
             if (mode === 'guided') {
                 console.log('切换到实时指导模式');
-                // 检查是否有时间戳数据
-                if (!currentCharTimestamps.length) {
-                    console.warn('缺少时间戳数据，无法启用实时指导');
-                    showAlert('需要先生成带时间戳的标准发音才能使用实时指导模式', 'warning');
-                    // 重置到自由模式
-                    document.getElementById('freeMode').checked = true;
-                    return;
-                }
                 
                 console.log('显示实时指导区域');
                 // 显示指导区域
                 guideArea.style.display = 'block';
-                waveformContainer.innerHTML = `
-                    <span class="text-muted">
-                        <i class="fas fa-magic me-2"></i>
-                        实时指导模式：点击"开始录音"后将根据标准发音的时间戳为您提供实时朗读提示
-                    </span>
-                `;
                 
-                showAlert('已切换到实时指导录音模式，开始录音后将显示实时提示', 'success');
+                // 检查是否有时间戳数据
+                if (!currentCharTimestamps.length) {
+                    console.warn('缺少时间戳数据，显示提示信息');
+                    waveformContainer.innerHTML = `
+                        <span class="text-muted">
+                            <i class="fas fa-magic me-2"></i>
+                            实时指导模式：请先输入文本并生成标准发音，然后开始录音获得实时朗读提示
+                        </span>
+                    `;
+                } else {
+                    waveformContainer.innerHTML = `
+                        <span class="text-muted">
+                            <i class="fas fa-magic me-2"></i>
+                            实时指导模式：点击"开始录音"后将根据标准发音的时间戳为您提供实时朗读提示
+                        </span>
+                    `;
+                    showAlert('已切换到实时指导录音模式，开始录音后将显示实时提示', 'success');
+                }
                 
             } else {
                 console.log('切换到自由录音模式');
@@ -1357,15 +1358,25 @@
                 recordingGuideArea: !!recordingGuideArea,
                 waveformContainer: !!waveformContainer,
                 RecordingGuide: typeof RecordingGuide !== 'undefined',
-                RealtimeTextSync: typeof RealtimeTextSync !== 'undefined'
+                RealtimeTextSync: typeof RealtimeTextSync !== 'undefined',
+                guidedModeChecked: guidedMode ? guidedMode.checked : false
             });
             
-            // 设置默认为实时指导模式并触发切换事件
-            if (guidedMode) {
-                console.log('设置默认为实时指导模式...');
-                const event = new Event('change', { bubbles: true });
-                guidedMode.checked = true;
-                guidedMode.dispatchEvent(event);
+            // 检查当前选中的模式并设置相应的界面
+            if (guidedMode && guidedMode.checked) {
+                console.log('当前已选中实时指导模式，设置相应界面...');
+                // 手动调用模式切换处理函数来设置界面
+                handleRecordingModeChange({ target: { value: 'guided' } });
+            } else if (freeMode && freeMode.checked) {
+                console.log('当前已选中自由录音模式，设置相应界面...');
+                handleRecordingModeChange({ target: { value: 'free' } });
+            } else {
+                // 如果没有选中任何模式，强制选中实时指导模式
+                console.log('没有选中任何模式，强制选中实时指导模式...');
+                if (guidedMode) {
+                    guidedMode.checked = true;
+                    handleRecordingModeChange({ target: { value: 'guided' } });
+                }
             }
         }
         
