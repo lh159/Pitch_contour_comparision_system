@@ -581,11 +581,19 @@ class RecordingGuide extends RealtimeTextSync {
     restartRecording() {
         console.log('从录音指导面板重新录制');
         
-        // 调用主页面的重新练习函数
-        if (window.retry && typeof window.retry === 'function') {
+        // 调用主页面的重新录制并立即开始录音函数
+        if (window.restartAndRecord && typeof window.restartAndRecord === 'function') {
+            window.restartAndRecord();
+        } else if (window.retry && typeof window.retry === 'function') {
+            // 如果新函数不存在，回退到旧的方式并手动开始录音
             window.retry();
+            setTimeout(() => {
+                if (window.startRecording && typeof window.startRecording === 'function') {
+                    window.startRecording();
+                }
+            }, 100);
         } else {
-            console.warn('未找到全局retry函数');
+            console.warn('未找到全局重新录制函数');
         }
     }
     

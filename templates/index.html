@@ -1010,6 +1010,29 @@
             }
         }
         
+        // 重新录制并立即开始录音（供录音指导组件调用）
+        function restartAndRecord() {
+            console.log('重新录制并立即开始录音');
+            
+            // 先重置状态
+            retry();
+            
+            // 等待一小段时间确保状态重置完成，然后自动开始录音
+            setTimeout(() => {
+                if (recordBtn && !recordBtn.disabled) {
+                    startRecording();
+                } else {
+                    console.warn('录音按钮不可用，无法自动开始录音');
+                }
+            }, 100);
+        }
+        
+        // 将函数暴露到全局作用域，供录音指导组件调用
+        window.retry = retry;
+        window.restartAndRecord = restartAndRecord;
+        window.startRecording = startRecording;
+        window.stopRecording = stopRecording;
+        
         // 练习新词汇
         function newWord() {
             // 重置所有状态
