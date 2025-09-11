@@ -468,21 +468,7 @@ class RecordingGuide extends RealtimeTextSync {
                     </div>
                 </div>
                 
-                <!-- 实时反馈区域 -->
-                <div class="realtime-feedback" id="realtimeFeedback">
-                    <div class="feedback-item">
-                        <span class="feedback-label">准确:</span>
-                        <span class="feedback-value correct-count" id="correctCount">0</span>
-                    </div>
-                    <div class="feedback-item">
-                        <span class="feedback-label">错过:</span>
-                        <span class="feedback-value missed-count" id="missedCount">0</span>
-                    </div>
-                    <div class="feedback-item">
-                        <span class="feedback-label">节奏:</span>
-                        <span class="feedback-value timing-score" id="timingScore">--</span>
-                    </div>
-                </div>
+                <!-- 实时反馈区域已移除 -->
                 
                 <!-- 控制按钮 -->
                 <div class="recording-controls">

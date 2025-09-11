@@ -417,10 +417,10 @@
                     <div class="recording-mode-selector mb-3">
                         <label class="form-label">录音模式:</label>
                         <div class="btn-group" role="group">
-                            <input type="radio" class="btn-check" name="recordingMode" id="freeMode" value="free" checked>
+                            <input type="radio" class="btn-check" name="recordingMode" id="freeMode" value="free">
                             <label class="btn btn-outline-primary" for="freeMode">自由录音</label>
                             
-                            <input type="radio" class="btn-check" name="recordingMode" id="guidedMode" value="guided">
+                            <input type="radio" class="btn-check" name="recordingMode" id="guidedMode" value="guided" checked>
                             <label class="btn btn-outline-success" for="guidedMode">实时指导录音</label>
                         </div>
                     </div>
@@ -1342,9 +1342,9 @@
             }
         }
         
-        // 验证录音模式切换功能
+        // 验证录音模式切换功能并设置默认模式
         function validateRecordingModeSwitch() {
-            console.log('🔍 验证录音模式切换功能...');
+            console.log('🔍 验证录音模式切换功能并设置默认模式...');
             
             const guidedMode = document.getElementById('guidedMode');
             const freeMode = document.getElementById('freeMode');
@@ -1360,18 +1360,12 @@
                 RealtimeTextSync: typeof RealtimeTextSync !== 'undefined'
             });
             
-            // 测试事件监听器
+            // 设置默认为实时指导模式并触发切换事件
             if (guidedMode) {
-                console.log('测试点击 guidedMode...');
+                console.log('设置默认为实时指导模式...');
                 const event = new Event('change', { bubbles: true });
                 guidedMode.checked = true;
                 guidedMode.dispatchEvent(event);
-                
-                setTimeout(() => {
-                    console.log('测试点击 freeMode...');
-                    freeMode.checked = true;
-                    freeMode.dispatchEvent(event);
-                }, 2000);
             }
         }
         
