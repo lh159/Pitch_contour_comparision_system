@@ -32,9 +32,21 @@ except ImportError:
     print("警告: jieba分词工具未安装，文本对齐功能将受限")
 
 class VADProcessor:
-    """语音活动检测处理器"""
+    """语音活动检测处理器 (单例模式)"""
+    
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
     
     def __init__(self):
+        # 避免重复初始化
+        if self._initialized:
+            return
+            
         self.api_key = Config.ALIBABA_PARAFORMER_API_KEY
         self.vad_model_name = Config.ALIBABA_VAD_MODEL
         self.asr_model_name = Config.ALIBABA_ASR_MODEL
@@ -49,6 +61,7 @@ class VADProcessor:
         
         # 初始化服务
         self._initialize_services()
+        self._initialized = True
     
     def _initialize_services(self):
         """初始化语音服务"""
@@ -76,7 +89,7 @@ class VADProcessor:
                 
                 # 初始化本地ASR模型
                 try:
-                    print("正在加载本地ASR模型...")
+                    print(f"正在加载本地ASR模型: {self.asr_model_name}")
                     self.local_asr_model = AutoModel(
                         model=self.asr_model_name,
                         model_revision="v2.0.4"
@@ -85,7 +98,8 @@ class VADProcessor:
                     print("✓ 本地ASR模型加载成功")
                 except Exception as e:
                     print(f"⚠️ 本地ASR模型加载失败: {e}")
-                    print("文本时间戳功能将不可用")
+                    print("将使用VAD+uniform估算方法作为降级方案")
+                    # 不设置为完全不可用，而是使用降级方案
             
         except Exception as e:
             print(f"VAD服务初始化失败: {e}")

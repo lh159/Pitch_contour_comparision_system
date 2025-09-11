@@ -16,6 +16,8 @@ dtaidistance>=2.3.4
 # Web框架
 flask>=2.0.0
 flask-cors>=3.0.10
+flask-socketio>=5.3.0
+redis>=4.5.0
 
 # TTS语音合成 (多个选项，可根据需要选择)
 # edge-tts>=6.1.0  # 免费的Edge TTS选项

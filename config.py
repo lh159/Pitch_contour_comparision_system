@@ -19,8 +19,8 @@ class Config:
     
     # === 阿里达摩院语音配置 ===
     ALIBABA_PARAFORMER_API_KEY = os.getenv('ALIBABA_PARAFORMER_API_KEY', '')
-    ALIBABA_VAD_MODEL = 'fsmn-vad'  # VAD模型名称
-    ALIBABA_ASR_MODEL = 'paraformer-v2'  # ASR模型名称
+    ALIBABA_VAD_MODEL = 'iic/speech_fsmn_vad_zh-cn-16k-common-pytorch'  # VAD模型名称
+    ALIBABA_ASR_MODEL = 'iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch'  # ASR模型名称
     
     # === 音频配置 ===
     SAMPLE_RATE = 16000  # 采样率

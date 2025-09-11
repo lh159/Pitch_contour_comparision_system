@@ -1,0 +1,781 @@
+/* 实时字词同步功能的CSS样式 */
+
+/* 实时同步文本显示 */
+.sync-display-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 15px;
+    padding: 25px;
+    margin: 20px 0;
+    border: 2px solid #e9ecef;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.sync-display-container.active {
+    border-color: #667eea;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.2);
+}
+
+.sync-text-container {
+    text-align: center;
+}
+
+.sync-text {
+    font-size: 28px;
+    line-height: 1.8;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.sync-char {
+    display: inline-block;
+    padding: 8px 6px;
+    margin: 3px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    position: relative;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.sync-char:hover {
+    background: rgba(102, 126, 234, 0.1);
+    transform: scale(1.05);
+}
+
+.sync-char.highlight-current {
+    background: linear-gradient(45deg, #ff6b6b, #ffa500);
+    color: white;
+    transform: scale(1.3);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+    animation: pulse-highlight 1.2s infinite;
+    z-index: 10;
+}
+
+.sync-char.upcoming-char {
+    background: #e3f2fd;
+    color: #1976d2;
+    border: 2px dashed #1976d2;
+    animation: upcoming-glow 2s infinite;
+}
+
+.sync-char.completed-char {
+    background: #c8e6c9;
+    color: #388e3c;
+    opacity: 0.9;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.sync-char.next-char {
+    background: rgba(255, 193, 7, 0.2);
+    border: 2px solid #ffc107;
+    color: #e65100;
+}
+
+@keyframes pulse-highlight {
+    0%, 100% { 
+        transform: scale(1.3);
+        box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+    }
+    50% { 
+        transform: scale(1.4);
+        box-shadow: 0 8px 25px rgba(255, 107, 107, 0.6);
+    }
+}
+
+@keyframes upcoming-glow {
+    0%, 100% { 
+        border-color: #1976d2;
+        box-shadow: 0 0 0 rgba(25, 118, 210, 0.4);
+    }
+    50% { 
+        border-color: #42a5f5;
+        box-shadow: 0 0 15px rgba(25, 118, 210, 0.6);
+    }
+}
+
+/* 进度条样式 */
+.sync-progress {
+    width: 100%;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    margin: 20px 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    width: 0%;
+    transition: width 0.2s ease;
+    position: relative;
+}
+
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: progress-shine 2s infinite;
+}
+
+@keyframes progress-shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* 时间显示 */
+.sync-timer {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #6c757d;
+    margin-top: 10px;
+}
+
+/* 同步控制按钮 */
+.sync-controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.sync-controls .btn {
+    min-width: 120px;
+    transition: all 0.3s ease;
+}
+
+.sync-controls .btn:hover {
+    transform: translateY(-2px);
+}
+
+/* 录音指导界面 */
+.recording-guide-container {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 20px;
+    padding: 30px;
+    margin: 25px 0;
+    box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.recording-guide-container::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+    transform: rotate(45deg);
+    animation: shimmer 4s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+}
+
+/* 录音状态栏 */
+.recording-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    position: relative;
+    z-index: 1;
+}
+
+.recording-indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.recording-icon {
+    color: #ff4757;
+    animation: recording-pulse 1.5s infinite;
+    font-size: 20px;
+}
+
+@keyframes recording-pulse {
+    0%, 100% { 
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% { 
+        opacity: 0.6;
+        transform: scale(1.1);
+    }
+}
+
+.recording-icon.stopped {
+    color: #ffa726;
+    animation: none;
+}
+
+.recording-timer {
+    font-size: 24px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 8px 15px;
+    border-radius: 20px;
+    min-width: 80px;
+    text-align: center;
+}
+
+.recording-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 进度环 */
+.progress-ring {
+    position: relative;
+}
+
+.progress-ring-svg {
+    transform: rotate(-90deg);
+}
+
+.progress-ring-circle-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.2);
+    stroke-width: 3;
+}
+
+.progress-ring-circle {
+    fill: none;
+    stroke: #00ff88;
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.3s ease;
+}
+
+/* 大字显示区域 */
+.guide-text-large {
+    font-size: 42px;
+    line-height: 1.5;
+    text-align: center;
+    margin: 35px 0;
+    min-height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 1;
+}
+
+.guide-char {
+    display: inline-block;
+    padding: 15px 10px;
+    margin: 6px;
+    border-radius: 15px;
+    transition: all 0.4s ease;
+    position: relative;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.guide-char:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.guide-char.current-char {
+    background: rgba(255, 255, 255, 0.95);
+    color: #333;
+    transform: scale(1.4);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+    z-index: 10;
+    font-weight: bold;
+}
+
+.guide-char.pulse-highlight {
+    animation: guide-pulse 0.8s infinite;
+}
+
+@keyframes guide-pulse {
+    0%, 100% { 
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+        background: rgba(255, 255, 255, 0.95);
+    }
+    50% { 
+        box-shadow: 0 12px 30px rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 1);
+        transform: scale(1.45);
+    }
+}
+
+.guide-char.next-char {
+    background: rgba(255, 255, 255, 0.3);
+    border: 2px dashed rgba(255, 255, 255, 0.8);
+    animation: next-char-blink 2s infinite;
+}
+
+@keyframes next-char-blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.7; }
+}
+
+.guide-char.completed-char {
+    background: rgba(76, 175, 80, 0.4);
+    color: #c8e6c9;
+    opacity: 0.8;
+    transform: scale(0.9);
+}
+
+.guide-char.missed-char {
+    background: rgba(244, 67, 54, 0.4);
+    color: #ffcdd2;
+    text-decoration: line-through;
+    animation: missed-shake 0.5s ease-in-out;
+}
+
+@keyframes missed-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+.guide-char.early-char {
+    background: rgba(255, 193, 7, 0.4);
+    color: #fff3cd;
+    border: 2px solid #ffc107;
+}
+
+.guide-char.late-char {
+    background: rgba(255, 152, 0, 0.4);
+    color: #ffe0b2;
+    border: 2px solid #ff9800;
+}
+
+.guide-char.warning-char {
+    background: rgba(255, 235, 59, 0.3);
+    border: 2px solid #ffeb3b;
+    animation: warning-pulse 1s infinite;
+}
+
+@keyframes warning-pulse {
+    0%, 100% { 
+        border-color: #ffeb3b;
+        box-shadow: 0 0 0 rgba(255, 235, 59, 0.4);
+    }
+    50% { 
+        border-color: #ffc107;
+        box-shadow: 0 0 15px rgba(255, 235, 59, 0.6);
+    }
+}
+
+/* 实时提示区域 */
+.recording-hints {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 20px;
+    margin: 25px 0;
+    position: relative;
+    z-index: 1;
+}
+
+.current-hint {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.timing-hint {
+    font-size: 16px;
+    text-align: center;
+    margin-bottom: 15px;
+    transition: color 0.3s ease;
+}
+
+.timing-hint.warning {
+    color: #ffeb3b;
+    animation: timing-warning 1s infinite;
+}
+
+.timing-hint.urgent {
+    color: #ff5722;
+    font-weight: bold;
+    animation: timing-urgent 0.5s infinite;
+}
+
+.timing-hint.success {
+    color: #4caf50;
+}
+
+@keyframes timing-warning {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+@keyframes timing-urgent {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.upcoming-hint {
+    font-size: 14px;
+    text-align: center;
+    opacity: 0.9;
+}
+
+.upcoming-chars {
+    font-weight: bold;
+    color: #ffeb3b;
+}
+
+/* 实时反馈区域 */
+.realtime-feedback {
+    display: flex;
+    justify-content: space-around;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 15px;
+    margin: 20px 0;
+    position: relative;
+    z-index: 1;
+}
+
+.feedback-item {
+    text-align: center;
+    flex: 1;
+}
+
+.feedback-label {
+    display: block;
+    font-size: 12px;
+    opacity: 0.8;
+    margin-bottom: 5px;
+}
+
+.feedback-value {
+    font-size: 18px;
+    font-weight: bold;
+    display: block;
+}
+
+.correct-count {
+    color: #4caf50;
+}
+
+.missed-count {
+    color: #f44336;
+}
+
+.timing-score.excellent {
+    color: #4caf50;
+}
+
+.timing-score.good {
+    color: #8bc34a;
+}
+
+.timing-score.fair {
+    color: #ff9800;
+}
+
+.timing-score.poor {
+    color: #f44336;
+}
+
+/* 控制按钮 */
+.recording-controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 25px;
+    position: relative;
+    z-index: 1;
+}
+
+.guide-control-btn {
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 25px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    min-width: 140px;
+}
+
+.guide-control-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    color: white;
+}
+
+.guide-control-btn:active {
+    transform: translateY(0);
+}
+
+.guide-control-btn.btn-warning {
+    background: rgba(255, 167, 38, 0.2);
+    border-color: rgba(255, 167, 38, 0.6);
+}
+
+.guide-control-btn.btn-warning:hover {
+    background: rgba(255, 167, 38, 0.3);
+    border-color: rgba(255, 167, 38, 0.8);
+}
+
+.timing-hint.info {
+    color: #4fc3f7;
+    font-weight: 500;
+}
+
+/* 设置面板 */
+.guide-settings {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    margin-top: 20px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+}
+
+.guide-settings.collapsed .settings-content {
+    max-height: 0;
+    padding: 0 20px;
+}
+
+.settings-toggle {
+    padding: 15px 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    transition: background 0.3s ease;
+}
+
+.settings-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.settings-content {
+    max-height: 300px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.setting-item label {
+    flex: 1;
+    font-size: 14px;
+    margin: 0;
+}
+
+.setting-item input[type="range"] {
+    flex: 2;
+    margin: 0 10px;
+}
+
+.setting-item input[type="checkbox"] {
+    transform: scale(1.2);
+}
+
+/* 录音模式选择器 */
+.recording-mode-selector {
+    margin-bottom: 20px;
+}
+
+.recording-mode-selector .btn-group {
+    width: 100%;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.recording-mode-selector .btn {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    background: white;
+    color: #333;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.recording-mode-selector .btn:first-child {
+    border-radius: 10px 0 0 10px;
+}
+
+.recording-mode-selector .btn:last-child {
+    border-radius: 0 10px 10px 0;
+}
+
+.recording-mode-selector .btn-check:checked + .btn {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    color: white;
+    transform: scale(1.02);
+    z-index: 2;
+}
+
+.recording-mode-selector .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .sync-text {
+        font-size: 24px;
+        line-height: 1.6;
+    }
+    
+    .guide-text-large {
+        font-size: 32px;
+        line-height: 1.4;
+        min-height: 120px;
+    }
+    
+    .guide-char {
+        padding: 12px 8px;
+        margin: 4px;
+        font-size: 32px;
+    }
+    
+    .recording-hints {
+        padding: 15px;
+    }
+    
+    .current-hint {
+        font-size: 18px;
+    }
+    
+    .timing-hint {
+        font-size: 14px;
+    }
+    
+    .recording-controls {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .guide-control-btn {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .realtime-feedback {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .recording-status {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .sync-controls {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .sync-controls .btn {
+        min-width: auto;
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .sync-text {
+        font-size: 20px;
+    }
+    
+    .guide-text-large {
+        font-size: 28px;
+    }
+    
+    .recording-guide-container {
+        padding: 20px;
+        margin: 15px 0;
+    }
+    
+    .sync-display-container {
+        padding: 20px;
+        margin: 15px 0;
+    }
+}
+
+/* 动画增强 */
+@keyframes correctPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); box-shadow: 0 0 20px rgba(76, 175, 80, 0.6); }
+    100% { transform: scale(1); }
+}
+
+/* 无障碍增强 */
+.sync-char:focus,
+.guide-char:focus {
+    outline: 3px solid #fff;
+    outline-offset: 2px;
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+    .sync-char.highlight-current {
+        background: #000;
+        color: #fff;
+    }
+    
+    .guide-char.current-char {
+        background: #000;
+        color: #fff;
+        border: 3px solid #fff;
+    }
+}
+
+/* 减动效模式支持 */
+@media (prefers-reduced-motion: reduce) {
+    .sync-char,
+    .guide-char,
+    .progress-bar,
+    .guide-control-btn {
+        transition: none;
+        animation: none;
+    }
+    
+    .sync-char.highlight-current,
+    .guide-char.pulse-highlight {
+        animation: none;
+    }
+}

@@ -6,6 +6,7 @@
     <title>音高曲线比对系统</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/realtime-sync.css') }}" rel="stylesheet">
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -203,6 +204,45 @@
             padding: 15px 20px;
         }
         
+        .recording-status-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            background: linear-gradient(45deg, #dc3545, #e74c3c);
+            color: white;
+            border-radius: 8px;
+            margin: 10px 0;
+            box-shadow: 0 2px 10px rgba(220, 53, 69, 0.3);
+        }
+        
+        .recording-pulse {
+            width: 12px;
+            height: 12px;
+            background: white;
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+        }
+        
+        .status-text {
+            font-weight: 500;
+        }
+        
+        .recording-guide-area {
+            margin: 15px 0;
+            border: 2px dashed #28a745;
+            border-radius: 10px;
+            padding: 20px;
+            background: #f8fff8;
+            min-height: 200px;
+        }
+        
+        .guide-container-placeholder {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+        }
+        
         @media (max-width: 768px) {
             .main-container {
                 margin: 10px;
@@ -216,6 +256,11 @@
             .audio-controls {
                 flex-direction: column;
                 gap: 10px;
+            }
+            
+            .recording-status-bar {
+                flex-direction: column;
+                text-align: center;
             }
         }
     </style>
@@ -266,15 +311,16 @@
                 </div>
             </div>
 
-            <!-- 步骤2: 标准发音 -->
+            <!-- 步骤2: 标准发音播放与同步预览 -->
             <div class="step-card" id="standardAudioCard" style="display: none;">
                 <div class="step-header">
                     <h4 class="mb-0">
                         <span class="step-number">2</span>
-                        标准发音播放
+                        标准发音播放与同步预览
                     </h4>
                 </div>
                 <div class="card-body p-4">
+                    <!-- 原有的音频控件 -->
                     <div class="audio-controls">
                         <audio controls class="flex-grow-1" id="standardAudio" preload="metadata">
                             您的浏览器不支持音频播放
@@ -283,23 +329,48 @@
                             <i class="fas fa-chart-line me-2"></i>
                             分析音高
                         </button>
+                        <button class="btn btn-outline-success" id="toggleSyncBtn">
+                            <i class="fas fa-sync-alt me-2"></i>
+                            启用同步显示
+                        </button>
                     </div>
+                    
+                    <!-- 新增：实时同步文本显示区域 -->
+                    <div class="sync-display-container" id="syncDisplayContainer" style="display: none;">
+                        <div class="sync-text-area" id="syncTextArea">
+                            <!-- 同步文本将在这里动态生成 -->
+                        </div>
+                    </div>
+                    
                     <div class="alert alert-success alert-custom">
                         <i class="fas fa-lightbulb me-2"></i>
-                        <strong>提示:</strong> 请仔细听标准发音，注意音调的起伏变化，然后模仿录制
+                        <strong>提示:</strong> 启用同步显示可以看到每个字的朗读时机，帮助您更好地掌握节奏
                     </div>
                 </div>
             </div>
 
-            <!-- 步骤3: 用户录音 -->
+            <!-- 步骤3: 录制您的发音（带实时指导） -->
             <div class="step-card" id="recordingCard" style="display: none;">
                 <div class="step-header">
                     <h4 class="mb-0">
                         <span class="step-number">3</span>
-                        录制您的发音
+                        录制您的发音（带实时指导）
                     </h4>
                 </div>
                 <div class="card-body p-4">
+                    <!-- 录音模式选择 -->
+                    <div class="recording-mode-selector mb-3">
+                        <label class="form-label">录音模式:</label>
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="recordingMode" id="freeMode" value="free" checked>
+                            <label class="btn btn-outline-primary" for="freeMode">自由录音</label>
+                            
+                            <input type="radio" class="btn-check" name="recordingMode" id="guidedMode" value="guided">
+                            <label class="btn btn-outline-success" for="guidedMode">实时指导录音</label>
+                        </div>
+                    </div>
+                    
+                    <!-- 原有的录音控件 -->
                     <div class="audio-controls">
                         <button class="btn btn-danger" id="recordBtn">
                             <i class="fas fa-microphone me-2"></i>
@@ -315,10 +386,29 @@
                         </button>
                     </div>
                     
+                    <!-- 录音状态指示器 -->
+                    <div class="recording-status-bar" id="recordingStatusBar" style="display: none;">
+                        <div class="status-indicator recording-pulse"></div>
+                        <span class="status-text">录音进行中...</span>
+                        <button class="btn btn-sm btn-danger ms-auto" id="quickStopBtn">
+                            <i class="fas fa-stop"></i> 立即停止
+                        </button>
+                    </div>
+                    
+                    <!-- 实时指导区域 -->
+                    <div class="recording-guide-area" id="recordingGuideArea" style="display: none;">
+                        <div class="guide-container-placeholder">
+                            <i class="fas fa-magic me-2"></i>
+                            实时录音指导区域<br>
+                            <small>选择"实时指导录音"模式并开始录音后，这里将显示实时朗读提示</small>
+                        </div>
+                    </div>
+                    
+                    <!-- 原有的波形容器和音频播放器 -->
                     <div class="waveform-container" id="waveformContainer">
                         <span class="text-muted">
                             <i class="fas fa-microphone me-2"></i>
-                            点击"开始录音"进行录制
+                            选择录音模式并点击"开始录音"
                         </span>
                     </div>
                     
@@ -408,6 +498,13 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    
+    <!-- 实时同步组件 -->
+    <script src="{{ url_for('static', filename='js/realtime-sync.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/recording-guide.js') }}"></script>
+    
     <!-- 主要JavaScript代码 -->
     <script>
         // 全局变量
@@ -416,6 +513,10 @@
         let standardFileId = null;
         let userFileId = null;
         let currentText = '';
+        let currentCharTimestamps = [];
+        let realtimeSync = null;
+        let recordingGuide = null;
+        let socket = null;
         
         // DOM元素
         const textInput = document.getElementById('textInput');
@@ -434,8 +535,15 @@
         
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOM加载完成，开始初始化...');
             checkSystemStatus();
             setupEventListeners();
+            initializeWebSocket();
+            
+            // 额外验证录音模式切换功能
+            setTimeout(() => {
+                validateRecordingModeSwitch();
+            }, 1000);
         });
         
         // 检查系统状态
@@ -479,6 +587,29 @@
             });
             document.getElementById('audioFileInput').addEventListener('change', handleFileUpload);
             
+            // 快速停止按钮
+            const quickStopBtn = document.getElementById('quickStopBtn');
+            if (quickStopBtn) {
+                quickStopBtn.addEventListener('click', () => {
+                    console.log('快速停止按钮被点击');
+                    forceStopRecording();
+                });
+            }
+            
+            // 实时同步相关事件
+            const toggleSyncBtn = document.getElementById('toggleSyncBtn');
+            if (toggleSyncBtn) {
+                toggleSyncBtn.addEventListener('click', toggleRealtimeSync);
+            }
+            
+            // 录音模式切换事件
+            const recordingModeInputs = document.querySelectorAll('input[name="recordingMode"]');
+            console.log('🎛️ 找到录音模式切换元素:', recordingModeInputs.length);
+            recordingModeInputs.forEach((input, index) => {
+                console.log(`  元素 ${index}: id=${input.id}, value=${input.value}`);
+                input.addEventListener('change', handleRecordingModeChange);
+            });
+            
             // 回车键触发生成
             textInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
@@ -487,7 +618,7 @@
             });
         }
         
-        // 生成标准音频
+        // 生成标准音频（增强版，支持时间戳）
         async function generateStandardAudio() {
             const text = textInput.value.trim();
             if (!text) {
@@ -500,15 +631,32 @@
             generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>生成中...';
             
             try {
-                const response = await fetch('/api/tts/generate', {
+                // 优先使用带时间戳的API
+                let response = await fetch('/api/tts/generate_with_timestamps', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ text: text })
+                    body: JSON.stringify({ 
+                        text: text,
+                        method: 'auto'  // 自动选择最佳时间戳生成方法
+                    })
                 });
                 
-                const data = await response.json();
+                let data = await response.json();
+                
+                // 如果新API不可用，降级到旧API
+                if (!data.success) {
+                    console.log('时间戳API不可用，降级到标准TTS API');
+                    response = await fetch('/api/tts/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ text: text })
+                    });
+                    data = await response.json();
+                }
                 
                 if (data.success) {
                     standardFileId = data.file_id;
@@ -516,7 +664,28 @@
                     standardAudioCard.style.display = 'block';
                     recordingCard.style.display = 'block';
                     
-                    showAlert(`成功生成标准发音！时长: ${data.pitch_info.duration.toFixed(2)}秒`, 'success');
+                    // 保存时间戳数据
+                    currentCharTimestamps = data.char_timestamps || [];
+                    
+                    let message = `成功生成标准发音！时长: ${data.pitch_info.duration.toFixed(2)}秒`;
+                    
+                    if (currentCharTimestamps.length > 0) {
+                        message += ` | 时间戳: ${currentCharTimestamps.length}个字符 (${data.timestamp_method})`;
+                        
+                        // 显示同步按钮
+                        const toggleSyncBtn = document.getElementById('toggleSyncBtn');
+                        if (toggleSyncBtn) {
+                            toggleSyncBtn.style.display = 'inline-block';
+                        }
+                    } else {
+                        message += ' | 未获取到时间戳数据';
+                    }
+                    
+                    if (data.warning) {
+                        message += ` | 警告: ${data.warning}`;
+                    }
+                    
+                    showAlert(message, 'success');
                 } else {
                     showAlert(`生成失败: ${data.error}`, 'danger');
                 }
@@ -528,10 +697,24 @@
             }
         }
         
-        // 开始录音
+        // 开始录音（增强版，支持实时指导）
         async function startRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // 检查录音模式
+                const guidedMode = document.getElementById('guidedMode').checked;
+                
+                // 如果是指导模式，启动录音指导
+                if (guidedMode) {
+                    const guideStarted = startRecordingGuide();
+                    if (!guideStarted) {
+                        // 指导启动失败，切换到自由模式
+                        document.getElementById('freeMode').checked = true;
+                        handleRecordingModeChange({ target: { value: 'free' } });
+                        showAlert('已切换到自由录音模式', 'info');
+                    }
+                }
                 
                 // 尝试使用WAV格式，如果不支持则使用默认格式
                 let options = {};
@@ -559,6 +742,11 @@
                     userAudio.src = audioUrl;
                     userAudio.style.display = 'block';
                     
+                    // 停止录音指导
+                    if (recordingGuide) {
+                        recordingGuide.stopGuide();
+                    }
+                    
                     // 上传录音
                     uploadRecording(audioBlob);
                 };
@@ -567,27 +755,87 @@
                 
                 recordBtn.disabled = true;
                 stopBtn.disabled = false;
-                waveformContainer.classList.add('recording');
-                waveformContainer.innerHTML = '<i class="fas fa-microphone text-danger me-2"></i>录音中...';
+                
+                // 显示录音状态栏
+                const statusBar = document.getElementById('recordingStatusBar');
+                if (statusBar) {
+                    statusBar.style.display = 'flex';
+                }
+                
+                if (guidedMode) {
+                    waveformContainer.innerHTML = '<i class="fas fa-microphone text-danger me-2"></i>正在录音中... 请跟随上方的实时指导进行朗读';
+                } else {
+                    waveformContainer.classList.add('recording');
+                    waveformContainer.innerHTML = '<i class="fas fa-microphone text-danger me-2"></i>录音中... 可以点击上方的"立即停止"按钮结束录音';
+                }
                 
             } catch (error) {
                 showAlert('无法访问麦克风，请检查权限设置', 'danger');
             }
         }
         
-        // 停止录音
+        // 停止录音（增强版）
         function stopRecording() {
+            console.log('停止录音被调用');
             if (mediaRecorder && mediaRecorder.state === 'recording') {
                 mediaRecorder.stop();
                 
                 recordBtn.disabled = false;
                 stopBtn.disabled = true;
                 waveformContainer.classList.remove('recording');
-                waveformContainer.innerHTML = '<i class="fas fa-check text-success me-2"></i>录音完成';
+                
+                // 隐藏录音状态栏
+                const statusBar = document.getElementById('recordingStatusBar');
+                if (statusBar) {
+                    statusBar.style.display = 'none';
+                }
+                
+                // 检查录音模式
+                const guidedMode = document.getElementById('guidedMode').checked;
+                
+                if (guidedMode) {
+                    waveformContainer.innerHTML = '<i class="fas fa-check text-success me-2"></i>录音和指导完成';
+                    
+                    // 停止录音指导并获取结果
+                    if (recordingGuide) {
+                        const result = recordingGuide.getGuidanceResult();
+                        console.log('录音指导结果:', result);
+                        
+                        // 显示简要统计
+                        if (result.stats) {
+                            const accuracy = result.stats.accuracy || 0;
+                            showAlert(`录音指导完成！准确率: ${accuracy.toFixed(1)}%`, 
+                                     accuracy >= 80 ? 'success' : accuracy >= 60 ? 'warning' : 'info');
+                        }
+                        
+                        recordingGuide.stopGuide();
+                        recordingGuide = null;
+                    }
+                } else {
+                    waveformContainer.innerHTML = '<i class="fas fa-check text-success me-2"></i>录音完成';
+                }
                 
                 // 停止所有音频轨道
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                if (mediaRecorder.stream) {
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
             }
+        }
+        
+        // 强制停止录音（用于快速停止按钮）
+        function forceStopRecording() {
+            console.log('强制停止录音');
+            
+            // 停止录音指导
+            if (recordingGuide) {
+                recordingGuide.stopGuide();
+                recordingGuide = null;
+            }
+            
+            // 停止录音
+            stopRecording();
+            
+            showAlert('录音已强制停止', 'info');
         }
         
         // 上传录音
@@ -736,11 +984,30 @@
             compareBtn.style.display = 'none';
             resultContainer.style.display = 'none';
             waveformContainer.classList.remove('recording');
-            waveformContainer.innerHTML = '<span class="text-muted"><i class="fas fa-microphone me-2"></i>点击"开始录音"进行录制</span>';
+            
+            // 隐藏录音状态栏
+            const statusBar = document.getElementById('recordingStatusBar');
+            if (statusBar) {
+                statusBar.style.display = 'none';
+            }
+            
+            // 根据当前模式设置提示文本
+            const guidedMode = document.getElementById('guidedMode').checked;
+            if (guidedMode) {
+                waveformContainer.innerHTML = '<span class="text-muted"><i class="fas fa-magic me-2"></i>实时指导模式：点击"开始录音"后将根据标准发音的时间戳为您提供实时朗读提示</span>';
+            } else {
+                waveformContainer.innerHTML = '<span class="text-muted"><i class="fas fa-microphone me-2"></i>自由录音模式：点击"开始录音"进行录制</span>';
+            }
             
             // 重置按钮状态
             recordBtn.disabled = false;
             stopBtn.disabled = true;
+            
+            // 清理录音指导组件
+            if (recordingGuide) {
+                recordingGuide.stopGuide();
+                recordingGuide = null;
+            }
         }
         
         // 练习新词汇
@@ -768,6 +1035,264 @@
             textInput.focus();
         }
         
+        // 初始化WebSocket连接
+        function initializeWebSocket() {
+            if (typeof io !== 'undefined') {
+                try {
+                    socket = io();
+                    
+                    socket.on('connect', () => {
+                        console.log('WebSocket连接成功');
+                    });
+                    
+                    socket.on('disconnect', () => {
+                        console.log('WebSocket连接断开');
+                    });
+                    
+                    socket.on('error', (error) => {
+                        console.error('WebSocket错误:', error);
+                    });
+                    
+                } catch (error) {
+                    console.warn('WebSocket初始化失败:', error);
+                }
+            } else {
+                console.warn('Socket.IO不可用，实时同步功能将被禁用');
+            }
+        }
+        
+        // 切换实时同步显示
+        function toggleRealtimeSync() {
+            const syncContainer = document.getElementById('syncDisplayContainer');
+            const toggleBtn = document.getElementById('toggleSyncBtn');
+            
+            if (!currentCharTimestamps.length) {
+                showAlert('无时间戳数据，无法启用实时同步', 'warning');
+                return;
+            }
+            
+            if (syncContainer.style.display === 'none' || !syncContainer.style.display) {
+                // 启用同步显示
+                syncContainer.style.display = 'block';
+                syncContainer.classList.add('active');
+                toggleBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>关闭同步显示';
+                toggleBtn.classList.remove('btn-outline-success');
+                toggleBtn.classList.add('btn-success');
+                
+                // 初始化实时同步组件
+                initializeRealtimeSync();
+                
+            } else {
+                // 关闭同步显示
+                syncContainer.style.display = 'none';
+                syncContainer.classList.remove('active');
+                toggleBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>启用同步显示';
+                toggleBtn.classList.remove('btn-success');
+                toggleBtn.classList.add('btn-outline-success');
+                
+                // 销毁同步组件
+                if (realtimeSync) {
+                    realtimeSync.destroy();
+                    realtimeSync = null;
+                }
+            }
+        }
+        
+        // 初始化实时同步组件
+        function initializeRealtimeSync() {
+            const syncTextArea = document.getElementById('syncTextArea');
+            
+            if (!syncTextArea || !currentCharTimestamps.length) {
+                console.warn('无法初始化实时同步组件');
+                return;
+            }
+            
+            try {
+                // 创建实时同步组件
+                realtimeSync = new RealtimeTextSync(syncTextArea, {
+                    highlightClass: 'highlight-current',
+                    upcomingClass: 'upcoming-char',
+                    completedClass: 'completed-char'
+                });
+                
+                // 加载文本和时间戳
+                realtimeSync.loadText(currentText, currentCharTimestamps);
+                
+                // 设置事件回调
+                realtimeSync.setCallback('onCharacterChange', (index, char, timestamp) => {
+                    console.log(`当前字符: ${char} (索引: ${index})`);
+                    
+                    // 发送同步状态到服务器
+                    if (socket && socket.connected) {
+                        socket.emit('sync_position', {
+                            session_id: standardFileId,
+                            current_time: timestamp.start_time,
+                            char_index: index
+                        });
+                    }
+                });
+                
+                // 绑定音频
+                const audio = document.getElementById('standardAudio');
+                if (audio) {
+                    realtimeSync.startSync(audio);
+                }
+                
+                console.log('实时同步组件初始化成功');
+                
+            } catch (error) {
+                console.error('实时同步组件初始化失败:', error);
+                showAlert('实时同步功能初始化失败', 'danger');
+            }
+        }
+        
+        // 处理录音模式切换
+        function handleRecordingModeChange(event) {
+            console.log('🔄 录音模式切换:', event.target.value);
+            const mode = event.target.value;
+            const guideArea = document.getElementById('recordingGuideArea');
+            const waveformContainer = document.getElementById('waveformContainer');
+            const statusBar = document.getElementById('recordingStatusBar');
+            
+            console.log('DOM元素检查:', {
+                guideArea: !!guideArea,
+                waveformContainer: !!waveformContainer,
+                statusBar: !!statusBar,
+                currentCharTimestamps: currentCharTimestamps.length
+            });
+            
+            // 如果正在录音，先停止
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                showAlert('正在录音中，请先停止录音再切换模式', 'warning');
+                return;
+            }
+            
+            if (mode === 'guided') {
+                console.log('切换到实时指导模式');
+                // 检查是否有时间戳数据
+                if (!currentCharTimestamps.length) {
+                    console.warn('缺少时间戳数据，无法启用实时指导');
+                    showAlert('需要先生成带时间戳的标准发音才能使用实时指导模式', 'warning');
+                    // 重置到自由模式
+                    document.getElementById('freeMode').checked = true;
+                    return;
+                }
+                
+                console.log('显示实时指导区域');
+                // 显示指导区域
+                guideArea.style.display = 'block';
+                waveformContainer.innerHTML = `
+                    <span class="text-muted">
+                        <i class="fas fa-magic me-2"></i>
+                        实时指导模式：点击"开始录音"后将根据标准发音的时间戳为您提供实时朗读提示
+                    </span>
+                `;
+                
+                showAlert('已切换到实时指导录音模式，开始录音后将显示实时提示', 'success');
+                
+            } else {
+                console.log('切换到自由录音模式');
+                // 隐藏指导区域
+                guideArea.style.display = 'none';
+                waveformContainer.innerHTML = `
+                    <span class="text-muted">
+                        <i class="fas fa-microphone me-2"></i>
+                        自由录音模式：点击"开始录音"进行录制
+                    </span>
+                `;
+                
+                // 清理录音指导组件
+                if (recordingGuide) {
+                    recordingGuide.stopGuide();
+                    recordingGuide = null;
+                }
+                
+                showAlert('已切换到自由录音模式', 'info');
+            }
+        }
+        
+        // 启动录音指导
+        function startRecordingGuide() {
+            const guideArea = document.getElementById('recordingGuideArea');
+            
+            if (!currentCharTimestamps.length) {
+                showAlert('无时间戳数据，无法启动录音指导', 'warning');
+                return false;
+            }
+            
+            try {
+                // 创建录音指导组件
+                recordingGuide = new RecordingGuide(guideArea, {
+                    showRecordingHints: true,
+                    enableVoiceDetection: false,  // 暂时禁用语音检测
+                    missedThreshold: 0.5
+                });
+                
+                // 开始指导
+                recordingGuide.startRecordingGuide(currentCharTimestamps, {
+                    enableVoiceDetection: false,
+                    warningBeforeTime: 0.5
+                });
+                
+                // 监听指导停止事件
+                guideArea.addEventListener('guidestopped', (event) => {
+                    const result = event.detail;
+                    console.log('录音指导结束:', result);
+                    
+                    // 发送指导结果到服务器
+                    if (socket && socket.connected) {
+                        socket.emit('recording_guide_stopped', {
+                            session_id: standardFileId,
+                            progress: result.progress,
+                            stats: result.stats,
+                            duration: result.duration
+                        });
+                    }
+                });
+                
+                console.log('录音指导启动成功');
+                return true;
+                
+            } catch (error) {
+                console.error('录音指导启动失败:', error);
+                showAlert('录音指导功能启动失败', 'danger');
+                return false;
+            }
+        }
+        
+        // 验证录音模式切换功能
+        function validateRecordingModeSwitch() {
+            console.log('🔍 验证录音模式切换功能...');
+            
+            const guidedMode = document.getElementById('guidedMode');
+            const freeMode = document.getElementById('freeMode');
+            const recordingGuideArea = document.getElementById('recordingGuideArea');
+            const waveformContainer = document.getElementById('waveformContainer');
+            
+            console.log('DOM元素检查:', {
+                guidedMode: !!guidedMode,
+                freeMode: !!freeMode,
+                recordingGuideArea: !!recordingGuideArea,
+                waveformContainer: !!waveformContainer,
+                RecordingGuide: typeof RecordingGuide !== 'undefined',
+                RealtimeTextSync: typeof RealtimeTextSync !== 'undefined'
+            });
+            
+            // 测试事件监听器
+            if (guidedMode) {
+                console.log('测试点击 guidedMode...');
+                const event = new Event('change', { bubbles: true });
+                guidedMode.checked = true;
+                guidedMode.dispatchEvent(event);
+                
+                setTimeout(() => {
+                    console.log('测试点击 freeMode...');
+                    freeMode.checked = true;
+                    freeMode.dispatchEvent(event);
+                }, 2000);
+            }
+        }
+        
         // 显示警告信息
         function showAlert(message, type = 'info') {
             // 移除现有的警告
@@ -790,7 +1315,7 @@
                 if (alertDiv.parentNode) {
                     alertDiv.remove();
                 }
-            }, 5000);
+            }, 8000);  // 延长显示时间以便阅读更长的消息
         }
     </script>
 </body>
