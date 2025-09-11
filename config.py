@@ -12,20 +12,10 @@ class Config:
     """系统配置类"""
     
     # === TTS配置 ===
-    # Azure TTS配置
-    AZURE_SPEECH_KEY = os.getenv('AZURE_SPEECH_KEY', '')
-    AZURE_SPEECH_REGION = os.getenv('AZURE_SPEECH_REGION', 'eastasia')
-    AZURE_VOICE_NAME = 'zh-CN-XiaoxiaoNeural'  # 标准女声
-    
     # 百度TTS配置
     BAIDU_API_KEY = os.getenv('BAIDU_API_KEY', '')
     BAIDU_SECRET_KEY = os.getenv('BAIDU_SECRET_KEY', '')
     BAIDU_VOICE_PER = int(os.getenv('BAIDU_VOICE_PER', '0'))  # 发音人，0=度小美
-    
-    # 腾讯TTS配置 
-    TENCENT_SECRET_ID = os.getenv('TENCENT_SECRET_ID', '')
-    TENCENT_SECRET_KEY = os.getenv('TENCENT_SECRET_KEY', '')
-    TENCENT_VOICE_TYPE = int(os.getenv('TENCENT_VOICE_TYPE', '101001'))  # 音色
     
     # === 阿里达摩院语音配置 ===
     ALIBABA_PARAFORMER_API_KEY = os.getenv('ALIBABA_PARAFORMER_API_KEY', '')

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 TTS模块 - 文本转语音功能
-支持多种TTS服务：百度TTS、腾讯云TTS、Azure TTS、Edge TTS、离线TTS
+支持多种TTS服务：百度TTS、Edge TTS、离线TTS
 """
 import os
 import io
@@ -55,90 +55,6 @@ class BaiduTTS(TTSBase):
             print(f"百度TTS合成失败: {e}")
             return False
 
-class TencentTTS(TTSBase):
-    """腾讯云TTS"""
-    
-    def __init__(self):
-        self.secret_id = Config.TENCENT_SECRET_ID
-        self.secret_key = Config.TENCENT_SECRET_KEY
-        self.voice_type = Config.TENCENT_VOICE_TYPE
-        
-        if not self.secret_id or not self.secret_key:
-            raise ValueError("腾讯云TTS密钥未配置，请在.env文件中设置TENCENT_SECRET_ID和TENCENT_SECRET_KEY")
-    
-    def synthesize(self, text: str, output_path: str) -> bool:
-        """使用腾讯云TTS合成语音"""
-        try:
-            from tts_engines.tencent_tts import TencentTTS as TencentTTSEngine
-            
-            engine = TencentTTSEngine(self.secret_id, self.secret_key)
-            result = engine.synthesize(text, output_path, VoiceType=self.voice_type)
-            
-            if result:
-                print(f"腾讯云TTS成功合成: {text} -> {output_path}")
-                return True
-            else:
-                print(f"腾讯云TTS合成失败")
-                return False
-                
-        except ImportError as e:
-            print(f"腾讯云TTS引擎导入失败: {e}")
-            return False
-        except Exception as e:
-            print(f"腾讯云TTS合成失败: {e}")
-            return False
-
-class AzureTTS(TTSBase):
-    """Azure认知服务TTS"""
-    
-    def __init__(self):
-        self.speech_key = Config.AZURE_SPEECH_KEY
-        self.region = Config.AZURE_SPEECH_REGION
-        self.voice_name = Config.AZURE_VOICE_NAME
-        
-        if not self.speech_key:
-            raise ValueError("Azure Speech Key未配置，请在.env文件中设置AZURE_SPEECH_KEY")
-    
-    def synthesize(self, text: str, output_path: str) -> bool:
-        """使用Azure TTS合成语音"""
-        try:
-            import azure.cognitiveservices.speech as speechsdk
-            
-            # 配置语音服务
-            speech_config = speechsdk.SpeechConfig(
-                subscription=self.speech_key,
-                region=self.region
-            )
-            speech_config.speech_synthesis_voice_name = self.voice_name
-            speech_config.set_speech_synthesis_output_format(
-                speechsdk.SpeechSynthesisOutputFormat.Riff16Khz16BitMonoPcm
-            )
-            
-            # 配置音频输出
-            audio_config = speechsdk.audio.AudioOutputConfig(filename=output_path)
-            
-            # 创建合成器
-            synthesizer = speechsdk.SpeechSynthesizer(
-                speech_config=speech_config,
-                audio_config=audio_config
-            )
-            
-            # 合成语音
-            result = synthesizer.speak_text_async(text).get()
-            
-            if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
-                print(f"Azure TTS成功合成: {text} -> {output_path}")
-                return True
-            else:
-                print(f"Azure TTS合成失败: {result.reason}")
-                return False
-                
-        except ImportError:
-            print("Azure TTS SDK未安装，请安装: pip install azure-cognitiveservices-speech")
-            return False
-        except Exception as e:
-            print(f"Azure TTS合成失败: {e}")
-            return False
 
 class EdgeTTS(TTSBase):
     """Edge TTS (免费替代方案)"""
@@ -223,22 +139,6 @@ class TTSManager:
             print("✓ 百度TTS 初始化成功")
         except Exception as e:
             print(f"✗ 百度TTS 初始化失败: {e}")
-        
-        # 尝试初始化腾讯云TTS
-        try:
-            tencent_tts = TencentTTS()
-            self.tts_engines.append(("腾讯云TTS", tencent_tts))
-            print("✓ 腾讯云TTS 初始化成功")
-        except Exception as e:
-            print(f"✗ 腾讯云TTS 初始化失败: {e}")
-        
-        # 尝试初始化Azure TTS
-        try:
-            azure_tts = AzureTTS()
-            self.tts_engines.append(("Azure TTS", azure_tts))
-            print("✓ Azure TTS 初始化成功")
-        except Exception as e:
-            print(f"✗ Azure TTS 初始化失败: {e}")
         
         # 尝试初始化Edge TTS
         try:

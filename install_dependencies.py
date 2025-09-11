@@ -34,7 +34,6 @@ class DependencyInstaller:
         
         self.optional_packages = {
             # TTS选项
-            'azure-cognitiveservices-speech': 'azure-cognitiveservices-speech>=1.19.0',
             'edge-tts': 'edge-tts>=6.1.0',
             'pyttsx3': 'pyttsx3>=2.90',
             
@@ -94,7 +93,7 @@ class DependencyInstaller:
                 print(f"⚠️  缺少: {package_name} (可选)")
                 
                 # 询问是否安装可选包
-                if package_name in ['azure-cognitiveservices-speech', 'edge-tts', 'pyttsx3']:
+                if package_name in ['edge-tts', 'pyttsx3']:
                     response = input(f"是否安装 {package_name}? (y/n): ").lower().strip()
                     if response in ['y', 'yes', '是']:
                         if self.install_package(package_spec):
@@ -115,10 +114,11 @@ class DependencyInstaller:
         env_content = """# 音高曲线比对系统环境变量配置
 # 请根据需要修改以下配置
 
-# === Azure TTS配置 ===
-# 请在 Azure 官网申请 Speech Services 服务并获取密钥
-AZURE_SPEECH_KEY=your_azure_speech_key_here
-AZURE_SPEECH_REGION=eastasia
+# === 百度TTS配置（推荐）===
+# 请在百度智能云申请TTS服务并获取密钥
+BAIDU_API_KEY=your_baidu_api_key_here
+BAIDU_SECRET_KEY=your_baidu_secret_key_here
+BAIDU_VOICE_PER=0
 
 # === 系统配置 ===
 SECRET_KEY=your_secret_key_here_change_in_production
@@ -126,8 +126,8 @@ DEBUG=true
 PORT=5000
 
 # === 使用说明 ===
-# 1. 如果要使用Azure TTS，请填写上面的AZURE_SPEECH_KEY和AZURE_SPEECH_REGION
-# 2. 如果不使用Azure TTS，系统会自动尝试其他TTS引擎
+# 1. 推荐使用百度TTS，性价比高，免费额度大
+# 2. 如果不配置百度TTS，系统会尝试其他TTS引擎（Edge TTS、离线TTS）
 # 3. 生产环境中请将DEBUG设置为false，并更改SECRET_KEY
 """
         

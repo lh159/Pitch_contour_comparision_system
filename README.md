@@ -18,7 +18,7 @@
 - 🎨 **智能对比算法**: DTW时间对齐 + 多维度相似度计算
 - 📊 **可视化分析**: 直观的音高曲线对比图表
 - 🎯 **智能评分**: 四维度评分体系，提供个性化改进建议
-- 🔊 **多TTS支持**: Azure TTS、Edge TTS、离线TTS多重选择
+- 🔊 **多TTS支持**: 百度TTS、Edge TTS、离线TTS多重选择
 - 🌐 **Web界面**: 现代化响应式设计，支持在线录音
 
 ## 🚀 快速开始
@@ -50,17 +50,18 @@ python install_dependencies.py
 
 ### 3. 配置TTS服务（可选）
 
-如果需要使用Azure TTS（推荐），请：
+如果需要使用百度TTS（推荐），请：
 
-1. 在Azure官网申请Speech Services服务
+1. 在百度智能云申请TTS服务并获取密钥
 2. 编辑 `.env` 文件，填入你的密钥：
 
 ```env
-AZURE_SPEECH_KEY=your_azure_speech_key_here
-AZURE_SPEECH_REGION=eastasia
+BAIDU_API_KEY=your_baidu_api_key_here
+BAIDU_SECRET_KEY=your_baidu_secret_key_here
+BAIDU_VOICE_PER=0
 ```
 
-> 💡 **提示**: 系统支持多种TTS服务，即使不配置Azure也能正常运行
+> 💡 **提示**: 系统支持多种TTS服务，即使不配置百度TTS也能正常运行（会使用Edge TTS或离线TTS）
 
 ### 4. 启动系统
 
@@ -132,7 +133,7 @@ print(f"得分: {result['score']['total_score']}")
 
 系统支持多种TTS服务，按优先级自动选择：
 
-1. **Azure TTS** - 质量最高，需要API密钥
+1. **百度TTS** - 质量高，性价比好，需要API密钥
 2. **Edge TTS** - 免费使用，质量良好
 3. **离线TTS** - 本地合成，无需网络
 
@@ -290,9 +291,8 @@ CMD ["python", "web_interface.py"]
 
 支持部署到各大云平台：
 - 阿里云
-- 腾讯云  
-- Azure
 - AWS
+- Google Cloud
 
 ## 🤝 贡献指南
 
@@ -319,7 +319,7 @@ CMD ["python", "web_interface.py"]
 
 - [parselmouth](https://github.com/YannickJadoul/Parselmouth) - 音频分析核心
 - [Flask](https://flask.palletsprojects.com/) - Web框架
-- [Azure Cognitive Services](https://azure.microsoft.com/services/cognitive-services/) - TTS服务
+- [百度智能云TTS](https://cloud.baidu.com/product/speech) - TTS服务
 - [Bootstrap](https://getbootstrap.com/) - 前端UI框架
 
 ## 📮 联系我们
