@@ -263,6 +263,61 @@
                 text-align: center;
             }
         }
+        
+        /* 准备阶段样式 */
+        .preparation-hint {
+            position: relative;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            border-radius: 15px;
+            padding: 25px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(79, 172, 254, 0.3);
+            animation: fadeInScale 0.5s ease-out;
+            margin-bottom: 20px;
+        }
+        
+        .preparation-content h4 {
+            margin: 0 0 15px 0;
+            font-size: 1.4em;
+            font-weight: 600;
+        }
+        
+        .preparation-content p {
+            margin: 0 0 20px 0;
+            font-size: 1.1em;
+            line-height: 1.5;
+        }
+        
+        .preparation-text {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 1.2em;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            line-height: 1.6;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        #countdown {
+            font-weight: bold;
+            font-size: 1.3em;
+            color: #ffeb3b;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
     </style>
 </head>
 <body>
@@ -1251,10 +1306,14 @@
                     missedThreshold: 0.5
                 });
                 
-                // 开始指导
+                // 开始指导（使用新的配置参数）
                 recordingGuide.startRecordingGuide(currentCharTimestamps, {
                     enableVoiceDetection: false,
-                    warningBeforeTime: 0.5
+                    warningBeforeTime: 0.5,
+                    reactionTime: 0.5,        // 用户反应时间补偿
+                    preparationTime: 3.0,     // 录音前准备时间
+                    flexibleWindow: 1.0,      // 宽松时间窗口
+                    enablePreparationPhase: true  // 启用准备阶段
                 });
                 
                 // 监听指导停止事件

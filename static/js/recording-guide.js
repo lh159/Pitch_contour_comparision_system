@@ -29,7 +29,11 @@ class RecordingGuide extends RealtimeTextSync {
             warningBeforeTime: 0.5,   // 提前多久开始警告
             autoAdvanceTime: 0.2,     // 自动推进时间
             enableVoiceDetection: false, // 是否启用语音检测
-            enableHapticFeedback: false  // 是否启用触觉反馈
+            enableHapticFeedback: false, // 是否启用触觉反馈
+            reactionTime: 0.5,        // 用户反应时间补偿（秒）
+            preparationTime: 3.0,     // 录音前准备时间（秒）
+            flexibleWindow: 0.8,      // 宽松时间窗口（秒）
+            enablePreparationPhase: true // 是否启用准备阶段
         };
         
         // 语音检测相关
@@ -54,16 +58,351 @@ class RecordingGuide extends RealtimeTextSync {
         console.log('开始录音指导模式');
         
         this.charTimestamps = charTimestamps || [];
-        this.isRecording = true;
-        this.recordingStartTime = Date.now();
+        
+        // 合并配置选项
+        this.guideConfig = { ...this.guideConfig, ...options };
+        
+        // 初始化状态
         this.currentCharIndex = 0;
         this.userProgress = new Array(this.charTimestamps.length).fill(null);
+        this.preparationStartTime = null;
+        this.isInPreparation = false;
         
         // 重置统计
         this.resetStats();
         
         // 合并配置
         Object.assign(this.guideConfig, options);
+        
+        // 如果启用准备阶段，先进入准备模式
+        if (this.guideConfig.enablePreparationPhase) {
+            this.startPreparationPhase();
+        } else {
+            this.startActualRecording();
+        }
+    }
+    
+    /**
+     * 开始准备阶段
+     */
+    startPreparationPhase() {
+        console.log('进入录音准备阶段...');
+        
+        this.isInPreparation = true;
+        this.preparationStartTime = Date.now();
+        
+        // 显示准备提示
+        this.showPreparationHint();
+        
+        // 立即显示初始倒计时状态
+        this.updatePreparationDisplay(this.guideConfig.preparationTime);
+        
+        // 设置准备阶段倒计时
+        const countdownInterval = setInterval(() => {
+            const elapsed = (Date.now() - this.preparationStartTime) / 1000;
+            const remaining = Math.max(0, this.guideConfig.preparationTime - elapsed);
+            
+            if (remaining <= 0) {
+                clearInterval(countdownInterval);
+                this.endPreparationPhase();
+            } else {
+                this.updatePreparationDisplay(remaining);
+            }
+        }, 100);
+    }
+    
+    /**
+     * 显示准备提示
+     */
+    showPreparationHint() {
+        // 在容器中显示准备提示
+        const hintElement = document.createElement('div');
+        hintElement.className = 'preparation-hint';
+        hintElement.innerHTML = `
+            <div class="preparation-content">
+                <div class="preparation-header">
+                    <h4>📢 录音准备中</h4>
+                    <p>请先熟悉一下要朗读的内容</p>
+                </div>
+                <div class="preparation-text">${this.getTextPreview()}</div>
+                
+                <!-- 跨年式倒计时显示区域 -->
+                <div class="countdown-display" id="countdownDisplay">
+                    <div class="countdown-circle">
+                        <div class="countdown-number" id="countdownNumber">3</div>
+                        <div class="countdown-text">准备开始</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        this.container.appendChild(hintElement);
+        
+        // 添加倒计时样式
+        this.addCountdownStyles();
+    }
+    
+    /**
+     * 添加倒计时样式
+     */
+    addCountdownStyles() {
+        // 检查是否已经添加过样式
+        if (document.getElementById('countdown-styles')) {
+            return;
+        }
+        
+        const style = document.createElement('style');
+        style.id = 'countdown-styles';
+        style.textContent = `
+            /* 倒计时容器样式 */
+            .countdown-display {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                margin: 30px 0;
+                min-height: 200px;
+                position: relative;
+            }
+            
+            /* 倒计时圆圈 */
+            .countdown-circle {
+                width: 150px;
+                height: 150px;
+                border-radius: 50%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+                transition: all 0.3s ease;
+            }
+            
+            /* 不同状态的颜色 */
+            .countdown-3 .countdown-circle {
+                background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+                box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
+            }
+            
+            .countdown-2 .countdown-circle {
+                background: linear-gradient(135deg, #feca57 0%, #ff9ff3 100%);
+                box-shadow: 0 10px 30px rgba(254, 202, 87, 0.4);
+            }
+            
+            .countdown-1 .countdown-circle {
+                background: linear-gradient(135deg, #48dbfb 0%, #0abde3 100%);
+                box-shadow: 0 10px 30px rgba(72, 219, 251, 0.4);
+            }
+            
+            .countdown-start .countdown-circle {
+                background: linear-gradient(135deg, #1dd1a1 0%, #10ac84 100%);
+                box-shadow: 0 10px 30px rgba(29, 209, 161, 0.4);
+                animation: pulse-success 0.6s ease-in-out;
+            }
+            
+            /* 倒计时数字 */
+            .countdown-number {
+                font-size: 48px;
+                font-weight: bold;
+                color: white;
+                text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                transform: scale(1);
+                transition: transform 0.3s ease;
+            }
+            
+            /* 数字变化动画 */
+            .countdown-animate {
+                animation: countdown-bounce 0.6s ease-in-out;
+            }
+            
+            .countdown-start-animate {
+                animation: start-celebration 1s ease-in-out;
+            }
+            
+            /* 倒计时文本 */
+            .countdown-text {
+                color: white;
+                font-size: 14px;
+                font-weight: 500;
+                margin-top: 8px;
+                text-shadow: 0 1px 5px rgba(0,0,0,0.3);
+                text-align: center;
+            }
+            
+            /* 动画定义 */
+            @keyframes countdown-bounce {
+                0% {
+                    transform: scale(1);
+                }
+                50% {
+                    transform: scale(1.3);
+                }
+                100% {
+                    transform: scale(1);
+                }
+            }
+            
+            @keyframes start-celebration {
+                0% {
+                    transform: scale(1);
+                }
+                25% {
+                    transform: scale(1.4);
+                }
+                50% {
+                    transform: scale(1.2) rotate(10deg);
+                }
+                75% {
+                    transform: scale(1.3) rotate(-5deg);
+                }
+                100% {
+                    transform: scale(1.1);
+                }
+            }
+            
+            @keyframes pulse-success {
+                0% {
+                    transform: scale(1);
+                    box-shadow: 0 10px 30px rgba(29, 209, 161, 0.4);
+                }
+                50% {
+                    transform: scale(1.05);
+                    box-shadow: 0 15px 40px rgba(29, 209, 161, 0.6);
+                }
+                100% {
+                    transform: scale(1);
+                    box-shadow: 0 10px 30px rgba(29, 209, 161, 0.4);
+                }
+            }
+            
+            /* 准备阶段整体样式优化 */
+            .preparation-hint {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                border-radius: 15px;
+                padding: 30px;
+                margin: 20px 0;
+                text-align: center;
+                box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+                border: 1px solid rgba(255,255,255,0.2);
+            }
+            
+            .preparation-header h4 {
+                color: #2c3e50;
+                margin-bottom: 10px;
+                font-size: 20px;
+            }
+            
+            .preparation-header p {
+                color: #7f8c8d;
+                margin-bottom: 20px;
+            }
+            
+            .preparation-text {
+                background: white;
+                padding: 15px 20px;
+                border-radius: 10px;
+                margin: 20px 0;
+                font-size: 16px;
+                line-height: 1.6;
+                color: #2c3e50;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+                border-left: 4px solid #3498db;
+            }
+        `;
+        
+        document.head.appendChild(style);
+    }
+    
+    /**
+     * 更新准备阶段显示
+     */
+    updatePreparationDisplay(remaining) {
+        console.log('更新倒计时显示:', remaining); // 调试信息
+        
+        const countdownNumber = document.getElementById('countdownNumber');
+        const countdownDisplay = document.getElementById('countdownDisplay');
+        const countdownText = countdownDisplay?.querySelector('.countdown-text');
+        
+        if (!countdownNumber || !countdownDisplay) {
+            console.log('倒计时元素未找到', { countdownNumber, countdownDisplay }); // 调试信息
+            return;
+        }
+        
+        const currentCount = Math.ceil(remaining);
+        const previousCount = parseInt(countdownNumber.textContent) || 0;
+        
+        // 当数字发生变化时触发动画
+        if (currentCount !== previousCount && currentCount > 0) {
+            // 更新数字
+            countdownNumber.textContent = currentCount;
+            
+            // 触发缩放动画
+            countdownNumber.classList.remove('countdown-animate');
+            void countdownNumber.offsetWidth; // 强制重排
+            countdownNumber.classList.add('countdown-animate');
+            
+            // 更新文本
+            if (countdownText) {
+                if (currentCount === 3) {
+                    countdownText.textContent = '准备开始';
+                    countdownDisplay.className = 'countdown-display countdown-3';
+                } else if (currentCount === 2) {
+                    countdownText.textContent = '深呼吸';
+                    countdownDisplay.className = 'countdown-display countdown-2';
+                } else if (currentCount === 1) {
+                    countdownText.textContent = '马上开始';
+                    countdownDisplay.className = 'countdown-display countdown-1';
+                }
+            }
+        } else if (currentCount === 0 && previousCount > 0) {
+            // 倒计时结束，显示"开始！"
+            countdownNumber.textContent = '🎤';
+            countdownText.textContent = '开始录音！';
+            countdownDisplay.className = 'countdown-display countdown-start';
+            
+            // 触发最终动画
+            countdownNumber.classList.remove('countdown-animate');
+            void countdownNumber.offsetWidth;
+            countdownNumber.classList.add('countdown-start-animate');
+        }
+    }
+    
+    /**
+     * 获取文本预览
+     */
+    getTextPreview() {
+        if (!this.charTimestamps || this.charTimestamps.length === 0) {
+            return '';
+        }
+        
+        return this.charTimestamps.map(ts => ts.char || ts.text).join('');
+    }
+    
+    /**
+     * 结束准备阶段
+     */
+    endPreparationPhase() {
+        console.log('准备阶段结束，开始正式录音');
+        
+        this.isInPreparation = false;
+        
+        // 移除准备提示
+        const hintElement = this.container.querySelector('.preparation-hint');
+        if (hintElement) {
+            hintElement.remove();
+        }
+        
+        // 开始正式录音
+        this.startActualRecording();
+    }
+    
+    /**
+     * 开始实际录音
+     */
+    startActualRecording() {
+        console.log('开始实际录音指导');
         
         // 渲染录音指导界面
         this.renderRecordingInterface();
@@ -76,7 +415,10 @@ class RecordingGuide extends RealtimeTextSync {
             this.initVoiceDetection();
         }
         
-        // 开始指导循环
+        this.isRecording = true;
+        this.recordingStartTime = Date.now();
+        
+        // 开始录音循环
         this.startRecordingLoop();
     }
     
@@ -281,26 +623,38 @@ class RecordingGuide extends RealtimeTextSync {
     }
     
     /**
-     * 更新录音指导状态
+     * 更新录音指导状态（增强版，支持反应时间补偿）
      */
     updateRecordingGuide(currentTime) {
-        // 找到当前应该朗读的字符
+        // 如果还在准备阶段，不进行指导
+        if (this.isInPreparation) {
+            return;
+        }
+        
+        // 找到当前应该朗读的字符（考虑反应时间补偿）
         let targetIndex = -1;
         let nextIndex = -1;
         let warningIndex = -1;
         
+        // 应用反应时间补偿：用户听到TTS后需要时间反应
+        const compensatedTime = currentTime + this.guideConfig.reactionTime;
+        
         for (let i = 0; i < this.charTimestamps.length; i++) {
             const timestamp = this.charTimestamps[i];
             
-            if (currentTime >= timestamp.start_time && currentTime < timestamp.end_time) {
+            // 扩展时间窗口，给用户更多容错空间
+            const startTime = timestamp.start_time - this.guideConfig.flexibleWindow / 2;
+            const endTime = timestamp.end_time + this.guideConfig.flexibleWindow / 2;
+            
+            if (compensatedTime >= startTime && compensatedTime < endTime) {
                 targetIndex = i;
                 nextIndex = i + 1;
                 break;
-            } else if (currentTime < timestamp.start_time) {
+            } else if (compensatedTime < startTime) {
                 nextIndex = i;
                 
-                // 检查是否需要提前警告
-                if (currentTime >= timestamp.start_time - this.guideConfig.warningBeforeTime) {
+                // 检查是否需要提前警告（也要考虑反应时间）
+                if (compensatedTime >= startTime - this.guideConfig.warningBeforeTime) {
                     warningIndex = i;
                 }
                 break;
@@ -431,19 +785,27 @@ class RecordingGuide extends RealtimeTextSync {
     }
     
     /**
-     * 检查错过的字符
+     * 检查错过的字符（增强版，考虑反应时间和宽松窗口）
      */
     checkMissedCharacters(currentTime) {
+        // 应用反应时间补偿
+        const compensatedTime = currentTime + this.guideConfig.reactionTime;
+        
         for (let i = 0; i < this.charTimestamps.length; i++) {
             const timestamp = this.charTimestamps[i];
             
-            if (currentTime > timestamp.end_time + this.missedThreshold && 
-                !this.userProgress[i]) {
-                
+            // 使用更宽松的错过判定：考虑反应时间 + 灵活窗口 + 错过阈值
+            const missedDeadline = timestamp.end_time + 
+                                 this.guideConfig.flexibleWindow / 2 + 
+                                 this.missedThreshold;
+            
+            if (compensatedTime > missedDeadline && !this.userProgress[i]) {
                 // 标记为错过
                 this.markCharacterMissed(i);
                 this.userProgress[i] = 'missed';
                 this.stats.missedCount++;
+                
+                console.log(`字符错过: "${timestamp.char}" (索引: ${i}), 当前时间: ${currentTime.toFixed(2)}s, 补偿时间: ${compensatedTime.toFixed(2)}s, 截止时间: ${missedDeadline.toFixed(2)}s`);
                 
                 // 触发错过回调
                 this.onCharacterMissed(i, timestamp.char);
@@ -581,20 +943,26 @@ class RecordingGuide extends RealtimeTextSync {
     restartRecording() {
         console.log('从录音指导面板重新录制');
         
-        // 调用主页面的重新录制并立即开始录音函数
-        if (window.restartAndRecord && typeof window.restartAndRecord === 'function') {
-            window.restartAndRecord();
-        } else if (window.retry && typeof window.retry === 'function') {
-            // 如果新函数不存在，回退到旧的方式并手动开始录音
-            window.retry();
-            setTimeout(() => {
-                if (window.startRecording && typeof window.startRecording === 'function') {
-                    window.startRecording();
-                }
-            }, 100);
-        } else {
-            console.warn('未找到全局重新录制函数');
-        }
+        // 停止当前的录音指导
+        this.stopGuide();
+        
+        // 保存当前的字符时间戳数据
+        const savedCharTimestamps = this.charTimestamps;
+        const savedGuideConfig = { ...this.guideConfig };
+        
+        // 重置状态
+        this.isRecording = false;
+        this.isInPreparation = false;
+        this.currentCharIndex = 0;
+        this.recordingStartTime = null;
+        
+        // 清理界面
+        this.container.innerHTML = '';
+        
+        // 重新开始录音指导（包括倒计时），传入保存的数据
+        setTimeout(() => {
+            this.startRecordingGuide(savedCharTimestamps, savedGuideConfig);
+        }, 100);
     }
     
     /**
