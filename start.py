@@ -277,17 +277,7 @@ def show_usage_guide(mode='full'):
         
     print("=" * 60)
 
-def show_main_menu():
-    """显示主菜单"""
-    print("=" * 60)
-    print("🎵 音高曲线比对系统 - 统一启动器")
-    print("=" * 60)
-    print("请选择启动模式:")
-    print("1. 完整系统 (音高比对 + 实时同步)")
-    print("2. 实时字词同步功能")
-    print("3. 基础音高比对系统")
-    print("4. 退出")
-    print("-" * 60)
+# 移除交互式菜单，改为自动启动模式
 
 def main():
     """主函数"""
@@ -296,88 +286,52 @@ def main():
         print("❌ 请在项目根目录下运行此脚本")
         return False
     
-    while True:
-        show_main_menu()
-        
-        try:
-            choice = input("请选择 (1-4): ").strip()
-            
-            if choice == '4':
-                print("👋 再见！")
-                return True
-            
-            if choice not in ['1', '2', '3']:
-                print("❌ 无效选择，请输入 1-4")
-                continue
-            
-            # 确定模式
-            if choice == '1':
-                mode = 'full'
-                print("\n🎯 启动模式: 完整系统")
-            elif choice == '2':
-                mode = 'realtime'
-                print("\n🎯 启动模式: 实时字词同步")
-            else:
-                mode = 'basic'
-                print("\n🎯 启动模式: 基础音高比对")
-            
-            # 检查依赖
-            deps_ok, missing = check_dependencies()
+    # 默认配置：完整系统，不进行功能测试，端口9999
+    mode = 'full'
+    port = 9999
+    
+    print("=" * 60)
+    print("🎵 音高曲线比对系统 - 自动启动")
+    print("=" * 60)
+    print("🎯 启动模式: 完整系统 (音高比对 + 实时同步)")
+    print(f"🔌 端口号: {port}")
+    print("🚫 跳过功能测试")
+    print("-" * 60)
+    
+    try:
+        # 检查依赖
+        deps_ok, missing = check_dependencies()
+        if not deps_ok:
+            print(f"\n❌ 缺少必需依赖: {', '.join(missing)}")
+            print("正在自动安装依赖...")
+            if not install_dependencies():
+                print("❌ 依赖安装失败，请手动运行 python install_dependencies.py")
+                return False
+            # 重新检查
+            deps_ok, _ = check_dependencies()
             if not deps_ok:
-                response = input(f"\n是否自动安装缺失的依赖? (y/n): ").lower().strip()
-                if response in ['y', 'yes', '是']:
-                    if not install_dependencies():
-                        print("❌ 依赖安装失败，请手动运行 python install_dependencies.py")
-                        continue
-                    # 重新检查
-                    deps_ok, _ = check_dependencies()
-                    if not deps_ok:
-                        print("❌ 安装后仍有依赖缺失")
-                        continue
-                else:
-                    print("请先安装依赖: python install_dependencies.py")
-                    continue
+                print("❌ 安装后仍有依赖缺失")
+                return False
+        
+        # 检查文件
+        if not check_system_files(mode):
+            print("❌ 系统文件检查失败")
+            return False
+        
+        # 创建目录
+        create_directories()
+        
+        print("\n✅ 系统检查完成，正在启动服务器...")
+        
+        # 启动服务器
+        return start_server(mode, port)
             
-            # 检查文件
-            if not check_system_files(mode):
-                print("❌ 系统文件检查失败")
-                input("按回车键返回主菜单...")
-                continue
-            
-            # 创建目录
-            create_directories()
-            
-            # 询问是否运行测试(仅对实时同步功能)
-            if mode in ['full', 'realtime']:
-                while True:
-                    run_test = input("\n🧪 是否运行功能测试? (y/n): ").strip().lower()
-                    if run_test in ['y', 'yes', '是']:
-                        if not run_tests():
-                            print("⚠️ 测试未完全通过，但您仍可以尝试启动系统")
-                        break
-                    elif run_test in ['n', 'no', '否']:
-                        break
-                    else:
-                        print("请输入 y 或 n")
-            
-            # 询问端口
-            port = None
-            port_input = input(f"\n🔌 请输入端口号 (默认: {'5000' if mode == 'realtime' else '9999'}): ").strip()
-            if port_input.isdigit():
-                port = int(port_input)
-            
-            # 启动服务器
-            if start_server(mode, port):
-                break
-            else:
-                input("按回车键返回主菜单...")
-                
-        except KeyboardInterrupt:
-            print("\n👋 已取消")
-            return True
-        except Exception as e:
-            print(f"❌ 执行出错: {e}")
-            input("按回车键返回主菜单...")
+    except KeyboardInterrupt:
+        print("\n👋 已取消")
+        return True
+    except Exception as e:
+        print(f"❌ 执行出错: {e}")
+        return False
 
 if __name__ == '__main__':
     try:
