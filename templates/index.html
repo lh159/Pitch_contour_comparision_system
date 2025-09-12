@@ -410,6 +410,83 @@
                 transform: scale(1) translateY(0);
             }
         }
+        
+        /* 场景对话样式 */
+        .dialogue-content {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            background: #f8f9fa;
+        }
+        
+        .dialogue-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 10px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .dialogue-item.user-dialogue {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border-left: 4px solid #2196f3;
+        }
+        
+        .dialogue-item.ai-dialogue {
+            background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+            border-left: 4px solid #4caf50;
+        }
+        
+        .dialogue-speaker {
+            font-weight: bold;
+            font-size: 14px;
+            color: #666;
+            min-width: 80px;
+            margin-right: 15px;
+        }
+        
+        .dialogue-text {
+            flex: 1;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #333;
+        }
+        
+        .dialogue-status {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            background: #f0f0f0;
+            color: #666;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .dialogue-status.active {
+            background: #2196f3;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .dialogue-status.playing {
+            background: #ff9800;
+            color: white;
+        }
+        
+        .dialogue-status.completed {
+            background: #4caf50;
+            color: white;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -432,27 +509,123 @@
                 正在检查系统状态...
             </div>
 
-            <!-- 步骤1: 输入词汇 -->
+            <!-- 步骤1: 选择练习模式 -->
             <div class="step-card">
                 <div class="step-header">
                     <h4 class="mb-0">
                         <span class="step-number">1</span>
-                        输入中文词汇
+                        选择练习模式
                     </h4>
                 </div>
                 <div class="card-body p-4">
-                    <div class="row">
-                        <div class="col-md-8">
-                            <label for="textInput" class="form-label">请输入要练习的中文词汇:</label>
-                            <input type="text" class="form-control form-control-lg" id="textInput" 
-                                   placeholder="例如: 你好、早上好、欢迎光临" maxlength="20">
-                            <div class="form-text">支持词汇、短语和简单句子</div>
+                    <!-- 练习模式选择 -->
+                    <div class="mb-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="practiceMode" id="basicMode" value="basic" checked>
+                                    <label class="form-check-label fw-bold" for="basicMode">
+                                        <i class="fas fa-keyboard me-2 text-primary"></i>基础模式
+                                    </label>
+                                    <div class="form-text text-muted ms-4">直接输入词汇进行发音练习</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="practiceMode" id="scenarioMode" value="scenario">
+                                    <label class="form-check-label fw-bold" for="scenarioMode">
+                                        <i class="fas fa-theater-masks me-2 text-success"></i>场景对话模式 <span class="badge bg-success ms-1">NEW</span>
+                                    </label>
+                                    <div class="form-text text-muted ms-4">AI生成情景对话，沉浸式练习</div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <button class="btn btn-custom w-100" id="generateBtn">
-                                <i class="fas fa-volume-up me-2"></i>
-                                生成标准发音
-                            </button>
+                    </div>
+                    
+                    <!-- 基础模式输入区域 -->
+                    <div id="basicModeInput">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <label for="textInput" class="form-label">请输入要练习的中文词汇:</label>
+                                <input type="text" class="form-control form-control-lg" id="textInput" 
+                                       placeholder="例如: 你好、早上好、欢迎光临" maxlength="20">
+                                <div class="form-text">支持词汇、短语和简单句子</div>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button class="btn btn-custom w-100" id="generateBtn">
+                                    <i class="fas fa-volume-up me-2"></i>
+                                    生成标准发音
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 场景对话模式输入区域 -->
+                    <div id="scenarioModeInput" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <label for="scenarioInput" class="form-label">请描述您想要练习的场景:</label>
+                                <textarea class="form-control form-control-lg" id="scenarioInput" 
+                                          placeholder="例如：妈妈教导三年级小孩学习数学、朋友之间讨论周末计划、客服接待顾客咨询、医生问诊患者等..."
+                                          rows="3" maxlength="200"></textarea>
+                                <div class="form-text">描述一个具体的对话场景，系统将为您生成个性化的角色扮演对话</div>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button class="btn btn-custom w-100" id="generateScenarioBtn">
+                                    <i class="fas fa-magic me-2"></i>
+                                    生成场景对话
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 场景对话展示区域 -->
+            <div class="step-card" id="dialogueContainer" style="display: none;">
+                <div class="step-header">
+                    <h4 class="mb-0">
+                        <i class="fas fa-theater-masks me-2"></i>
+                        <span id="scenarioTitle">场景对话</span>
+                    </h4>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="alert alert-primary mb-0">
+                                <i class="fas fa-user me-2"></i>
+                                <span class="user-role">您的角色：用户</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="alert alert-success mb-0">
+                                <i class="fas fa-robot me-2"></i>
+                                <span class="ai-role">AI角色：助手</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="dialogue-content" id="dialogueContent">
+                        <!-- 动态生成对话内容 -->
+                    </div>
+                    
+                    <div class="dialogue-controls mt-4">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <button class="btn btn-success w-100" id="startDialogueBtn">
+                                    <i class="fas fa-play me-2"></i>开始对话
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-warning w-100" id="continueBtn" style="display:none;">
+                                    <i class="fas fa-arrow-right me-2"></i>继续对话
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-info w-100" id="regenerateBtn">
+                                    <i class="fas fa-redo me-2"></i>重新生成
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -674,6 +847,12 @@
         let recordingGuide = null;
         let socket = null;
         
+        // 场景对话相关变量
+        let currentSession = null;
+        let currentOrder = 0;
+        let dialogueData = null;
+        let isDialogueMode = false;
+        
         // DOM元素
         const textInput = document.getElementById('textInput');
         const generateBtn = document.getElementById('generateBtn');
@@ -686,6 +865,20 @@
         const compareBtn = document.getElementById('compareBtn');
         const loadingSpinner = document.getElementById('loadingSpinner');
         const resultContainer = document.getElementById('resultContainer');
+        
+        // 场景对话相关DOM元素
+        const basicModeRadio = document.getElementById('basicMode');
+        const scenarioModeRadio = document.getElementById('scenarioMode');
+        const basicModeInput = document.getElementById('basicModeInput');
+        const scenarioModeInput = document.getElementById('scenarioModeInput');
+        const scenarioInput = document.getElementById('scenarioInput');
+        const generateScenarioBtn = document.getElementById('generateScenarioBtn');
+        const dialogueContainer = document.getElementById('dialogueContainer');
+        const scenarioTitle = document.getElementById('scenarioTitle');
+        const dialogueContent = document.getElementById('dialogueContent');
+        const startDialogueBtn = document.getElementById('startDialogueBtn');
+        const continueBtn = document.getElementById('continueBtn');
+        const regenerateBtn = document.getElementById('regenerateBtn');
         const waveformContainer = document.getElementById('waveformContainer');
         const systemStatus = document.getElementById('systemStatus');
         
@@ -772,6 +965,22 @@
                     generateStandardAudio();
                 }
             });
+            
+            // 场景对话相关事件监听
+            basicModeRadio.addEventListener('change', handleModeChange);
+            scenarioModeRadio.addEventListener('change', handleModeChange);
+            generateScenarioBtn.addEventListener('click', generateScenario);
+            startDialogueBtn.addEventListener('click', startDialogue);
+            continueBtn.addEventListener('click', continueDialogue);
+            regenerateBtn.addEventListener('click', regenerateScenario);
+            
+            // 场景输入回车键触发生成
+            scenarioInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    generateScenario();
+                }
+            });
         }
         
         // 生成标准音频（增强版，支持时间戳）
@@ -781,6 +990,13 @@
                 showAlert('请输入要练习的文本', 'warning');
                 return;
             }
+            
+            // 🔧 每次生成新的标准音频时重置用户文件ID
+            console.log('生成新标准音频 - 重置userFileId');
+            userFileId = null;
+            userAudio.style.display = 'none';
+            compareBtn.style.display = 'none';
+            resultContainer.style.display = 'none';
             
             currentText = text;
             generateBtn.disabled = true;
@@ -843,6 +1059,18 @@
                     }
                     
                     showAlert(message, 'success');
+                    
+                    // 🔧 在场景对话模式下，提供录音提示（不自动开始）
+                    if (isDialogueMode) {
+                        const guidedMode = document.getElementById('guidedMode').checked;
+                        if (guidedMode) {
+                            console.log('场景对话模式 + 实时指导模式：提示用户手动开始录音');
+                            showAlert('新的台词已准备好，请点击"开始录音"开始实时指导录音', 'info');
+                        } else {
+                            console.log('场景对话模式 + 自由录音模式：提示用户手动开始录音');
+                            showAlert('新的台词已准备好，请点击"开始录音"按钮开始录制', 'info');
+                        }
+                    }
                 } else {
                     showAlert(`生成失败: ${data.error}`, 'danger');
                 }
@@ -858,6 +1086,12 @@
         async function startRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // 🔧 场景对话模式下的特殊提示（现在通过按钮点击流程，不需要额外提示）
+                if (isDialogueMode) {
+                    console.log('场景对话模式：开始录音，当前句子:', currentText);
+                    // 通过按钮点击流程启动，录音指导会有自己的倒计时提示
+                }
                 
                 // 检查录音模式
                 const guidedMode = document.getElementById('guidedMode').checked;
@@ -1163,7 +1397,17 @@
                 // 图表加载完成后显示容器
                 chart.onload = function() {
                     if (chartWrapper) {
+                        // 🔧 强制重置并应用正确的样式
                         chartWrapper.style.display = 'block';
+                        chartWrapper.style.width = '100%';
+                        chartWrapper.style.maxWidth = '1200px';
+                        chartWrapper.style.margin = '0 auto';
+                        
+                        // 🔧 确保图表本身也有正确的样式
+                        chart.style.width = '100%';
+                        chart.style.height = 'auto';
+                        chart.style.minHeight = '600px';
+                        chart.style.maxHeight = '800px';
                     }
                     console.log('音高曲线图加载完成');
                 };
@@ -1194,6 +1438,12 @@
             
             // 显示结果容器
             resultContainer.style.display = 'block';
+            
+            // 🔧 在场景对话模式下，比对分析完成后显示继续对话按钮
+            if (isDialogueMode && dialogueData && currentOrder < dialogueData.dialogues.length) {
+                continueBtn.style.display = 'inline-block';
+                showAlert('比对分析完成！点击"继续对话"进入下一句', 'success');
+            }
             
             // 平滑滚动到结果区域
             setTimeout(() => {
@@ -1287,6 +1537,283 @@
         window.startRecording = startRecording;
         window.stopRecording = stopRecording;
         
+        // === 场景对话功能函数 ===
+        
+        // 处理练习模式切换
+        function handleModeChange() {
+            isDialogueMode = scenarioModeRadio.checked;
+            
+            if (isDialogueMode) {
+                basicModeInput.style.display = 'none';
+                scenarioModeInput.style.display = 'block';
+                console.log('切换到场景对话模式');
+            } else {
+                basicModeInput.style.display = 'block';
+                scenarioModeInput.style.display = 'none';
+                dialogueContainer.style.display = 'none';
+                console.log('切换到基础模式');
+            }
+            
+            // 重置状态
+            resetDialogueState();
+        }
+        
+        // 重置对话状态
+        function resetDialogueState() {
+            currentSession = null;
+            currentOrder = 0;
+            dialogueData = null;
+            continueBtn.style.display = 'none';
+            
+            // 🔧 重置开始对话按钮状态
+            startDialogueBtn.style.display = 'inline-block';
+            
+            // 隐藏其他卡片
+            standardAudioCard.style.display = 'none';
+            recordingCard.style.display = 'none';
+            resultContainer.style.display = 'none';
+        }
+        
+        // 生成场景对话
+        async function generateScenario() {
+            const scenario = scenarioInput.value.trim();
+            
+            if (!scenario) {
+                showAlert('请输入场景描述', 'warning');
+                return;
+            }
+            
+            if (scenario.length > 200) {
+                showAlert('场景描述不能超过200个字符', 'warning');
+                return;
+            }
+            
+            generateScenarioBtn.disabled = true;
+            generateScenarioBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>生成中...';
+            
+            try {
+                console.log('开始生成场景对话:', scenario);
+                
+                const response = await fetch('/api/scenario/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ scenario: scenario })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentSession = data.session_id;
+                    dialogueData = data.dialogue_data;
+                    currentOrder = 0;
+                    
+                    displayDialogue();
+                    showAlert('场景对话生成成功！', 'success');
+                    console.log('对话生成成功:', dialogueData);
+                } else {
+                    showAlert(`生成失败: ${data.error}`, 'danger');
+                    console.error('对话生成失败:', data.error);
+                }
+            } catch (error) {
+                showAlert(`网络错误: ${error.message}`, 'danger');
+                console.error('网络错误:', error);
+            } finally {
+                generateScenarioBtn.disabled = false;
+                generateScenarioBtn.innerHTML = '<i class="fas fa-magic me-2"></i>生成场景对话';
+            }
+        }
+        
+        // 显示对话内容
+        function displayDialogue() {
+            if (!dialogueData) return;
+            
+            scenarioTitle.textContent = dialogueData.scenario_title;
+            
+            // 显示角色信息
+            document.querySelector('.user-role').innerHTML = 
+                `<i class="fas fa-user me-2"></i>您的角色：${dialogueData.user_role}`;
+            document.querySelector('.ai-role').innerHTML = 
+                `<i class="fas fa-robot me-2"></i>AI角色：${dialogueData.ai_role}`;
+            
+            // 生成对话列表
+            dialogueContent.innerHTML = '';
+            dialogueData.dialogues.forEach((dialogue, index) => {
+                const dialogueItem = document.createElement('div');
+                dialogueItem.className = `dialogue-item ${dialogue.speaker}-dialogue`;
+                dialogueItem.innerHTML = `
+                    <div class="dialogue-speaker">${dialogue.speaker === 'user' ? dialogueData.user_role : dialogueData.ai_role}</div>
+                    <div class="dialogue-text">${dialogue.text}</div>
+                    <div class="dialogue-status" id="status-${dialogue.order}">
+                        ${dialogue.speaker === 'user' ? '待练习' : '待播放'}
+                    </div>
+                `;
+                dialogueContent.appendChild(dialogueItem);
+            });
+            
+            dialogueContainer.style.display = 'block';
+            startDialogueBtn.style.display = 'inline-block';
+        }
+        
+        // 开始对话
+        async function startDialogue() {
+            if (!dialogueData || !currentSession) {
+                showAlert('请先生成场景对话', 'warning');
+                return;
+            }
+            
+            // 🔧 隐藏开始对话按钮，因为对话已经开始
+            startDialogueBtn.style.display = 'none';
+            
+            currentOrder = 1;
+            await processCurrentDialogue();
+        }
+        
+        // 处理当前对话
+        async function processCurrentDialogue() {
+            const currentDialogue = dialogueData.dialogues.find(d => d.order === currentOrder);
+            
+            if (!currentDialogue) {
+                showAlert('对话已完成！', 'success');
+                return;
+            }
+            
+            const statusEl = document.getElementById(`status-${currentOrder}`);
+            
+            if (currentDialogue.speaker === 'user') {
+                // 用户台词 - 进入录音模式
+                statusEl.textContent = '请朗读';
+                statusEl.className = 'dialogue-status active';
+                
+                // 🔧 重置用户文件ID和相关状态
+                console.log('切换到新对话 - 重置userFileId和录音状态');
+                userFileId = null;
+                userAudio.style.display = 'none';
+                compareBtn.style.display = 'none';
+                resultContainer.style.display = 'none';
+                
+                // 设置当前文本并启动录音功能
+                textInput.value = currentDialogue.text;
+                currentText = currentDialogue.text;
+                
+                await generateStandardAudio();
+                
+                showAlert('请朗读您的台词，完成后进行比对分析', 'info');
+                // 🔧 不再立即显示继续对话按钮，需要等比对分析完成后
+                
+            } else {
+                // AI台词 - 暂时显示文本（后续会添加TTS播放）
+                statusEl.textContent = '已播放';
+                statusEl.className = 'dialogue-status completed';
+                
+                showAlert(`AI说: ${currentDialogue.text}`, 'info');
+                
+                // 自动进入下一轮对话
+                setTimeout(() => {
+                    currentOrder++;
+                    processCurrentDialogue();
+                }, 2000);
+            }
+        }
+        
+        // 继续对话
+        async function continueDialogue() {
+            // 完成当前用户对话，进入下一轮
+            const statusEl = document.getElementById(`status-${currentOrder}`);
+            statusEl.textContent = '已完成';
+            statusEl.className = 'dialogue-status completed';
+            
+            // 🔧 隐藏继续对话按钮
+            continueBtn.style.display = 'none';
+            
+            // 🔧 隐藏之前的结果和录音区域，准备进入下一句话
+            resultContainer.style.display = 'none';
+            userAudio.style.display = 'none';
+            compareBtn.style.display = 'none';
+            
+            // 🔧 重置音高曲线图容器状态，确保下次显示时样式正确
+            const chartLoading = document.getElementById('chartLoading');
+            const chartWrapper = document.getElementById('chartWrapper');
+            const chart = document.getElementById('comparisonChart');
+            
+            if (chartLoading) {
+                chartLoading.style.display = 'flex';
+                chartLoading.innerHTML = `
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                    <p class="mt-2">正在生成音高曲线对比图...</p>
+                `;
+            }
+            
+            if (chartWrapper) {
+                chartWrapper.style.display = 'none';
+                // 🔧 重置包装器样式，确保下次显示时尺寸正确
+                chartWrapper.style.width = '';
+                chartWrapper.style.height = '';
+            }
+            
+            if (chart) {
+                chart.src = '';
+                chart.onload = null;
+                chart.onerror = null;
+                // 🔧 重置图表样式，确保下次显示时尺寸正确
+                chart.style.width = '';
+                chart.style.height = '';
+                chart.style.maxWidth = '';
+                chart.style.maxHeight = '';
+            }
+            
+            // 🔧 重置录音状态，准备录制下一句话
+            userFileId = null;
+            
+            // 🔧 完全清理录音指导组件和相关状态
+            if (recordingGuide) {
+                recordingGuide.stopGuide();
+                recordingGuide = null;  // 完全清理，下次录音时重新创建
+            }
+            
+            // 🔧 恢复录音指导区域到初始状态
+            const guideArea = document.getElementById('recordingGuideArea');
+            if (guideArea) {
+                guideArea.innerHTML = `
+                    <div class="guide-container-placeholder">
+                        <i class="fas fa-magic me-2"></i>
+                        实时录音指导区域<br>
+                        <small>选择"实时指导录音"模式并开始录音后，这里将显示实时朗读提示</small>
+                    </div>
+                `;
+                // 确保指导区域可见（因为用户在场景对话模式下，通常使用实时指导）
+                guideArea.style.display = 'block';
+            }
+            
+            // 🔧 重置录音按钮状态
+            recordBtn.disabled = false;
+            stopBtn.disabled = true;
+            
+            // 🔧 重置波形容器
+            const guidedMode = document.getElementById('guidedMode').checked;
+            if (guidedMode) {
+                waveformContainer.innerHTML = '<span class="text-muted"><i class="fas fa-magic me-2"></i>实时指导模式：点击"开始录音"后将根据标准发音的时间戳为您提供实时朗读提示</span>';
+            } else {
+                waveformContainer.innerHTML = '<span class="text-muted"><i class="fas fa-microphone me-2"></i>自由录音模式：点击"开始录音"进行录制</span>';
+            }
+            
+            currentOrder++;
+            await processCurrentDialogue();
+        }
+        
+        // 重新生成场景
+        function regenerateScenario() {
+            const scenario = scenarioInput.value.trim();
+            if (!scenario) {
+                showAlert('请先输入场景描述', 'warning');
+                return;
+            }
+            
+            resetDialogueState();
+            generateScenario();
+        }
+        
         // 练习新词汇
         function newWord() {
             // 重置所有状态
@@ -1296,10 +1823,14 @@
             standardFileId = null;
             userFileId = null;
             
+            // 重置对话状态
+            resetDialogueState();
+            
             // 隐藏所有卡片
             standardAudioCard.style.display = 'none';
             recordingCard.style.display = 'none';
             resultContainer.style.display = 'none';
+            dialogueContainer.style.display = 'none';
             
             // 重置音频
             standardAudio.src = '';
@@ -1310,7 +1841,11 @@
             retry();
             
             // 聚焦到输入框
-            textInput.focus();
+            if (isDialogueMode) {
+                scenarioInput.focus();
+            } else {
+                textInput.focus();
+            }
         }
         
         // 初始化WebSocket连接
@@ -1502,7 +2037,16 @@
             }
             
             try {
-                // 创建录音指导组件
+                // 🔧 清理之前的录音指导组件（如果存在）
+                if (recordingGuide) {
+                    recordingGuide.stopGuide();
+                    recordingGuide = null;
+                }
+                
+                // 🔧 清理容器内容，确保干净的状态
+                guideArea.innerHTML = '';
+                
+                // 🔧 重新创建录音指导组件，确保每次都是新的实例
                 recordingGuide = new RecordingGuide(guideArea, {
                     showRecordingHints: true,
                     enableVoiceDetection: false,  // 暂时禁用语音检测

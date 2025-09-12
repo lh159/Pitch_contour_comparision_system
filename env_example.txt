@@ -1,20 +1,29 @@
 # 音高曲线比对系统环境变量配置示例
 # 请复制此文件为 .env 并填入真实的配置值
 
+# === DeepSeek API配置（场景对话功能）===
+DEEPSEEK_API_KEY=sk-c48010af3fad435f94e48b613916b1b2
+
 # === 百度智能云TTS配置（推荐，性价比高）===
 BAIDU_API_KEY=your_baidu_api_key_here
 BAIDU_SECRET_KEY=your_baidu_secret_key_here
 BAIDU_VOICE_PER=0
 
+# === 阿里达摩院语音配置 ===
+ALIBABA_PARAFORMER_API_KEY=your_alibaba_api_key_here
+
 # === 系统配置 ===
 SECRET_KEY=your_secret_key_here
 DEBUG=true
-PORT=5000
+PORT=9999
 
 # === 注意事项 ===
-# 1. 百度TTS（推荐）: https://cloud.baidu.com/product/speech
+# 1. DeepSeek API: https://platform.deepseek.com/
+#    - 用于场景对话生成功能
+#    - 上面已经填入了有效的API密钥
+# 2. 百度TTS（推荐）: https://cloud.baidu.com/product/speech
 #    - 免费额度大，性价比高
 #    - 申请流程简单，审核快
-# 2. 如果不配置百度TTS，系统会自动尝试其他免费TTS引擎（Edge TTS、离线TTS）
-# 3. 将此文件复制为 .env 文件并填入真实配置值
-# 4. .env 文件已在 .gitignore 中，不会被提交到版本控制
+# 3. 如果不配置百度TTS，系统会自动尝试其他免费TTS引擎（Edge TTS、离线TTS）
+# 4. 将此文件复制为 .env 文件并填入真实配置值
+# 5. .env 文件已在 .gitignore 中，不会被提交到版本控制

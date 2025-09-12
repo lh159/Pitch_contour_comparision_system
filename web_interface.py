@@ -22,6 +22,9 @@ from visualization import PitchVisualization
 # 导入数值处理
 import numpy as np
 
+# 导入场景对话模块
+from deepseek_integration import get_deepseek_generator
+
 # 创建Flask应用
 app = Flask(__name__)
 app.config['SECRET_KEY'] = Config.SECRET_KEY
@@ -68,6 +71,9 @@ comparator = None
 scoring_system = None
 analyzer = None
 visualizer = None
+
+# 场景对话会话存储
+dialogue_sessions = {}
 
 def init_system():
     """初始化系统组件"""
@@ -816,6 +822,169 @@ def clear_cache():
             'success': False,
             'error': '缓存系统未启用'
         }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# === 场景对话API端点 ===
+
+@app.route('/api/scenario/generate', methods=['POST'])
+def generate_scenario_dialogue():
+    """生成场景对话"""
+    try:
+        data = request.get_json()
+        scenario = data.get('scenario', '').strip()
+        
+        if not scenario:
+            return jsonify({
+                'success': False,
+                'error': '请输入场景描述'
+            }), 400
+        
+        if len(scenario) > Config.MAX_SCENARIO_LENGTH:
+            return jsonify({
+                'success': False,
+                'error': f'场景描述不能超过{Config.MAX_SCENARIO_LENGTH}个字符'
+            }), 400
+        
+        # 调用DeepSeek生成对话
+        generator = get_deepseek_generator()
+        result = generator.generate_scenario_dialogue(scenario, Config.DEFAULT_DIALOGUE_ROUNDS)
+        
+        if result.get('success'):
+            # 保存对话会话
+            session_id = str(uuid.uuid4())
+            dialogue_sessions[session_id] = {
+                'dialogue_data': result['data'],
+                'scenario_description': scenario,
+                'created_at': time.time(),
+                'last_accessed': time.time()
+            }
+            
+            print(f"✓ 场景对话生成成功，会话ID: {session_id}")
+            print(f"场景: {result['data'].get('scenario_title', 'N/A')}")
+            
+            return jsonify({
+                'success': True,
+                'session_id': session_id,
+                'dialogue_data': result['data']
+            })
+        else:
+            print(f"✗ 对话生成失败: {result.get('error', '未知错误')}")
+            return jsonify({
+                'success': False,
+                'error': result.get('error', '对话生成失败')
+            }), 500
+            
+    except Exception as e:
+        print(f"✗ 场景对话生成异常: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'服务器错误: {str(e)}'
+        }), 500
+
+@app.route('/api/scenario/next', methods=['POST'])
+def get_next_dialogue():
+    """获取下一句对话"""
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id')
+        current_order = data.get('current_order', 0)
+        
+        if not session_id or session_id not in dialogue_sessions:
+            return jsonify({
+                'success': False,
+                'error': '对话会话不存在或已过期'
+            }), 404
+        
+        # 更新访问时间
+        dialogue_sessions[session_id]['last_accessed'] = time.time()
+        
+        session_data = dialogue_sessions[session_id]
+        dialogue_data = session_data['dialogue_data']
+        
+        # 查找下一句对话
+        next_dialogue = None
+        for dialogue in dialogue_data['dialogues']:
+            if dialogue['order'] == current_order + 1:
+                next_dialogue = dialogue
+                break
+        
+        if next_dialogue:
+            # 检查是否是对话结束
+            is_complete = current_order + 1 >= len(dialogue_data['dialogues'])
+            
+            return jsonify({
+                'success': True,
+                'dialogue': next_dialogue,
+                'is_complete': is_complete,
+                'total_dialogues': len(dialogue_data['dialogues'])
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'dialogue': None,
+                'is_complete': True,
+                'total_dialogues': len(dialogue_data['dialogues'])
+            })
+            
+    except Exception as e:
+        print(f"✗ 获取下一句对话失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'获取对话失败: {str(e)}'
+        }), 500
+
+@app.route('/api/scenario/session/<session_id>', methods=['GET'])
+def get_dialogue_session(session_id):
+    """获取对话会话信息"""
+    try:
+        if session_id not in dialogue_sessions:
+            return jsonify({
+                'success': False,
+                'error': '对话会话不存在'
+            }), 404
+        
+        session_data = dialogue_sessions[session_id]
+        
+        # 更新访问时间
+        session_data['last_accessed'] = time.time()
+        
+        return jsonify({
+            'success': True,
+            'session_data': {
+                'session_id': session_id,
+                'dialogue_data': session_data['dialogue_data'],
+                'scenario_description': session_data['scenario_description'],
+                'created_at': session_data['created_at']
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/scenario/test', methods=['GET'])
+def test_scenario_api():
+    """测试场景对话API"""
+    try:
+        generator = get_deepseek_generator()
+        test_result = generator.test_api_connection()
+        
+        return jsonify({
+            'success': True,
+            'api_test': test_result,
+            'config': {
+                'max_scenario_length': Config.MAX_SCENARIO_LENGTH,
+                'default_dialogue_rounds': Config.DEFAULT_DIALOGUE_ROUNDS,
+                'api_configured': bool(Config.DEEPSEEK_API_KEY)
+            }
+        })
+        
     except Exception as e:
         return jsonify({
             'success': False,

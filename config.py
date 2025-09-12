@@ -56,6 +56,14 @@ class Config:
     DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
     PORT = int(os.getenv('PORT', 9999))
     
+    # === DeepSeek API配置 ===
+    DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
+    
+    # === 场景对话配置 ===
+    MAX_SCENARIO_LENGTH = 200  # 场景描述最大长度
+    DEFAULT_DIALOGUE_ROUNDS = 6  # 默认对话轮数
+    DIALOGUE_SESSION_TIMEOUT = 3600  # 对话会话超时时间（秒）
+    
     @classmethod
     def create_directories(cls):
         """创建必要的目录"""
