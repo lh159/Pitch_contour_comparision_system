@@ -123,8 +123,10 @@ class PitchComparisonSystem:
                 f"comparison_{text}_{int(datetime.now().timestamp())}.png"
             )
             
+            # 强制使用桌面端完整布局尺寸
             chart_success = self.visualizer.plot_pitch_comparison(
-                comparison_result, score_result, chart_path, input_text=text
+                comparison_result, score_result, chart_path, 
+                fig_size=(18, 12), dpi=150, input_text=text
             )
             
             # 6. 记录到历史

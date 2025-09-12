@@ -323,8 +323,10 @@ def compare_audio():
         chart_filename = f"comparison_{user_file_id}_{int(time.time())}.png"
         chart_path = os.path.join(Config.OUTPUT_FOLDER, chart_filename)
         
+        # 强制使用桌面端完整布局尺寸
         chart_success = visualizer.plot_pitch_comparison(
-            comparison_result, score_result, chart_path, input_text=text
+            comparison_result, score_result, chart_path, 
+            fig_size=(18, 12), dpi=150, input_text=text
         )
         
         # 准备返回数据，使用安全序列化

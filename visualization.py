@@ -121,7 +121,7 @@ class PitchVisualization:
             return ax.text(*args, **kwargs)
     
     def plot_pitch_comparison(self, comparison_result: dict, score_result: dict, 
-                            output_path: str, fig_size=(16, 12), dpi=300, input_text: str = None) -> bool:
+                            output_path: str, fig_size=(16, 10), dpi=150, input_text: str = None) -> bool:
         """
         绘制音高曲线对比图 - 全新设计，更加直观
         """
@@ -145,10 +145,10 @@ class PitchVisualization:
             
             # 创建更清晰的布局：主图 + 侧边栏（删除反馈建议模块）
             if has_text_alignment:
-                # 有文本对齐时，只显示主图、文本对齐图和评分
-                fig = plt.figure(figsize=(fig_size[0], fig_size[1] - 2), facecolor='white')
-                gs = fig.add_gridspec(2, 3, height_ratios=[3.5, 0.8], width_ratios=[2, 1, 1], 
-                                     hspace=0.3, wspace=0.3)
+                # 有文本对齐时，只显示主图、文本对齐图和评分 - 优化尺寸
+                fig = plt.figure(figsize=(fig_size[0], fig_size[1]), facecolor='white')
+                gs = fig.add_gridspec(2, 4, height_ratios=[3.5, 0.8], width_ratios=[2.5, 0.8, 0.8, 0.8], 
+                                     hspace=0.15, wspace=0.3)
                 
                 # 1. 主要音高对比图 (占据左侧大部分空间)
                 ax_main = fig.add_subplot(gs[0, :2])
@@ -159,11 +159,11 @@ class PitchVisualization:
                 ax_text = fig.add_subplot(gs[1, :2])
                 self._plot_text_alignment(ax_text, comparison_result['vad_result'])
                 
-                # 调整评分子图位置
+                # 调整评分子图位置 - 给右侧更多空间
                 score_row, components_row = 0, 1
             else:
-                fig = plt.figure(figsize=(fig_size[0], fig_size[1] - 3), facecolor='white')
-                gs = fig.add_gridspec(1, 3, width_ratios=[2, 1, 1], wspace=0.3)
+                fig = plt.figure(figsize=(fig_size[0], fig_size[1] - 1), facecolor='white')
+                gs = fig.add_gridspec(1, 4, width_ratios=[2.5, 0.8, 0.8, 0.8], wspace=0.3)
                 
                 # 1. 主要音高对比图 (占据左侧大部分空间)
                 ax_main = fig.add_subplot(gs[0, :2])
@@ -173,19 +173,16 @@ class PitchVisualization:
                 
                 score_row, components_row = 0, 0
             
-            # 2. 评分总览 (右上角)
+            # 2. 评分总览 (右侧第一列)
             ax_score = fig.add_subplot(gs[score_row, 2])
             self._plot_score_overview(ax_score, score_result)
             
-            # 3. 各项能力评分 (右下角)
+            # 3. 各项能力评分 (右侧第二列)
             if has_text_alignment:
-                ax_components = fig.add_subplot(gs[components_row, 2])
+                ax_components = fig.add_subplot(gs[components_row, 3])
             else:
-                # 没有文本对齐时，将组件评分放在评分总览下方
-                gs_components = gs[score_row, 2].subgridspec(2, 1, hspace=0.3)
-                ax_score = fig.add_subplot(gs_components[0])
-                self._plot_score_overview(ax_score, score_result)
-                ax_components = fig.add_subplot(gs_components[1])
+                # 没有文本对齐时，将组件评分放在评分总览右侧
+                ax_components = fig.add_subplot(gs[score_row, 3])
             self._plot_component_scores(ax_components, score_result['component_scores'])
             
             # 设置整体标题
@@ -194,11 +191,11 @@ class PitchVisualization:
             title = f"🎵 音高曲线对比分析报告 - 总分: {total_score:.1f}分 ({level})"
             if has_text_alignment:
                 title += " (含文本对齐分析)"
-            fig.suptitle(title, fontsize=18, weight='bold', y=0.95, 
+            fig.suptitle(title, fontsize=16, weight='bold', y=0.97, 
                         color=self._get_score_color(total_score))
             
             # 保存图片
-            plt.tight_layout(rect=[0, 0, 1, 0.92])
+            plt.tight_layout(rect=[0, 0, 1, 0.94])
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             plt.savefig(output_path, dpi=dpi, bbox_inches='tight', facecolor='white')
             plt.close(fig)
@@ -309,8 +306,8 @@ class PitchVisualization:
             # 确保汉字标注使用与音高曲线图相同的时间轴范围
             print(f"音高曲线图时间轴范围: {x_min:.3f}s - {x_max:.3f}s")
             
-            # 计算标注位置 - 紧贴音高曲线图底部，时间轴对齐，增加更多空间确保完全可见
-            annotation_y = y_min - (y_max - y_min) * 0.15  # 紧贴在x轴下方，增加到15%确保完全可见
+            # 计算标注位置 - 紧贴音高曲线图底部，时间轴对齐
+            annotation_y = y_min - (y_max - y_min) * 0.05  # 紧贴在x轴下方，减少空白间距
             
             # 用于避免标注重叠的位置记录
             used_positions = []
@@ -374,12 +371,12 @@ class PitchVisualization:
                 # 添加时间范围标注 (小字体，在字符下方)
                 if end_time - start_time > 0.2:  # 只对足够长的段显示时间
                     time_text = f'{start_time:.2f}-{end_time:.2f}s'
-                    self._set_text_with_font(ax, 'text', char_center_time, annotation_y - (y_max - y_min) * 0.04,
-                           time_text, ha='center', va='center', fontsize=8, 
+                    self._set_text_with_font(ax, 'text', char_center_time, annotation_y - (y_max - y_min) * 0.03,
+                           time_text, ha='center', va='center', fontsize=7, 
                            color='gray', alpha=0.8)
             
-            # 调整y轴范围以容纳标注，确保汉字完全可见
-            ax.set_ylim(annotation_y - (y_max - y_min) * 0.20, y_max)  # 底部增加更多空间确保汉字完全可见
+            # 调整y轴范围以容纳标注，确保汉字完全可见，但减少空白空间
+            ax.set_ylim(annotation_y - (y_max - y_min) * 0.08, y_max)  # 减少底部空间，紧凑布局
             
         except Exception as e:
             print(f"添加汉字标注失败: {e}")
@@ -578,28 +575,28 @@ class PitchVisualization:
             # 添加文本标注
             mid_time = (start_time + end_time) / 2
             
-            # 期望文本（上方）
+            # 期望文本（上方） - 调整间距避免重叠
             if expected:
-                self._set_text_with_font(ax, 'text', mid_time, y_pos + 0.1, f'标准: {expected}', 
-                       ha='center', va='bottom', fontsize=10, fontweight='bold',
+                self._set_text_with_font(ax, 'text', mid_time, y_pos + 0.15, f'标准: {expected}', 
+                       ha='center', va='bottom', fontsize=9, fontweight='bold',
                        color='darkblue')
             
-            # 识别文本（下方）
+            # 识别文本（下方） - 调整间距避免重叠
             if recognized:
-                self._set_text_with_font(ax, 'text', mid_time, y_pos - 0.1, f'识别: {recognized}', 
-                       ha='center', va='top', fontsize=10, 
+                self._set_text_with_font(ax, 'text', mid_time, y_pos - 0.15, f'识别: {recognized}', 
+                       ha='center', va='top', fontsize=9, 
                        color='darkred' if match_quality < 0.5 else 'darkgreen')
             
-            # 时间标注
-            self._set_text_with_font(ax, 'text', start_time, y_pos - 0.35, f'{start_time:.2f}s', 
-                   ha='left', va='top', fontsize=8, color='gray')
-            self._set_text_with_font(ax, 'text', end_time, y_pos - 0.35, f'{end_time:.2f}s', 
-                   ha='right', va='top', fontsize=8, color='gray')
+            # 时间标注 - 调整位置和字体大小
+            self._set_text_with_font(ax, 'text', start_time, y_pos - 0.4, f'{start_time:.2f}s', 
+                   ha='left', va='top', fontsize=7, color='gray')
+            self._set_text_with_font(ax, 'text', end_time, y_pos - 0.4, f'{end_time:.2f}s', 
+                   ha='right', va='top', fontsize=7, color='gray')
             
-            # 匹配质量指示
+            # 匹配质量指示 - 调整位置和字体大小
             quality_text = f'{match_quality:.1%}'
-            self._set_text_with_font(ax, 'text', end_time + 0.05, y_pos, quality_text, 
-                   ha='left', va='center', fontsize=9, fontweight='bold',
+            self._set_text_with_font(ax, 'text', end_time + 0.1, y_pos, quality_text, 
+                   ha='left', va='center', fontsize=8, fontweight='bold',
                    color=color)
         
         # 设置标签
@@ -607,32 +604,32 @@ class PitchVisualization:
         ax.set_yticks(range(len(text_mapping)))
         ax.set_yticklabels(reversed(segment_labels))  # 从上到下显示
         
-        self._set_text_with_font(ax, 'xlabel', '时间 (秒)', fontsize=12, fontweight='bold')
+        self._set_text_with_font(ax, 'xlabel', '时间 (秒)', fontsize=11, fontweight='bold')
         self._set_text_with_font(ax, 'title', '📝 文本时域对齐分析 - 语音段与文字对应关系', 
-               fontsize=14, fontweight='bold')
+               fontsize=12, fontweight='bold')
         
-        # 设置坐标轴刻度字体
+        # 设置坐标轴刻度字体 - 文本对齐图专用
         for label in ax.get_xticklabels() + ax.get_yticklabels():
-            label.set_fontproperties(self._get_font_properties(10))
+            label.set_fontproperties(self._get_font_properties(9))
         
         ax.grid(True, alpha=0.3, axis='x')
         
-        # 添加图例
+        # 添加图例 - 调整字体大小
         legend_elements = [
             plt.Rectangle((0, 0), 1, 1, facecolor=self.colors['good'], alpha=0.8, label='匹配良好 (≥80%)'),
             plt.Rectangle((0, 0), 1, 1, facecolor=self.colors['warning'], alpha=0.7, label='匹配一般 (≥50%)'),
             plt.Rectangle((0, 0), 1, 1, facecolor=self.colors['error'], alpha=0.6, label='匹配较差 (<50%)')
         ]
-        ax.legend(handles=legend_elements, loc='upper right', fontsize=10,
-                 prop=self._get_font_properties(10))
+        ax.legend(handles=legend_elements, loc='upper right', fontsize=9,
+                 prop=self._get_font_properties(9))
         
-        # 添加统计信息
+        # 添加统计信息 - 调整字体大小
         if text_mapping:
             avg_quality = sum(m.get('match_quality', 0) for m in text_mapping) / len(text_mapping)
             total_words = sum(m.get('word_count', 0) for m in text_mapping)
             info_text = f'平均匹配度: {avg_quality:.1%}\n总词数: {total_words}'
             self._set_text_with_font(ax, 'text', 0.02, 0.98, info_text, transform=ax.transAxes,
-                   verticalalignment='top', fontsize=10,
+                   verticalalignment='top', fontsize=9,
                    bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow', alpha=0.8))
     
     def _plot_score_overview(self, ax, score_result):
@@ -643,26 +640,26 @@ class PitchVisualization:
         total_score = score_result['total_score']
         level = score_result['level']
         
-        # 绘制大分数
+        # 绘制大分数 - 调整字体大小避免重叠
         color = self._get_score_color(total_score)
-        self._set_text_with_font(ax, 'text', 0.5, 0.7, f'{total_score:.1f}', 
+        self._set_text_with_font(ax, 'text', 0.5, 0.65, f'{total_score:.1f}', 
                horizontalalignment='center', verticalalignment='center',
-               fontsize=48, fontweight='bold', color=color, transform=ax.transAxes)
+               fontsize=32, fontweight='bold', color=color, transform=ax.transAxes)
         
-        self._set_text_with_font(ax, 'text', 0.5, 0.4, '分', 
+        self._set_text_with_font(ax, 'text', 0.5, 0.45, '分', 
                horizontalalignment='center', verticalalignment='center',
-               fontsize=24, color=color, transform=ax.transAxes)
+               fontsize=16, color=color, transform=ax.transAxes)
         
-        self._set_text_with_font(ax, 'text', 0.5, 0.2, level, 
+        self._set_text_with_font(ax, 'text', 0.5, 0.25, level, 
                horizontalalignment='center', verticalalignment='center',
-               fontsize=16, fontweight='bold', color=color, transform=ax.transAxes)
+               fontsize=12, fontweight='bold', color=color, transform=ax.transAxes)
         
-        # 添加背景圆圈
-        circle = plt.Circle((0.5, 0.5), 0.4, transform=ax.transAxes, 
-                           fill=False, linewidth=3, color=color, alpha=0.3)
+        # 添加背景圆圈 - 调整大小避免与文字重叠
+        circle = plt.Circle((0.5, 0.45), 0.35, transform=ax.transAxes, 
+                           fill=False, linewidth=2, color=color, alpha=0.3)
         ax.add_patch(circle)
         
-        self._set_text_with_font(ax, 'title', '🏆 总体评分', fontsize=14, fontweight='bold', pad=10)
+        self._set_text_with_font(ax, 'title', '🏆 总体评分', fontsize=12, fontweight='bold', pad=8)
     
     def _plot_component_scores(self, ax, component_scores):
         """绘制各项能力评分"""
@@ -679,31 +676,31 @@ class PitchVisualization:
         # 创建颜色列表
         colors = [self._get_score_color(score) for score in scores]
         
-        # 绘制水平条形图
+        # 绘制水平条形图 - 调整高度和字体大小
         y_pos = np.arange(len(categories))
-        bars = ax.barh(y_pos, scores, color=colors, alpha=0.7, height=0.6)
+        bars = ax.barh(y_pos, scores, color=colors, alpha=0.7, height=0.5)
         
-        # 添加分数标签
+        # 添加分数标签 - 调整位置避免重叠
         for i, (bar, score) in enumerate(zip(bars, scores)):
             width = bar.get_width()
-            self._set_text_with_font(ax, 'text', width + 1, bar.get_y() + bar.get_height()/2,
-                   f'{score:.0f}', ha='left', va='center', fontsize=11, fontweight='bold')
+            self._set_text_with_font(ax, 'text', width + 2, bar.get_y() + bar.get_height()/2,
+                   f'{score:.0f}', ha='left', va='center', fontsize=9, fontweight='bold')
         
-        # 设置图表属性
+        # 设置图表属性 - 调整字体大小
         ax.set_yticks(y_pos)
-        ax.set_yticklabels(categories, fontsize=11, fontproperties=self._get_font_properties(11))
-        self._set_text_with_font(ax, 'xlabel', '得分', fontsize=12, fontweight='bold')
-        self._set_text_with_font(ax, 'title', '🎯 各项能力评分', fontsize=14, fontweight='bold')
-        ax.set_xlim(0, 100)
+        ax.set_yticklabels(categories, fontsize=9, fontproperties=self._get_font_properties(9))
+        self._set_text_with_font(ax, 'xlabel', '得分', fontsize=10, fontweight='bold')
+        self._set_text_with_font(ax, 'title', '🎯 各项能力评分', fontsize=12, fontweight='bold')
+        ax.set_xlim(0, 105)  # 增加右侧空间给分数标签
         ax.grid(True, alpha=0.3, axis='x')
         
-        # 设置坐标轴刻度字体
+        # 设置坐标轴刻度字体 - 调整字体大小
         for label in ax.get_xticklabels() + ax.get_yticklabels():
-            label.set_fontproperties(self._get_font_properties(10))
+            label.set_fontproperties(self._get_font_properties(8))
         
-        # 添加参考线
-        ax.axvline(x=60, color='orange', linestyle='--', alpha=0.7, label='及格线')
-        ax.axvline(x=80, color='green', linestyle='--', alpha=0.7, label='良好线')
+        # 添加参考线 - 调整透明度避免干扰
+        ax.axvline(x=60, color='orange', linestyle='--', alpha=0.5, linewidth=1)
+        ax.axvline(x=80, color='green', linestyle='--', alpha=0.5, linewidth=1)
     
     
     def _plot_main_comparison(self, ax, times, standard_pitch, user_pitch):
@@ -822,7 +819,7 @@ class PitchVisualization:
             return False
     
     def plot_individual_pitch(self, pitch_data: dict, output_path: str, 
-                            title: str = "音高曲线", fig_size=(12, 6)) -> bool:
+                            title: str = "音高曲线", fig_size=(14, 8)) -> bool:
         """
         绘制单个音高曲线
         :param pitch_data: 音高数据
