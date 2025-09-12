@@ -324,7 +324,7 @@ def compare_audio():
         chart_path = os.path.join(Config.OUTPUT_FOLDER, chart_filename)
         
         chart_success = visualizer.plot_pitch_comparison(
-            comparison_result, score_result, chart_path
+            comparison_result, score_result, chart_path, input_text=text
         )
         
         # 准备返回数据，使用安全序列化

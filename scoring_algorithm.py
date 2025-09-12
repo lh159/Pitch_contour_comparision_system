@@ -88,14 +88,6 @@ class ScoringSystem:
         # 确定评级
         level = self._get_score_level(total_score)
         
-        # 生成反馈建议
-        feedback = self._generate_feedback(metrics, {
-            'correlation': correlation_score,
-            'rmse': rmse_score,
-            'trend': trend_score,
-            'range': range_score
-        })
-        
         return {
             'total_score': round(total_score, 1),
             'component_scores': {
@@ -105,7 +97,6 @@ class ScoringSystem:
                 'range': round(range_score, 1)
             },
             'level': level,
-            'feedback': feedback,
             'metrics': metrics
         }
     
@@ -174,52 +165,6 @@ class ScoringSystem:
         else:
             return "需要改进"
     
-    def _generate_feedback(self, metrics: dict, component_scores: dict) -> str:
-        """生成个性化反馈建议"""
-        feedback_parts = []
-        
-        # 总体评价
-        correlation = metrics.get('correlation', 0)
-        if correlation >= 0.8:
-            feedback_parts.append("🎉 您的发音整体音调把握很好！")
-        elif correlation >= 0.6:
-            feedback_parts.append("👍 您的发音基本准确，还有提升空间。")
-        else:
-            feedback_parts.append("💪 建议多练习，注意音调的起伏变化。")
-        
-        # 具体建议
-        suggestions = []
-        
-        # 音高准确性建议
-        if component_scores['correlation'] < 70:
-            suggestions.append("🎵 音高准确性需要改进，建议跟着标准发音多练习音调")
-        
-        # 趋势一致性建议
-        if component_scores['trend'] < 70:
-            suggestions.append("📈 注意音调变化的方向，练习声调的上升和下降")
-        
-        # 稳定性建议
-        if component_scores['rmse'] < 70:
-            suggestions.append("🎯 发音稳定性需要加强，避免音调过度波动")
-        
-        # 音域建议
-        if component_scores['range'] < 70:
-            std_mean = metrics.get('std_mean', 0)
-            user_mean = metrics.get('user_mean', 0)
-            if user_mean > std_mean * 1.2:
-                suggestions.append("🔽 您的音调偏高，可以试着降低一些")
-            elif user_mean < std_mean * 0.8:
-                suggestions.append("🔼 您的音调偏低，可以试着提高一些")
-            else:
-                suggestions.append("🎼 注意音调变化的幅度，应该与标准发音保持一致")
-        
-        if suggestions:
-            feedback_parts.append("\n改进建议：")
-            feedback_parts.extend(suggestions)
-        else:
-            feedback_parts.append("\n继续保持，您的发音很棒！")
-        
-        return "\n".join(feedback_parts)
 
 class DetailedAnalyzer:
     """详细分析器，提供更深入的音高分析"""

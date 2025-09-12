@@ -124,7 +124,7 @@ class PitchComparisonSystem:
             )
             
             chart_success = self.visualizer.plot_pitch_comparison(
-                comparison_result, score_result, chart_path
+                comparison_result, score_result, chart_path, input_text=text
             )
             
             # 6. 记录到历史

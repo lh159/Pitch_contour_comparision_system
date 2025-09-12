@@ -164,13 +164,6 @@
         .score-fair { background: linear-gradient(45deg, #ffc107, #fd7e14); }
         .score-poor { background: linear-gradient(45deg, #dc3545, #e83e8c); }
         
-        .feedback-text {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 15px 0;
-            border-left: 4px solid #667eea;
-        }
         
         .loading-spinner {
             display: none;
@@ -196,6 +189,9 @@
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             margin: 20px 0;
+            /* 确保图片底部汉字标注完全可见 */
+            padding-bottom: 10px;
+            background: white;
         }
         
         .alert-custom {
@@ -528,11 +524,6 @@
                 <!-- 音高曲线图 -->
                 <div class="text-center mt-4">
                     <img id="comparisonChart" class="comparison-chart" style="display: none;" alt="音高曲线对比图">
-                </div>
-                
-                <!-- 反馈建议 -->
-                <div class="feedback-text" id="feedbackText">
-                    正在生成个性化建议...
                 </div>
                 
                 <!-- 操作按钮 -->
@@ -1013,9 +1004,6 @@
             document.getElementById('trendScore').textContent = score.component_scores.trend;
             document.getElementById('stabilityScore').textContent = score.component_scores.stability;
             document.getElementById('rangeScore').textContent = score.component_scores.range;
-            
-            // 显示反馈
-            document.getElementById('feedbackText').innerHTML = score.feedback.replace(/\n/g, '<br>');
             
             // 显示图表
             if (data.chart_url) {

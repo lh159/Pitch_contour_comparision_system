@@ -121,7 +121,7 @@ class PitchVisualization:
             return ax.text(*args, **kwargs)
     
     def plot_pitch_comparison(self, comparison_result: dict, score_result: dict, 
-                            output_path: str, fig_size=(16, 12), dpi=300) -> bool:
+                            output_path: str, fig_size=(16, 12), dpi=300, input_text: str = None) -> bool:
         """
         绘制音高曲线对比图 - 全新设计，更加直观
         """
@@ -143,11 +143,11 @@ class PitchVisualization:
             has_text_alignment = (comparison_result.get('vad_result') and 
                                 comparison_result['vad_result'].get('text_alignment'))
             
-            # 创建更清晰的布局：主图 + 侧边栏
+            # 创建更清晰的布局：主图 + 侧边栏（删除反馈建议模块）
             if has_text_alignment:
-                # 有文本对齐时，增加一行显示文本时域对齐
-                fig = plt.figure(figsize=(fig_size[0], fig_size[1] + 2), facecolor='white')
-                gs = fig.add_gridspec(4, 3, height_ratios=[2.5, 0.8, 1, 1], width_ratios=[2, 1, 1], 
+                # 有文本对齐时，只显示主图、文本对齐图和评分
+                fig = plt.figure(figsize=(fig_size[0], fig_size[1] - 2), facecolor='white')
+                gs = fig.add_gridspec(2, 3, height_ratios=[3.5, 0.8], width_ratios=[2, 1, 1], 
                                      hspace=0.3, wspace=0.3)
                 
                 # 1. 主要音高对比图 (占据左侧大部分空间)
@@ -155,38 +155,38 @@ class PitchVisualization:
                 self._plot_enhanced_comparison_with_text(ax_main, times, standard_pitch, user_pitch, 
                                                        score_result, comparison_result['vad_result'])
                 
-                # 2. 文本时域对齐图 (新增)
+                # 2. 文本时域对齐图
                 ax_text = fig.add_subplot(gs[1, :2])
                 self._plot_text_alignment(ax_text, comparison_result['vad_result'])
                 
-                # 调整其他子图位置
-                score_row, stats_row, components_row, feedback_row = 0, 2, 2, 3
+                # 调整评分子图位置
+                score_row, components_row = 0, 1
             else:
-                fig = plt.figure(figsize=fig_size, facecolor='white')
-                gs = fig.add_gridspec(3, 3, height_ratios=[2.5, 1, 1], width_ratios=[2, 1, 1], 
-                                     hspace=0.3, wspace=0.3)
+                fig = plt.figure(figsize=(fig_size[0], fig_size[1] - 3), facecolor='white')
+                gs = fig.add_gridspec(1, 3, width_ratios=[2, 1, 1], wspace=0.3)
                 
                 # 1. 主要音高对比图 (占据左侧大部分空间)
                 ax_main = fig.add_subplot(gs[0, :2])
-                self._plot_enhanced_comparison(ax_main, times, standard_pitch, user_pitch, score_result)
+                # 为没有VAD数据的情况生成简单字符时间戳
+                char_timestamps = self._generate_simple_char_timestamps(input_text, times) if input_text else None
+                self._plot_enhanced_comparison(ax_main, times, standard_pitch, user_pitch, score_result, char_timestamps)
                 
-                score_row, stats_row, components_row, feedback_row = 0, 1, 1, 2
+                score_row, components_row = 0, 0
             
             # 2. 评分总览 (右上角)
             ax_score = fig.add_subplot(gs[score_row, 2])
             self._plot_score_overview(ax_score, score_result)
             
-            # 3. 音高统计对比 (左下)
-            ax_stats = fig.add_subplot(gs[stats_row, :2])
-            self._plot_pitch_statistics(ax_stats, comparison_result['metrics'])
-            
-            # 4. 各项能力评分 (右下)
-            ax_components = fig.add_subplot(gs[components_row, 2])
+            # 3. 各项能力评分 (右下角)
+            if has_text_alignment:
+                ax_components = fig.add_subplot(gs[components_row, 2])
+            else:
+                # 没有文本对齐时，将组件评分放在评分总览下方
+                gs_components = gs[score_row, 2].subgridspec(2, 1, hspace=0.3)
+                ax_score = fig.add_subplot(gs_components[0])
+                self._plot_score_overview(ax_score, score_result)
+                ax_components = fig.add_subplot(gs_components[1])
             self._plot_component_scores(ax_components, score_result['component_scores'])
-            
-            # 5. 改进建议 (底部全宽)
-            ax_feedback = fig.add_subplot(gs[feedback_row, :])
-            self._plot_enhanced_feedback(ax_feedback, score_result)
             
             # 设置整体标题
             total_score = score_result['total_score']
@@ -221,7 +221,7 @@ class PitchVisualization:
         else:
             return self.colors['error']
     
-    def _plot_enhanced_comparison(self, ax, times, standard_pitch, user_pitch, score_result):
+    def _plot_enhanced_comparison(self, ax, times, standard_pitch, user_pitch, score_result, char_timestamps=None):
         """绘制增强版音高对比曲线"""
         
         # 计算差异
@@ -252,6 +252,10 @@ class PitchVisualization:
                            [standard_pitch[i], standard_pitch[i+1]], 
                            [user_pitch[i], user_pitch[i+1]], 
                            color=color, alpha=alpha)
+        
+        # 🆕 添加汉字时间标注
+        if char_timestamps:
+            self._add_character_annotations(ax, char_timestamps, times)
         
         # 设置图表属性
         self._set_text_with_font(ax, 'xlabel', '时间 (秒)', fontsize=14, fontweight='bold')
@@ -288,11 +292,216 @@ class PitchVisualization:
                verticalalignment='top', fontsize=11,
                bbox=dict(boxstyle='round,pad=0.5', facecolor='lightblue', alpha=0.8))
     
+    def _add_character_annotations(self, ax, char_timestamps, times):
+        """
+        在音高曲线图上添加汉字时间标注
+        :param ax: matplotlib轴对象
+        :param char_timestamps: 字符时间戳列表，格式: [{'char': '你', 'start_time': 0.0, 'end_time': 0.5}, ...]
+        :param times: 时间轴数组
+        """
+        try:
+            if not char_timestamps:
+                return
+            
+            y_min, y_max = ax.get_ylim()
+            x_min, x_max = ax.get_xlim()
+            
+            # 确保汉字标注使用与音高曲线图相同的时间轴范围
+            print(f"音高曲线图时间轴范围: {x_min:.3f}s - {x_max:.3f}s")
+            
+            # 计算标注位置 - 紧贴音高曲线图底部，时间轴对齐，增加更多空间确保完全可见
+            annotation_y = y_min - (y_max - y_min) * 0.15  # 紧贴在x轴下方，增加到15%确保完全可见
+            
+            # 用于避免标注重叠的位置记录
+            used_positions = []
+            
+            for i, char_info in enumerate(char_timestamps):
+                char = char_info.get('char', '')
+                start_time = char_info.get('start_time', 0)
+                end_time = char_info.get('end_time', start_time + 0.1)
+                
+                # 跳过空字符或无效时间
+                if not char or start_time >= end_time:
+                    continue
+                
+                # 检查时间是否在当前图表范围内
+                if end_time < x_min or start_time > x_max:
+                    continue
+                
+                # 计算字符的中心位置
+                char_center_time = (start_time + end_time) / 2
+                
+                # 避免标注重叠 - 检查是否与已有标注太近
+                min_distance = (x_max - x_min) * 0.03  # 最小间距为图表宽度的3%
+                is_overlapping = any(abs(char_center_time - pos) < min_distance for pos in used_positions)
+                
+                if is_overlapping:
+                    # 如果重叠，稍微调整位置
+                    offset = min_distance * (1 if i % 2 == 0 else -1)
+                    char_center_time = max(x_min, min(x_max, char_center_time + offset))
+                
+                used_positions.append(char_center_time)
+                
+                # 绘制字符背景区域 (可选)
+                if end_time - start_time > 0.05:  # 只对足够长的段绘制背景
+                    rect_height = (y_max - y_min) * 0.05
+                    rect = plt.Rectangle((start_time, y_min - rect_height/2), 
+                                       end_time - start_time, rect_height,
+                                       facecolor='lightgray', alpha=0.3, 
+                                       edgecolor='gray', linewidth=0.5)
+                    ax.add_patch(rect)
+                
+                # 添加汉字标注 - 紧贴音高曲线图底部，时间轴对齐
+                self._set_text_with_font(ax, 'text', char_center_time, annotation_y, char,
+                       ha='center', va='center', fontsize=16, fontweight='bold',
+                       color='darkblue',
+                       bbox=dict(boxstyle='round,pad=0.3', 
+                               facecolor='white', 
+                               edgecolor='darkblue', 
+                               alpha=0.95,
+                               linewidth=1.5,
+                               zorder=10))  # 设置高层级，确保在最上层显示
+                
+                # 添加连接线，明确显示汉字与音高曲线的时间对应关系
+                if end_time - start_time > 0.05:  # 对有意义的时间段添加连接线
+                    # 从汉字位置向上连接到音高曲线底部
+                    line_y_start = annotation_y + (y_max - y_min) * 0.02  # 从汉字上方开始
+                    line_y_end = y_min - (y_max - y_min) * 0.02  # 到音高曲线底部
+                    ax.plot([char_center_time, char_center_time], 
+                           [line_y_start, line_y_end],
+                           color='lightblue', linestyle='-', alpha=0.6, linewidth=1.5, zorder=5)
+                
+                # 添加时间范围标注 (小字体，在字符下方)
+                if end_time - start_time > 0.2:  # 只对足够长的段显示时间
+                    time_text = f'{start_time:.2f}-{end_time:.2f}s'
+                    self._set_text_with_font(ax, 'text', char_center_time, annotation_y - (y_max - y_min) * 0.04,
+                           time_text, ha='center', va='center', fontsize=8, 
+                           color='gray', alpha=0.8)
+            
+            # 调整y轴范围以容纳标注，确保汉字完全可见
+            ax.set_ylim(annotation_y - (y_max - y_min) * 0.20, y_max)  # 底部增加更多空间确保汉字完全可见
+            
+        except Exception as e:
+            print(f"添加汉字标注失败: {e}")
+            # 不影响主图绘制，继续执行
+    
+    def _extract_char_timestamps_from_vad(self, vad_result):
+        """
+        从VAD结果中提取字符时间戳数据
+        :param vad_result: VAD处理结果
+        :return: 字符时间戳列表
+        """
+        try:
+            if not vad_result:
+                return None
+            
+            char_timestamps = []
+            
+            # 方法1: 从vad_text_mapping中提取
+            if vad_result.get('vad_text_mapping'):
+                for mapping in vad_result['vad_text_mapping']:
+                    expected_text = mapping.get('expected_text', '')
+                    start_time = mapping.get('vad_start', 0)
+                    end_time = mapping.get('vad_end', start_time + 0.1)
+                    
+                    if expected_text and end_time > start_time:
+                        # 将文本分割为单个字符，并估算每个字符的时间
+                        chars = list(expected_text.strip())
+                        if len(chars) > 0:
+                            duration_per_char = (end_time - start_time) / len(chars)
+                            
+                            for i, char in enumerate(chars):
+                                if char.strip():  # 跳过空白字符
+                                    char_start = start_time + i * duration_per_char
+                                    char_end = char_start + duration_per_char
+                                    
+                                    char_timestamps.append({
+                                        'char': char,
+                                        'start_time': char_start,
+                                        'end_time': char_end
+                                    })
+            
+            # 方法2: 从expected_text和总时长估算（备用方案）
+            elif vad_result.get('expected_text'):
+                expected_text = vad_result['expected_text']
+                
+                # 尝试从VAD段获取总时长
+                total_duration = 0
+                if vad_result.get('vad_segments'):
+                    total_duration = max(end for start, end in vad_result['vad_segments'])
+                
+                if total_duration > 0 and expected_text:
+                    chars = list(expected_text.strip())
+                    if len(chars) > 0:
+                        duration_per_char = total_duration / len(chars)
+                        
+                        for i, char in enumerate(chars):
+                            if char.strip():
+                                char_start = i * duration_per_char
+                                char_end = char_start + duration_per_char
+                                
+                                char_timestamps.append({
+                                    'char': char,
+                                    'start_time': char_start,
+                                    'end_time': char_end
+                                })
+            
+            return char_timestamps if char_timestamps else None
+            
+        except Exception as e:
+            print(f"从VAD结果提取字符时间戳失败: {e}")
+            return None
+    
+    def _generate_simple_char_timestamps(self, input_text, times):
+        """
+        为输入文本生成简单的字符时间戳（均匀分布）
+        :param input_text: 输入的文本
+        :param times: 时间轴数组
+        :return: 字符时间戳列表
+        """
+        try:
+            if not input_text or len(times) == 0:
+                return None
+            
+            # 清理文本，只保留有意义的字符
+            chars = [char for char in input_text.strip() if char.strip()]
+            if not chars:
+                return None
+            
+            # 计算总时长
+            total_duration = times[-1] - times[0]
+            if total_duration <= 0:
+                return None
+            
+            # 均匀分配时间给每个字符
+            duration_per_char = total_duration / len(chars)
+            start_time = times[0]
+            
+            char_timestamps = []
+            for i, char in enumerate(chars):
+                char_start = start_time + i * duration_per_char
+                char_end = char_start + duration_per_char
+                
+                char_timestamps.append({
+                    'char': char,
+                    'start_time': char_start,
+                    'end_time': char_end
+                })
+            
+            return char_timestamps
+            
+        except Exception as e:
+            print(f"生成简单字符时间戳失败: {e}")
+            return None
+    
     def _plot_enhanced_comparison_with_text(self, ax, times, standard_pitch, user_pitch, score_result, vad_result):
         """绘制带文本标注的增强版音高对比曲线"""
         
-        # 先绘制基础对比曲线
-        self._plot_enhanced_comparison(ax, times, standard_pitch, user_pitch, score_result)
+        # 提取字符时间戳数据
+        char_timestamps = self._extract_char_timestamps_from_vad(vad_result)
+        
+        # 先绘制基础对比曲线（包含汉字标注）
+        self._plot_enhanced_comparison(ax, times, standard_pitch, user_pitch, score_result, char_timestamps)
         
         # 添加VAD区域标注
         if vad_result and vad_result.get('vad_segments'):
@@ -455,40 +664,6 @@ class PitchVisualization:
         
         self._set_text_with_font(ax, 'title', '🏆 总体评分', fontsize=14, fontweight='bold', pad=10)
     
-    def _plot_pitch_statistics(self, ax, metrics):
-        """绘制音高统计对比"""
-        
-        # 准备数据
-        categories = ['标准音高', '您的音高']
-        values = [metrics.get('std_mean', 0), metrics.get('user_mean', 0)]
-        colors = [self.colors['standard'], self.colors['user']]
-        
-        # 绘制柱状图
-        bars = ax.bar(categories, values, color=colors, alpha=0.7, width=0.6)
-        
-        # 添加数值标签
-        for bar, value in zip(bars, values):
-            height = bar.get_height()
-            self._set_text_with_font(ax, 'text', bar.get_x() + bar.get_width()/2., height + 5,
-                   f'{value:.1f} Hz', ha='center', va='bottom', fontsize=12, fontweight='bold')
-        
-        # 设置图表属性
-        self._set_text_with_font(ax, 'ylabel', '平均基频 (Hz)', fontsize=12, fontweight='bold')
-        self._set_text_with_font(ax, 'title', '📈 音高统计对比', fontsize=14, fontweight='bold')
-        ax.grid(True, alpha=0.3, axis='y')
-        
-        # 设置坐标轴刻度字体
-        for label in ax.get_xticklabels() + ax.get_yticklabels():
-            label.set_fontproperties(self._get_font_properties(10))
-        
-        # 添加统计信息
-        correlation = metrics.get('correlation', 0)
-        rmse = metrics.get('rmse', 0)
-        info_text = f'相关系数: {correlation:.3f}\n均方根误差: {rmse:.1f} Hz'
-        self._set_text_with_font(ax, 'text', 0.02, 0.98, info_text, transform=ax.transAxes,
-               verticalalignment='top', fontsize=10,
-               bbox=dict(boxstyle='round,pad=0.3', facecolor='wheat', alpha=0.8))
-    
     def _plot_component_scores(self, ax, component_scores):
         """绘制各项能力评分"""
         
@@ -530,46 +705,6 @@ class PitchVisualization:
         ax.axvline(x=60, color='orange', linestyle='--', alpha=0.7, label='及格线')
         ax.axvline(x=80, color='green', linestyle='--', alpha=0.7, label='良好线')
     
-    def _plot_enhanced_feedback(self, ax, score_result):
-        """绘制增强版反馈建议"""
-        ax.clear()
-        ax.axis('off')
-        
-        feedback_text = score_result.get('feedback', '暂无反馈')
-        
-        # 分割并格式化反馈文本
-        lines = feedback_text.split('\n')
-        formatted_lines = []
-        
-        for line in lines:
-            if line.strip():
-                # 移除emoji，用更简洁的格式
-                clean_line = line.replace('🎉', '✓').replace('👍', '✓').replace('💪', '▶')
-                clean_line = clean_line.replace('🎵', '♪').replace('📊', '•')
-                formatted_lines.append(clean_line)
-        
-        # 显示反馈文本
-        y_start = 0.9
-        for i, line in enumerate(formatted_lines[:4]):  # 最多显示4行
-            y_pos = y_start - i * 0.2
-            if y_pos < 0:
-                break
-            
-            # 设置不同类型文本的样式
-            if line.startswith('✓') or '优秀' in line or '良好' in line:
-                color = self.colors['good']
-                fontweight = 'bold'
-            elif '建议' in line or '改进' in line:
-                color = self.colors['warning']
-                fontweight = 'normal'
-            else:
-                color = self.colors['text']
-                fontweight = 'normal'
-            
-            self._set_text_with_font(ax, 'text', 0.05, y_pos, line, fontsize=12, fontweight=fontweight,
-                   color=color, transform=ax.transAxes, verticalalignment='top')
-        
-        self._set_text_with_font(ax, 'title', '💡 评价与改进建议', fontsize=14, fontweight='bold')
     
     def _plot_main_comparison(self, ax, times, standard_pitch, user_pitch):
         """绘制主要的音高对比曲线"""
@@ -661,37 +796,6 @@ class PitchVisualization:
         
         ax.set_title('统计信息', fontsize=12, weight='bold')
     
-    def _plot_feedback(self, ax, score_result):
-        """绘制反馈建议"""
-        
-        # 清除坐标轴
-        ax.clear()
-        ax.axis('off')
-        
-        # 添加反馈文本
-        feedback_text = score_result.get('feedback', '暂无反馈')
-        
-        # 分割长文本
-        lines = feedback_text.split('\n')
-        
-        for i, line in enumerate(lines):
-            y_pos = 0.9 - i * 0.12
-            if y_pos < 0:
-                break
-            
-            # 设置不同类型文本的样式
-            if line.startswith('🎉') or line.startswith('👍') or line.startswith('💪'):
-                fontweight = 'bold'
-                fontsize = 12
-            else:
-                fontweight = 'normal'
-                fontsize = 11
-            
-            ax.text(0.05, y_pos, line, fontsize=fontsize, weight=fontweight,
-                   transform=ax.transAxes, verticalalignment='top',
-                   wrap=True)
-        
-        ax.set_title('评价与建议', fontsize=12, weight='bold')
     
     def _plot_error_message(self, error_message: str, output_path: str) -> bool:
         """绘制错误信息图"""
@@ -873,8 +977,7 @@ if __name__ == '__main__':
             'trend': 68.0,
             'stability': 80.0,
             'range': 82.0
-        },
-        'feedback': '👍 您的发音基本准确，还有提升空间。\n改进建议：\n🎵 音高准确性需要改进，建议跟着标准发音多练习音调'
+        }
     }
     
     # 测试对比图
