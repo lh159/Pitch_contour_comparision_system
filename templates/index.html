@@ -612,17 +612,17 @@
                     <div class="dialogue-controls mt-4">
                         <div class="row">
                             <div class="col-md-4">
-                                <button class="btn btn-success w-100" id="startDialogueBtn">
+                                <button class="btn btn-success w-100 apple-glass-btn" id="startDialogueBtn">
                                     <i class="fas fa-play me-2"></i>开始对话
                                 </button>
                             </div>
                             <div class="col-md-4">
-                                <button class="btn btn-warning w-100" id="continueBtn" style="display:none;">
+                                <button class="btn btn-warning w-100 apple-glass-btn" id="continueBtn" style="display:none;">
                                     <i class="fas fa-arrow-right me-2"></i>继续对话
                                 </button>
                             </div>
                             <div class="col-md-4">
-                                <button class="btn btn-info w-100" id="regenerateBtn">
+                                <button class="btn btn-info w-100 apple-glass-btn" id="regenerateBtn">
                                     <i class="fas fa-redo me-2"></i>重新生成
                                 </button>
                             </div>
@@ -809,14 +809,15 @@
                     </div>
                     
                     <!-- 操作按钮 -->
+                    <div class="col-md-4">
+                        <button class="btn btn-warning w-100 apple-glass-btn" id="continueBtn" style="display:none;">
+                            <i class="fas fa-arrow-right me-2"></i>继续对话
+                        </button>
+                    </div>
                     <div class="text-center">
-                        <button class="btn btn-custom me-2" id="retryBtn">
+                        <button class="btn btn-custom me-2 apple-glass-btn" id="retryBtn">
                             <i class="fas fa-redo me-2"></i>
                             重新练习
-                        </button>
-                        <button class="btn btn-outline-primary" id="newWordBtn">
-                            <i class="fas fa-plus me-2"></i>
-                            练习新词汇
                         </button>
                     </div>
                 </div>
@@ -885,6 +886,16 @@
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 DOM加载完成，开始初始化...');
+            
+            // 🔧 调试：检查场景对话模式相关DOM元素
+            console.log('📋 检查场景对话模式DOM元素:');
+            console.log('- basicModeRadio:', document.getElementById('basicMode'));
+            console.log('- scenarioModeRadio:', document.getElementById('scenarioMode'));
+            console.log('- basicModeInput:', document.getElementById('basicModeInput'));
+            console.log('- scenarioModeInput:', document.getElementById('scenarioModeInput'));
+            console.log('- scenarioInput:', document.getElementById('scenarioInput'));
+            console.log('- generateScenarioBtn:', document.getElementById('generateScenarioBtn'));
+            
             checkSystemStatus();
             setupEventListeners();
             initializeWebSocket();
@@ -929,12 +940,26 @@
             recordBtn.addEventListener('click', startRecording);
             stopBtn.addEventListener('click', stopRecording);
             compareBtn.addEventListener('click', compareAudio);
-            document.getElementById('retryBtn').addEventListener('click', retry);
-            document.getElementById('newWordBtn').addEventListener('click', newWord);
-            document.getElementById('uploadBtn').addEventListener('click', () => {
-                document.getElementById('audioFileInput').click();
-            });
-            document.getElementById('audioFileInput').addEventListener('change', handleFileUpload);
+            const retryBtn = document.getElementById('retryBtn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', retry);
+            }
+            
+            // newWordBtn检查
+            const newWordBtn = document.getElementById('newWordBtn');
+            if (newWordBtn) {
+                newWordBtn.addEventListener('click', newWord);
+            } else {
+                console.log('⚠️ newWordBtn元素不存在，跳过事件监听器设置');
+            }
+            const uploadBtn = document.getElementById('uploadBtn');
+            const audioFileInput = document.getElementById('audioFileInput');
+            if (uploadBtn && audioFileInput) {
+                uploadBtn.addEventListener('click', () => {
+                    audioFileInput.click();
+                });
+                audioFileInput.addEventListener('change', handleFileUpload);
+            }
             
             // 快速停止按钮
             const quickStopBtn = document.getElementById('quickStopBtn');
@@ -967,20 +992,52 @@
             });
             
             // 场景对话相关事件监听
-            basicModeRadio.addEventListener('change', handleModeChange);
-            scenarioModeRadio.addEventListener('change', handleModeChange);
-            generateScenarioBtn.addEventListener('click', generateScenario);
-            startDialogueBtn.addEventListener('click', startDialogue);
-            continueBtn.addEventListener('click', continueDialogue);
-            regenerateBtn.addEventListener('click', regenerateScenario);
+            console.log('🎯 设置场景对话事件监听器...');
+            if (basicModeRadio) {
+                basicModeRadio.addEventListener('change', handleModeChange);
+                console.log('✅ basicModeRadio 事件监听器已设置');
+            } else {
+                console.error('❌ basicModeRadio 元素不存在');
+            }
+            
+            if (scenarioModeRadio) {
+                scenarioModeRadio.addEventListener('change', handleModeChange);
+                console.log('✅ scenarioModeRadio 事件监听器已设置');
+            } else {
+                console.error('❌ scenarioModeRadio 元素不存在');
+            }
+            if (generateScenarioBtn) {
+                generateScenarioBtn.addEventListener('click', generateScenario);
+            } else {
+                console.log('⚠️ generateScenarioBtn元素不存在');
+            }
+            if (startDialogueBtn) {
+                startDialogueBtn.addEventListener('click', startDialogue);
+            } else {
+                console.log('⚠️ startDialogueBtn元素不存在');
+            }
+            if (continueBtn) {
+                continueBtn.addEventListener('click', continueDialogue);
+            } else {
+                console.log('⚠️ continueBtn元素不存在');
+            }
+            if (regenerateBtn) {
+                regenerateBtn.addEventListener('click', regenerateScenario);
+            } else {
+                console.log('⚠️ regenerateBtn元素不存在');
+            }
             
             // 场景输入回车键触发生成
-            scenarioInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    generateScenario();
-                }
-            });
+            if (scenarioInput) {
+                scenarioInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        generateScenario();
+                    }
+                });
+            } else {
+                console.log('⚠️ scenarioInput元素不存在');
+            }
         }
         
         // 生成标准音频（增强版，支持时间戳）
@@ -1541,17 +1598,21 @@
         
         // 处理练习模式切换
         function handleModeChange() {
+            console.log('🔄 handleModeChange 被调用');
+            console.log('- scenarioModeRadio.checked:', scenarioModeRadio ? scenarioModeRadio.checked : '元素不存在');
+            console.log('- basicModeRadio.checked:', basicModeRadio ? basicModeRadio.checked : '元素不存在');
+            
             isDialogueMode = scenarioModeRadio.checked;
             
             if (isDialogueMode) {
                 basicModeInput.style.display = 'none';
                 scenarioModeInput.style.display = 'block';
-                console.log('切换到场景对话模式');
+                console.log('✅ 切换到场景对话模式');
             } else {
                 basicModeInput.style.display = 'block';
                 scenarioModeInput.style.display = 'none';
                 dialogueContainer.style.display = 'none';
-                console.log('切换到基础模式');
+                console.log('✅ 切换到基础模式');
             }
             
             // 重置状态

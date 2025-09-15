@@ -779,3 +779,159 @@
         animation: none;
     }
 }
+
+/* Apple 风格透明玻璃按钮样式 */
+.apple-glass-btn {
+    background: rgba(255, 255, 255, 0.2) !important;
+    backdrop-filter: blur(20px) saturate(1.8) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(1.8) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 12px !important;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.05) !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    font-weight: 500 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+.apple-glass-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg, 
+        transparent,
+        rgba(255, 255, 255, 0.1),
+        transparent
+    );
+    transition: left 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.apple-glass-btn:hover {
+    background: rgba(255, 255, 255, 0.25) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+    transform: translateY(-1px) scale(1.02) !important;
+    box-shadow: 
+        0 12px 40px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.05) !important;
+    color: rgba(255, 255, 255, 1) !important;
+}
+
+.apple-glass-btn:hover::before {
+    left: 100%;
+}
+
+.apple-glass-btn:active {
+    transform: translateY(0) scale(0.98) !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 
+        0 4px 16px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+.apple-glass-btn:focus {
+    outline: none !important;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        0 0 0 3px rgba(255, 255, 255, 0.3) !important;
+}
+
+/* 特定按钮的玻璃效果颜色调整 */
+#startDialogueBtn.apple-glass-btn {
+    background: rgba(76, 175, 80, 0.2) !important;
+    border-color: rgba(76, 175, 80, 0.4) !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+}
+
+#startDialogueBtn.apple-glass-btn:hover {
+    background: rgba(76, 175, 80, 0.3) !important;
+    border-color: rgba(76, 175, 80, 0.5) !important;
+    box-shadow: 
+        0 12px 40px rgba(76, 175, 80, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+#continueBtn.apple-glass-btn {
+    background: rgba(255, 193, 7, 0.2) !important;
+    border-color: rgba(255, 193, 7, 0.4) !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+}
+
+#continueBtn.apple-glass-btn:hover {
+    background: rgba(255, 193, 7, 0.3) !important;
+    border-color: rgba(255, 193, 7, 0.5) !important;
+    box-shadow: 
+        0 12px 40px rgba(255, 193, 7, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+#regenerateBtn.apple-glass-btn {
+    background: rgba(23, 162, 184, 0.2) !important;
+    border-color: rgba(23, 162, 184, 0.4) !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+}
+
+#regenerateBtn.apple-glass-btn:hover {
+    background: rgba(23, 162, 184, 0.3) !important;
+    border-color: rgba(23, 162, 184, 0.5) !important;
+    box-shadow: 
+        0 12px 40px rgba(23, 162, 184, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+.btn-custom.apple-glass-btn {
+    background: rgba(108, 117, 125, 0.2) !important;
+    border-color: rgba(108, 117, 125, 0.4) !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+}
+
+.btn-custom.apple-glass-btn:hover {
+    background: rgba(108, 117, 125, 0.3) !important;
+    border-color: rgba(108, 117, 125, 0.5) !important;
+    box-shadow: 
+        0 12px 40px rgba(108, 117, 125, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 针对不支持backdrop-filter的浏览器的降级方案 */
+@supports not (backdrop-filter: blur(20px)) {
+    .apple-glass-btn {
+        background: rgba(255, 255, 255, 0.9) !important;
+        color: rgba(51, 51, 51, 0.9) !important;
+        text-shadow: none !important;
+    }
+    
+    #startDialogueBtn.apple-glass-btn {
+        background: rgba(76, 175, 80, 0.9) !important;
+        color: rgba(255, 255, 255, 0.95) !important;
+    }
+    
+    #continueBtn.apple-glass-btn {
+        background: rgba(255, 193, 7, 0.9) !important;
+        color: rgba(51, 51, 51, 0.9) !important;
+    }
+    
+    #regenerateBtn.apple-glass-btn {
+        background: rgba(23, 162, 184, 0.9) !important;
+        color: rgba(255, 255, 255, 0.95) !important;
+    }
+    
+    .btn-custom.apple-glass-btn {
+        background: rgba(108, 117, 125, 0.9) !important;
+        color: rgba(255, 255, 255, 0.95) !important;
+    }
+}
