@@ -343,7 +343,7 @@ class PitchAligner:
     
     def _align_pitch_baseline(self, standard: np.ndarray, user: np.ndarray) -> tuple:
         """
-        音高基线对齐：处理不同性别/年龄的基频差异
+        智能音高基线对齐：基于中文声调特征的优化对齐算法
         :param standard: 标准音高曲线
         :param user: 用户音高曲线  
         :return: 对齐后的 (标准音高, 用户音高)
@@ -353,38 +353,105 @@ class PitchAligner:
             std_valid = standard[~np.isnan(standard)]
             user_valid = user[~np.isnan(user)]
             
-            if len(std_valid) < 3 or len(user_valid) < 3:
+            if len(std_valid) < 5 or len(user_valid) < 5:
                 return standard, user
             
-            # 计算基线音高 (中位数更稳定)
-            std_baseline = np.median(std_valid)
-            user_baseline = np.median(user_valid)
+            # 🎯 使用统计分析确定基线和变化范围
+            std_stats = self._calculate_pitch_statistics(std_valid)
+            user_stats = self._calculate_pitch_statistics(user_valid)
             
-            # 计算基线差异
-            baseline_diff = user_baseline - std_baseline
+            # 计算基线差异 - 使用多种统计量的综合评估
+            baseline_diff = user_stats['median'] - std_stats['median']
+            mean_diff = user_stats['mean'] - std_stats['mean']
             
-            # 如果差异过大，可能是不同性别，需要调整
-            if abs(baseline_diff) > 50:  # 50Hz以上认为是显著差异
+            # 🎵 分析音高变化幅度 - 用于保留声调特征
+            std_range = std_stats['p75'] - std_stats['p25']  # 四分位距
+            user_range = user_stats['p75'] - user_stats['p25']
+            
+            # 🔍 智能阈值：基于音高范围动态调整
+            adaptive_threshold = max(30, min(80, std_range * 0.4))
+            
+            if abs(baseline_diff) > adaptive_threshold:
+                # 🎶 声调感知的对齐策略
+                scale_factor = self._calculate_optimal_scale_factor(
+                    std_stats, user_stats, baseline_diff
+                )
                 
-                # 方法1: 简单平移对齐
-                if baseline_diff > 0:
-                    # 用户音高偏高，下调用户音高
-                    aligned_user = user - baseline_diff * 0.7  # 保留30%的个人特色
+                # 📊 相对音高对齐：保持音调变化比例
+                if abs(baseline_diff) > abs(mean_diff) * 1.5:
+                    # 存在明显系统性偏差（如性别差异）
+                    aligned_user = self._apply_relative_alignment(
+                        user, std_stats, user_stats, scale_factor
+                    )
                     aligned_standard = standard
+                    
+                    print(f"🎵 智能基线对齐: 差异{baseline_diff:.1f}Hz，"
+                          f"缩放因子{scale_factor:.3f}，保持声调特征")
                 else:
-                    # 用户音高偏低，上调用户音高  
-                    aligned_user = user - baseline_diff * 0.7
+                    # 轻微调整，主要保持原有特征
+                    adjustment = baseline_diff * 0.5  # 更保守的调整
+                    aligned_user = user - adjustment
                     aligned_standard = standard
+                    
+                    print(f"🎶 轻度基线调整: {adjustment:.1f}Hz")
                 
-                print(f"检测到音高基线差异: {baseline_diff:.1f}Hz，已进行基线对齐")
                 return aligned_standard, aligned_user
             else:
-                # 差异不大，保持原样
+                # 差异在可接受范围内，保持原样
                 return standard, user
                 
         except Exception as e:
-            print(f"音高基线对齐失败: {e}")
+            print(f"智能音高基线对齐失败: {e}")
             return standard, user
+    
+    def _calculate_pitch_statistics(self, pitch_values: np.ndarray) -> dict:
+        """计算音高的详细统计信息"""
+        return {
+            'mean': np.mean(pitch_values),
+            'median': np.median(pitch_values),
+            'std': np.std(pitch_values),
+            'p25': np.percentile(pitch_values, 25),
+            'p75': np.percentile(pitch_values, 75),
+            'min': np.min(pitch_values),
+            'max': np.max(pitch_values),
+            'range': np.max(pitch_values) - np.min(pitch_values)
+        }
+    
+    def _calculate_optimal_scale_factor(self, std_stats: dict, user_stats: dict, 
+                                      baseline_diff: float) -> float:
+        """计算最优缩放因子，平衡基线对齐和声调保持"""
+        # 基于音高范围的智能缩放
+        std_range = std_stats['range']
+        user_range = user_stats['range']
+        
+        if std_range > 0 and user_range > 0:
+            # 考虑音高范围比例
+            range_ratio = user_range / std_range
+            # 基线差异的相对大小
+            relative_diff = abs(baseline_diff) / std_range
+            
+            # 智能缩放：差异越大，调整越保守
+            if relative_diff > 0.5:  # 大差异
+                return 0.3 + 0.2 * (1 / (1 + relative_diff))
+            else:  # 小差异
+                return 0.6 + 0.3 * (1 - relative_diff)
+        else:
+            return 0.5  # 默认中等调整
+    
+    def _apply_relative_alignment(self, user_pitch: np.ndarray, std_stats: dict, 
+                                user_stats: dict, scale_factor: float) -> np.ndarray:
+        """应用相对音高对齐，保持声调变化比例"""
+        # 计算用户音高相对于其基线的偏差
+        user_baseline = user_stats['median']
+        relative_pitch = user_pitch - user_baseline
+        
+        # 目标基线
+        target_baseline = std_stats['median']
+        
+        # 应用缩放和平移
+        aligned_pitch = target_baseline + relative_pitch * scale_factor
+        
+        return aligned_pitch
     
     def _interpolate_to_timeline(self, times: np.ndarray, values: np.ndarray, 
                                 target_times: np.ndarray) -> np.ndarray:
@@ -578,22 +645,158 @@ class PitchComparator:
         }
     
     def _calculate_trend_consistency(self, standard: np.ndarray, user: np.ndarray) -> float:
-        """计算音高变化趋势的一致性"""
-        if len(standard) < 2 or len(user) < 2:
+        """
+        计算音高变化趋势的一致性 - 针对听障人士优化
+        包含方向一致性、幅度相似性和声调模式匹配
+        """
+        if len(standard) < 3 or len(user) < 3:
             return 0.0
         
-        # 计算差分（变化方向）
-        std_diff = np.diff(standard)
-        user_diff = np.diff(user)
-        
-        # 计算符号一致性
-        same_direction = np.sum(np.sign(std_diff) == np.sign(user_diff))
-        total_changes = len(std_diff)
-        
-        if total_changes == 0:
+        try:
+            # 🎯 1. 计算多阶差分，捕捉细微变化
+            std_diff1 = np.diff(standard)  # 一阶差分：变化速度
+            user_diff1 = np.diff(user)
+            
+            std_diff2 = np.diff(std_diff1)  # 二阶差分：变化加速度
+            user_diff2 = np.diff(user_diff1)
+            
+            # 🎵 2. 方向一致性分析（权重60%）
+            direction_consistency = self._calculate_direction_consistency(
+                std_diff1, user_diff1
+            )
+            
+            # 📊 3. 幅度相似性分析（权重25%）
+            magnitude_consistency = self._calculate_magnitude_consistency(
+                std_diff1, user_diff1
+            )
+            
+            # 🎶 4. 声调模式一致性（权重15%）
+            pattern_consistency = self._calculate_tone_pattern_consistency(
+                std_diff1, user_diff1, std_diff2, user_diff2
+            )
+            
+            # 🎯 综合评分
+            total_consistency = (
+                direction_consistency * 0.6 +
+                magnitude_consistency * 0.25 +
+                pattern_consistency * 0.15
+            )
+            
+            return np.clip(total_consistency, 0.0, 1.0)
+            
+        except Exception as e:
+            print(f"趋势一致性计算失败: {e}")
+            return 0.0
+    
+    def _calculate_direction_consistency(self, std_diff: np.ndarray, 
+                                       user_diff: np.ndarray) -> float:
+        """计算方向一致性，考虑变化幅度权重"""
+        if len(std_diff) == 0:
             return 1.0
         
-        return same_direction / total_changes
+        # 计算方向符号
+        std_signs = np.sign(std_diff)
+        user_signs = np.sign(user_diff)
+        
+        # 变化幅度作为权重
+        std_weights = np.abs(std_diff)
+        std_weights = std_weights / np.sum(std_weights) if np.sum(std_weights) > 0 else np.ones_like(std_weights)
+        
+        # 加权方向一致性
+        direction_matches = (std_signs == user_signs).astype(float)
+        weighted_consistency = np.sum(direction_matches * std_weights)
+        
+        return weighted_consistency
+    
+    def _calculate_magnitude_consistency(self, std_diff: np.ndarray, 
+                                       user_diff: np.ndarray) -> float:
+        """计算变化幅度的相似性"""
+        if len(std_diff) == 0:
+            return 1.0
+        
+        # 归一化变化幅度
+        std_abs = np.abs(std_diff)
+        user_abs = np.abs(user_diff)
+        
+        # 避免除零
+        std_abs_norm = std_abs / (np.max(std_abs) + 1e-6)
+        user_abs_norm = user_abs / (np.max(user_abs) + 1e-6)
+        
+        # 计算幅度相似度
+        magnitude_diff = np.abs(std_abs_norm - user_abs_norm)
+        magnitude_similarity = np.mean(1.0 - magnitude_diff)
+        
+        return np.clip(magnitude_similarity, 0.0, 1.0)
+    
+    def _calculate_tone_pattern_consistency(self, std_diff1: np.ndarray, 
+                                          user_diff1: np.ndarray,
+                                          std_diff2: np.ndarray, 
+                                          user_diff2: np.ndarray) -> float:
+        """计算声调模式一致性 - 检测中文声调特征"""
+        if len(std_diff2) == 0:
+            return 1.0
+        
+        # 🎵 检测声调模式
+        std_pattern = self._identify_tone_pattern(std_diff1, std_diff2)
+        user_pattern = self._identify_tone_pattern(user_diff1, user_diff2)
+        
+        # 计算模式匹配度
+        pattern_match = self._compare_tone_patterns(std_pattern, user_pattern)
+        
+        return pattern_match
+    
+    def _identify_tone_pattern(self, diff1: np.ndarray, diff2: np.ndarray) -> str:
+        """识别音调变化模式"""
+        if len(diff1) < 2:
+            return 'unknown'
+        
+        # 分析整体趋势
+        total_change = np.sum(diff1)
+        monotonic_ratio = np.sum(np.abs(diff1)) / (np.abs(total_change) + 1e-6)
+        
+        # 分析变化方向的变化（二阶导数）
+        direction_changes = np.sum(np.abs(np.diff(np.sign(diff1))))
+        
+        # 声调模式判断
+        if abs(total_change) < np.std(diff1) * 0.5:
+            return 'flat'  # 平调（阴平）
+        elif total_change > 0 and monotonic_ratio > 0.7:
+            return 'rising'  # 升调（阳平）
+        elif total_change < 0 and monotonic_ratio > 0.7:
+            return 'falling'  # 降调（去声）
+        elif direction_changes >= 2:
+            return 'dipping'  # 降升调（上声）
+        else:
+            return 'complex'  # 复杂变化
+    
+    def _compare_tone_patterns(self, pattern1: str, pattern2: str) -> float:
+        """比较两个声调模式的匹配度"""
+        if pattern1 == pattern2:
+            return 1.0
+        
+        # 声调相似性矩阵
+        similarity_matrix = {
+            ('flat', 'flat'): 1.0,
+            ('rising', 'rising'): 1.0,
+            ('falling', 'falling'): 1.0,
+            ('dipping', 'dipping'): 1.0,
+            ('flat', 'rising'): 0.3,
+            ('flat', 'falling'): 0.3,
+            ('rising', 'falling'): 0.2,
+            ('dipping', 'complex'): 0.6,
+            ('complex', 'complex'): 0.8,
+        }
+        
+        # 对称性
+        key = (pattern1, pattern2)
+        reverse_key = (pattern2, pattern1)
+        
+        if key in similarity_matrix:
+            return similarity_matrix[key]
+        elif reverse_key in similarity_matrix:
+            return similarity_matrix[reverse_key]
+        else:
+            return 0.4  # 默认中等相似度
     
     def calculate_vad_enhanced_score(self, comparison_result: dict) -> dict:
         """

@@ -487,6 +487,112 @@
             50% { opacity: 0.7; }
             100% { opacity: 1; }
         }
+        
+        /* 标准发音音高可视化样式 */
+        .standard-pitch-visualization {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .standard-pitch-visualization:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.12);
+        }
+        
+        .visualization-header {
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .visualization-header h5 {
+            color: #667eea;
+            margin: 0;
+            font-weight: 600;
+        }
+        
+        .pitch-chart {
+            width: 100%;
+            height: auto;
+            min-height: 400px;
+            max-height: 600px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            background: white;
+        }
+        
+        .chart-text-overlay {
+            position: relative;
+            margin-top: 15px;
+            padding: 15px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 10px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .text-char {
+            display: inline-block;
+            padding: 5px 8px;
+            margin: 2px;
+            border-radius: 5px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            font-size: 18px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .text-char.tone-1 { border-left: 4px solid #ff6b6b; }  /* 阴平 - 红色 */
+        .text-char.tone-2 { border-left: 4px solid #4ecdc4; }  /* 阳平 - 青色 */
+        .text-char.tone-3 { border-left: 4px solid #45b7d1; }  /* 上声 - 蓝色 */
+        .text-char.tone-4 { border-left: 4px solid #96ceb4; }  /* 去声 - 绿色 */
+        .text-char.tone-0 { border-left: 4px solid #ffeaa7; }  /* 轻声 - 黄色 */
+        
+        .text-char:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background: #f8f9fa;
+        }
+        
+        .pitch-analysis-info {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 10px;
+        }
+        
+        .pitch-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .pitch-stat-item {
+            text-align: center;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .pitch-stat-item .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            display: block;
+        }
+        
+        .pitch-stat-item .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
@@ -662,6 +768,30 @@
                         </div>
                     </div>
                     
+                    <!-- 新增：标准发音音高可视化区域 -->
+                    <div class="standard-pitch-visualization" id="standardPitchVisualization" style="display: none;">
+                        <div class="visualization-header">
+                            <h5><i class="fas fa-chart-line me-2"></i>标准发音音高曲线分析</h5>
+                        </div>
+                        <div class="chart-wrapper" id="standardChartWrapper">
+                            <div class="chart-loading" id="standardChartLoading">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">分析中...</span>
+                                </div>
+                                <p class="mt-2">正在分析标准发音的音高曲线...</p>
+                            </div>
+                            <div class="chart-content" id="standardChartContent" style="display: none;">
+                                <img id="standardPitchChart" class="pitch-chart" alt="标准发音音高曲线图">
+                                <div class="chart-text-overlay" id="standardTextOverlay">
+                                    <!-- 汉字与音高对应显示 -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pitch-analysis-info" id="standardPitchInfo">
+                            <!-- 音高分析信息 -->
+                        </div>
+                    </div>
+                    
                     <div class="alert alert-success alert-custom">
                         <i class="fas fa-lightbulb me-2"></i>
                         <strong>提示:</strong> 启用同步显示可以看到每个字的朗读时机，帮助您更好地掌握节奏
@@ -834,6 +964,7 @@
     <!-- 实时同步组件 -->
     <script src="{{ url_for('static', filename='js/realtime-sync.js') }}"></script>
     <script src="{{ url_for('static', filename='js/recording-guide.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chinese-tone-analyzer.js') }}"></script>
     
     <!-- 主要JavaScript代码 -->
     <script>
@@ -847,6 +978,7 @@
         let realtimeSync = null;
         let recordingGuide = null;
         let socket = null;
+        let toneAnalyzer = null;
         
         // 场景对话相关变量
         let currentSession = null;
@@ -886,6 +1018,14 @@
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 DOM加载完成，开始初始化...');
+            
+            // 初始化声调分析器
+            if (typeof ChineseToneAnalyzer !== 'undefined') {
+                toneAnalyzer = new ChineseToneAnalyzer();
+                console.log('✓ 中文声调分析器初始化成功');
+            } else {
+                console.warn('⚠ 中文声调分析器未加载');
+            }
             
             // 🔧 调试：检查场景对话模式相关DOM元素
             console.log('📋 检查场景对话模式DOM元素:');
@@ -974,6 +1114,12 @@
             const toggleSyncBtn = document.getElementById('toggleSyncBtn');
             if (toggleSyncBtn) {
                 toggleSyncBtn.addEventListener('click', toggleRealtimeSync);
+            }
+            
+            // 分析音高按钮事件
+            const analyzeStandardBtn = document.getElementById('analyzeStandardBtn');
+            if (analyzeStandardBtn) {
+                analyzeStandardBtn.addEventListener('click', analyzeStandardPitch);
             }
             
             // 录音模式切换事件
@@ -2259,6 +2405,380 @@
                     handleRecordingModeChange({ target: { value: 'guided' } });
                 }
             }
+        }
+        
+        // === 标准发音音高分析功能 ===
+        
+        // 分析标准发音音高
+        async function analyzeStandardPitch() {
+            if (!standardFileId) {
+                showAlert('请先生成标准发音', 'warning');
+                return;
+            }
+            
+            const analyzeBtn = document.getElementById('analyzeStandardBtn');
+            const visualizationContainer = document.getElementById('standardPitchVisualization');
+            const chartLoading = document.getElementById('standardChartLoading');
+            const chartContent = document.getElementById('standardChartContent');
+            
+            // 显示可视化容器
+            visualizationContainer.style.display = 'block';
+            chartLoading.style.display = 'flex';
+            chartContent.style.display = 'none';
+            
+            // 禁用按钮
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>分析中...';
+            
+            try {
+                // 调用音高提取API
+                const response = await fetch('/api/pitch/extract', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        file_id: standardFileId,
+                        type: 'standard',
+                        text: currentText  // 传递当前文本用于声调分析
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 设置声调分析器的音高数据
+                    if (toneAnalyzer) {
+                        toneAnalyzer.setPitchAnalysisData(data.pitch_data);
+                    }
+                    
+                    // 显示音高图表
+                    displayStandardPitchChart(data);
+                    showAlert('标准发音音高分析完成！', 'success');
+                } else {
+                    showAlert(`音高分析失败: ${data.error}`, 'danger');
+                    visualizationContainer.style.display = 'none';
+                }
+                
+            } catch (error) {
+                showAlert(`分析错误: ${error.message}`, 'danger');
+                visualizationContainer.style.display = 'none';
+            } finally {
+                // 恢复按钮
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = '<i class="fas fa-chart-line me-2"></i>分析音高';
+            }
+        }
+        
+        // 显示标准发音音高图表
+        function displayStandardPitchChart(data) {
+            const chartLoading = document.getElementById('standardChartLoading');
+            const chartContent = document.getElementById('standardChartContent');
+            const chart = document.getElementById('standardPitchChart');
+            const textOverlay = document.getElementById('standardTextOverlay');
+            const pitchInfo = document.getElementById('standardPitchInfo');
+            
+            // 隐藏加载动画
+            chartLoading.style.display = 'none';
+            
+            // 设置图表
+            if (data.chart_url) {
+                chart.src = data.chart_url;
+                chart.onload = function() {
+                    chartContent.style.display = 'block';
+                };
+                chart.onerror = function() {
+                    showAlert('音高图表加载失败', 'warning');
+                };
+            }
+            
+            // 生成文本与音高对应显示
+            generateTextPitchOverlay(textOverlay);
+            
+            // 显示音高统计信息
+            displayPitchStats(pitchInfo, data.pitch_data);
+        }
+        
+        // 生成文本与音高对应的可视化
+        function generateTextPitchOverlay(container) {
+            if (!currentText) {
+                container.innerHTML = `
+                    <div class="text-center text-muted">
+                        <i class="fas fa-info-circle me-2"></i>
+                        暂无文本数据
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            // 创建标题
+            const title = document.createElement('div');
+            title.innerHTML = '<h6><i class="fas fa-font me-2"></i>汉字与音高对应（点击字符可查看详细信息）</h6>';
+            title.style.marginBottom = '15px';
+            container.appendChild(title);
+            
+            // 使用声调分析器生成可视化
+            if (toneAnalyzer) {
+                const visualizationHTML = toneAnalyzer.generateToneVisualization(currentText);
+                const contentDiv = document.createElement('div');
+                contentDiv.innerHTML = visualizationHTML;
+                contentDiv.style.lineHeight = '2';
+                contentDiv.style.fontSize = '18px';
+                container.appendChild(contentDiv);
+                
+                // 添加分析摘要
+                const summary = toneAnalyzer.getAnalysisSummary();
+                const summaryDiv = document.createElement('div');
+                summaryDiv.className = 'mt-3 p-2 bg-light rounded';
+                summaryDiv.innerHTML = `
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        分析方法: ${getAnalysisMethodName(summary.analysisMethod)} | 
+                        平均置信度: ${(summary.averageConfidence * 100).toFixed(1)}% |
+                        文本长度: ${summary.textLength}字
+                    </small>
+                `;
+                container.appendChild(summaryDiv);
+                
+                // 添加声调统计信息
+                const stats = toneAnalyzer.getToneStatistics(currentText);
+                const statsDiv = document.createElement('div');
+                statsDiv.className = 'tone-statistics';
+                statsDiv.style.marginTop = '15px';
+                statsDiv.innerHTML = `
+                    <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                        <strong>声调统计：</strong>
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px;">
+                        <span>轻声: ${stats.toneCount[0]}个 (${(stats.toneRatio[0] * 100).toFixed(1)}%)</span>
+                        <span>阴平: ${stats.toneCount[1]}个 (${(stats.toneRatio[1] * 100).toFixed(1)}%)</span>
+                        <span>阳平: ${stats.toneCount[2]}个 (${(stats.toneRatio[2] * 100).toFixed(1)}%)</span>
+                        <span>上声: ${stats.toneCount[3]}个 (${(stats.toneRatio[3] * 100).toFixed(1)}%)</span>
+                        <span>去声: ${stats.toneCount[4]}个 (${(stats.toneRatio[4] * 100).toFixed(1)}%)</span>
+                    </div>
+                `;
+                container.appendChild(statsDiv);
+                
+            } else {
+                // 降级处理：使用简单的方法
+                for (let i = 0; i < currentText.length; i++) {
+                    const char = currentText[i];
+                    const timestamp = currentCharTimestamps[i];
+                    
+                    const charElement = document.createElement('span');
+                    charElement.className = 'text-char';
+                    charElement.textContent = char;
+                    
+                    // 简单的声调分析
+                    const tone = simpleAnalyzeTone(char);
+                    if (tone > 0) {
+                        charElement.classList.add(`tone-${tone}`);
+                    }
+                    
+                    // 添加点击事件
+                    charElement.addEventListener('click', () => {
+                        showCharacterDetails(char, timestamp, tone, i);
+                    });
+                    
+                    // 添加悬停提示
+                    if (timestamp) {
+                        const duration = ((timestamp.end_time - timestamp.start_time) * 1000).toFixed(0);
+                        charElement.title = `${char} | ${timestamp.start_time.toFixed(2)}s - ${timestamp.end_time.toFixed(2)}s | 时长: ${duration}ms`;
+                    }
+                    
+                    container.appendChild(charElement);
+                }
+            }
+            
+            // 添加声调图例
+            const legend = document.createElement('div');
+            legend.className = 'tone-legend';
+            legend.style.marginTop = '15px';
+            legend.innerHTML = `
+                <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                    <strong>声调图例：</strong>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                    <span class="text-char tone-1" style="font-size: 14px;">阴平</span>
+                    <span class="text-char tone-2" style="font-size: 14px;">阳平</span>
+                    <span class="text-char tone-3" style="font-size: 14px;">上声</span>
+                    <span class="text-char tone-4" style="font-size: 14px;">去声</span>
+                    <span class="text-char tone-0" style="font-size: 14px;">轻声</span>
+                </div>
+            `;
+            container.appendChild(legend);
+        }
+        
+        // 简单的声调分析（降级方法）
+        function simpleAnalyzeTone(char) {
+            const charCode = char.charCodeAt(0);
+            
+            // 检查是否是中文字符
+            if (charCode >= 0x4e00 && charCode <= 0x9fff) {
+                return ((charCode - 0x4e00) % 4) + 1; // 返回1-4
+            }
+            return 0; // 非中文字符返回轻声
+        }
+        
+        // 获取分析方法的显示名称
+        function getAnalysisMethodName(method) {
+            const methodNames = {
+                'pitch_analysis': '音高曲线分析',
+                'pitch_estimation': '音高趋势估算',
+                'fallback': '字符编码推测',
+                'unknown': '未知'
+            };
+            return methodNames[method] || method;
+        }
+        
+        // 显示字符详细信息
+        function showCharacterDetails(char, timestamp, tone, index) {
+            let toneName, toneDescription;
+            
+            if (toneAnalyzer) {
+                toneName = toneAnalyzer.getToneName(tone);
+                toneDescription = toneAnalyzer.getToneDescription(tone);
+            } else {
+                const toneNames = ['轻声', '阴平', '阳平', '上声', '去声'];
+                toneName = toneNames[tone] || '未知';
+                toneDescription = '暂无详细描述';
+            }
+            
+            let details = `字符：${char}\n声调：${toneName}\n描述：${toneDescription}`;
+            
+            if (timestamp) {
+                const duration = ((timestamp.end_time - timestamp.start_time) * 1000).toFixed(0);
+                details += `\n\n⏱️ 时间信息：\n`;
+                details += `• 开始时间：${timestamp.start_time.toFixed(2)}秒\n`;
+                details += `• 结束时间：${timestamp.end_time.toFixed(2)}秒\n`;
+                details += `• 持续时长：${duration}毫秒\n`;
+                details += `• 字符位置：第${index + 1}个字符`;
+            } else {
+                details += `\n\n📍 位置信息：\n`;
+                details += `• 字符位置：第${index + 1}个字符\n`;
+                details += `• 时间戳：暂无数据`;
+            }
+            
+            // 使用更美观的模态框而不是alert
+            showCharacterModal(char, toneName, toneDescription, timestamp, index);
+        }
+        
+        // 显示字符详细信息模态框
+        function showCharacterModal(char, toneName, toneDescription, timestamp, index) {
+            // 创建模态框HTML
+            const modalHTML = `
+                <div class="modal fade" id="charDetailModal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    字符详细信息
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="text-center mb-4">
+                                    <div class="char-display" style="font-size: 72px; font-weight: bold; color: #667eea;">
+                                        ${char}
+                                    </div>
+                                </div>
+                                
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <strong><i class="fas fa-volume-up me-2"></i>声调：</strong>
+                                        <span class="badge bg-info fs-6">${toneName}</span>
+                                    </div>
+                                    
+                                    <div class="info-item mt-3">
+                                        <strong><i class="fas fa-book me-2"></i>描述：</strong>
+                                        <p class="text-muted mb-0">${toneDescription}</p>
+                                    </div>
+                                    
+                                    <div class="info-item mt-3">
+                                        <strong><i class="fas fa-map-marker-alt me-2"></i>位置：</strong>
+                                        <span>第 ${index + 1} 个字符</span>
+                                    </div>
+                                    
+                                    ${timestamp ? `
+                                    <div class="info-item mt-3">
+                                        <strong><i class="fas fa-clock me-2"></i>时间信息：</strong>
+                                        <div class="time-info mt-2">
+                                            <div class="row">
+                                                <div class="col-6">
+                                                    <small class="text-muted">开始时间</small><br>
+                                                    <strong>${timestamp.start_time.toFixed(2)}秒</strong>
+                                                </div>
+                                                <div class="col-6">
+                                                    <small class="text-muted">结束时间</small><br>
+                                                    <strong>${timestamp.end_time.toFixed(2)}秒</strong>
+                                                </div>
+                                            </div>
+                                            <div class="row mt-2">
+                                                <div class="col-12">
+                                                    <small class="text-muted">持续时长</small><br>
+                                                    <strong>${((timestamp.end_time - timestamp.start_time) * 1000).toFixed(0)}毫秒</strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    ` : `
+                                    <div class="info-item mt-3">
+                                        <strong><i class="fas fa-clock me-2"></i>时间信息：</strong>
+                                        <span class="text-muted">暂无时间戳数据</span>
+                                    </div>
+                                    `}
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 移除现有模态框
+            const existingModal = document.getElementById('charDetailModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // 添加新模态框到页面
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('charDetailModal'));
+            modal.show();
+            
+            // 自动清理模态框
+            document.getElementById('charDetailModal').addEventListener('hidden.bs.modal', function() {
+                this.remove();
+            });
+        }
+        
+        // 显示音高统计信息
+        function displayPitchStats(container, pitchData) {
+            const stats = {
+                '时长': `${pitchData.duration.toFixed(2)}秒`,
+                '平均音高': `${pitchData.mean_pitch.toFixed(1)}Hz`,
+                '音高范围': `${pitchData.pitch_range.toFixed(1)}Hz`,
+                '有效率': `${(pitchData.valid_ratio * 100).toFixed(1)}%`
+            };
+            
+            container.innerHTML = `
+                <h6><i class="fas fa-chart-bar me-2"></i>音高统计信息</h6>
+                <div class="pitch-stats">
+                    ${Object.entries(stats).map(([label, value]) => `
+                        <div class="pitch-stat-item">
+                            <span class="stat-value">${value}</span>
+                            <span class="stat-label">${label}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
         }
         
         // 显示警告信息

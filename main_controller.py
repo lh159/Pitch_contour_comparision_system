@@ -102,9 +102,9 @@ class PitchComparisonSystem:
             if 'error' in comparison_result:
                 return comparison_result
             
-            # 3. 计算评分
+            # 3. 计算评分 (传入文本用于声调分析)
             print("  ├─ 计算评分...")
-            score_result = self.scoring_system.calculate_score(comparison_result)
+            score_result = self.scoring_system.calculate_score(comparison_result, text)
             
             # 3.5 VAD增强评分（如果使用了VAD）
             vad_enhanced_score = None

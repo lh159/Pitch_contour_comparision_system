@@ -6,11 +6,24 @@
 import numpy as np
 from config import Config
 
+try:
+    from chinese_tone_analyzer import ChineseToneAnalyzer
+    TONE_ANALYZER_AVAILABLE = True
+except ImportError:
+    TONE_ANALYZER_AVAILABLE = False
+    print("警告: 中文声调分析器不可用")
+
 class ScoringSystem:
     """发音评分系统"""
     
     def __init__(self):
         self.weights = Config.SCORE_WEIGHTS
+        
+        # 初始化声调分析器
+        if TONE_ANALYZER_AVAILABLE:
+            self.tone_analyzer = ChineseToneAnalyzer()
+        else:
+            self.tone_analyzer = None
         
         # 评分阈值配置
         self.thresholds = {
@@ -40,10 +53,11 @@ class ScoringSystem:
             }
         }
     
-    def calculate_score(self, comparison_metrics: dict) -> dict:
+    def calculate_score(self, comparison_metrics: dict, input_text: str = None) -> dict:
         """
-        根据比较指标计算综合评分
+        根据比较指标计算综合评分 - 针对听障人士优化
         :param comparison_metrics: 音高比较指标
+        :param input_text: 输入文本（用于声调分析）
         :return: 评分结果
         """
         
@@ -52,12 +66,13 @@ class ScoringSystem:
                 'total_score': 0.0,
                 'component_scores': {},
                 'level': '错误',
-                'feedback': comparison_metrics['error']
+                'feedback': comparison_metrics['error'],
+                'tone_analysis': None
             }
         
         metrics = comparison_metrics.get('metrics', {})
         
-        # 计算各项子分数
+        # 🎯 基本评分计算
         correlation_score = self._calculate_correlation_score(
             metrics.get('correlation', 0)
         )
@@ -74,7 +89,26 @@ class ScoringSystem:
             metrics.get('pitch_range_ratio', 0)
         )
         
-        # 计算加权总分
+        # 🎵 声调特征增强评分
+        tone_enhancement = 0.0
+        tone_analysis = None
+        tone_feedback = ""
+        
+        if self.tone_analyzer and input_text:
+            tone_analysis = self._analyze_chinese_tones(
+                comparison_metrics, input_text
+            )
+            if tone_analysis and 'overall_tone_accuracy' in tone_analysis:
+                # 声调准确度可以提升趋势分数
+                tone_accuracy = tone_analysis['overall_tone_accuracy']
+                tone_enhancement = tone_accuracy * 10  # 最多加10分
+                trend_score = min(100, trend_score + tone_enhancement)
+                
+                tone_feedback = self.tone_analyzer.get_tone_feedback(
+                    tone_analysis.get('tone_analysis', [])
+                )
+        
+        # 🎯 计算加权总分 (新权重：趋势50%, 相关性25%, 稳定性15%, 音域10%)
         total_score = (
             correlation_score * self.weights['correlation'] +
             trend_score * self.weights['trend'] +
@@ -88,6 +122,11 @@ class ScoringSystem:
         # 确定评级
         level = self._get_score_level(total_score)
         
+        # 🎵 为听障人士生成专门反馈
+        hearing_impaired_feedback = self._generate_hearing_impaired_feedback(
+            total_score, trend_score, correlation_score, tone_feedback
+        )
+        
         return {
             'total_score': round(total_score, 1),
             'component_scores': {
@@ -97,8 +136,77 @@ class ScoringSystem:
                 'range': round(range_score, 1)
             },
             'level': level,
-            'metrics': metrics
+            'metrics': metrics,
+            'tone_analysis': tone_analysis,
+            'tone_enhancement': round(tone_enhancement, 1),
+            'feedback': hearing_impaired_feedback,
+            'tone_feedback': tone_feedback
         }
+    
+    def _analyze_chinese_tones(self, comparison_metrics: dict, text: str) -> dict:
+        """分析中文声调特征"""
+        if not self.tone_analyzer:
+            return None
+        
+        try:
+            # 提取音高数据
+            standard_pitch_data = comparison_metrics.get('standard_pitch', {})
+            user_pitch_data = comparison_metrics.get('user_pitch', {})
+            
+            user_pitch = user_pitch_data.get('pitch_values', np.array([]))
+            user_times = user_pitch_data.get('times', np.array([]))
+            
+            if len(user_pitch) == 0:
+                return None
+            
+            # 获取期望声调
+            expected_tones = self.tone_analyzer.analyze_text_tones(text)
+            
+            # 分析音高声调
+            tone_result = self.tone_analyzer.analyze_pitch_tones(
+                user_pitch, user_times, expected_tones
+            )
+            
+            return tone_result
+            
+        except Exception as e:
+            print(f"声调分析失败: {e}")
+            return None
+    
+    def _generate_hearing_impaired_feedback(self, total_score: float, 
+                                          trend_score: float, 
+                                          correlation_score: float,
+                                          tone_feedback: str) -> str:
+        """为听障人士生成专门的反馈建议"""
+        feedback_parts = []
+        
+        # 🎯 总体评价
+        if total_score >= 85:
+            feedback_parts.append("🌟 优秀！您的发音音调非常准确。")
+        elif total_score >= 70:
+            feedback_parts.append("👍 良好！您的音调掌握得不错。")
+        elif total_score >= 55:
+            feedback_parts.append("📈 还不错，继续练习会更好。")
+        else:
+            feedback_parts.append("💪 需要多练习，重点关注音调变化。")
+        
+        # 🎵 音调变化重点反馈
+        if trend_score >= 80:
+            feedback_parts.append("✅ 音调变化很准确，声调掌握得很好！")
+        elif trend_score >= 60:
+            feedback_parts.append("⚠️ 音调变化基本正确，但还可以更精确。")
+        else:
+            feedback_parts.append("❗ 重点改进：注意音调的升降变化，这是中文发音的关键。")
+        
+        # 🎯 具体建议
+        if correlation_score < 60:
+            feedback_parts.append("💡 建议：多关注整体音高曲线的相似性。")
+        
+        # 🎶 声调特定反馈
+        if tone_feedback:
+            feedback_parts.append(f"\n🎵 声调详细分析：\n{tone_feedback}")
+        
+        return "\n".join(feedback_parts)
     
     def _calculate_correlation_score(self, correlation: float) -> float:
         """计算相关性得分"""

@@ -44,11 +44,31 @@ class Config:
     VAD_ENABLED = True  # 是否启用VAD
     
     # === 评分配置 ===
+    # 针对听障人士优化的权重配置 - 强调音调变化重要性
     SCORE_WEIGHTS = {
-        'correlation': 0.4,    # 相关性权重
-        'trend': 0.3,          # 趋势一致性权重
-        'stability': 0.2,      # 稳定性权重
-        'range': 0.1           # 音域适配权重
+        'trend': 0.5,          # 趋势一致性权重 (提高到50% - 最重要)
+        'correlation': 0.25,   # 相关性权重 (降低到25%)
+        'stability': 0.15,     # 稳定性权重 (降低到15%)
+        'range': 0.1           # 音域适配权重 (保持10%)
+    }
+    
+    # === 中文声调特征配置 ===
+    CHINESE_TONE_CONFIG = {
+        'tone_patterns': {
+            1: 'flat_high',     # 阴平：高平调
+            2: 'rising',        # 阳平：升调
+            3: 'dipping',       # 上声：降升调
+            4: 'falling',       # 去声：降调
+            0: 'neutral'        # 轻声
+        },
+        'tone_weights': {
+            1: 1.0,  # 阴平权重
+            2: 1.2,  # 阳平权重 (升调更重要)
+            3: 1.5,  # 上声权重 (最复杂，权重最高)
+            4: 1.3,  # 去声权重 (降调重要)
+            0: 0.8   # 轻声权重
+        },
+        'pattern_sensitivity': 0.8  # 声调模式匹配敏感度
     }
     
     # === Web配置 ===

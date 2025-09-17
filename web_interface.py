@@ -358,8 +358,8 @@ def compare_audio():
                 'error': comparison_result['error']
             }), 400
         
-        # 计算评分
-        score_result = scoring_system.calculate_score(comparison_result)
+        # 计算评分 (传入文本用于声调分析)
+        score_result = scoring_system.calculate_score(comparison_result, text)
         
         # 详细分析
         detailed_analysis = analyzer.analyze_pitch_details(comparison_result)
@@ -401,6 +401,7 @@ def extract_pitch():
         data = request.get_json()
         file_id = data.get('file_id')
         file_type = data.get('type', 'user')  # 'user' or 'standard'
+        text = data.get('text', '')  # 添加文本参数
         
         if not file_id:
             return jsonify({
@@ -434,7 +435,7 @@ def extract_pitch():
         chart_path = os.path.join(Config.OUTPUT_FOLDER, chart_filename)
         
         title = "标准发音音高曲线" if file_type == 'standard' else "用户发音音高曲线"
-        chart_success = visualizer.plot_individual_pitch(pitch_data, chart_path, title)
+        chart_success = visualizer.plot_individual_pitch(pitch_data, chart_path, title, text)
         
         # 安全计算音高统计
         pitch_values = pitch_data.get('pitch_values', [0])
