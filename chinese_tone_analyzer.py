@@ -25,34 +25,45 @@ class ChineseToneAnalyzer:
             'min_duration': 0.1          # 最小分析时长(秒)
         }
     
-    def analyze_text_tones(self, text: str) -> List[int]:
+    def analyze_pitch_based_tones(self, pitch_values: np.ndarray, 
+                                 times: np.ndarray, 
+                                 text: str) -> List[int]:
         """
-        分析文本的声调序列
-        :param text: 中文文本
+        基于音高曲线分析文本的声调序列
+        :param pitch_values: 音高序列
+        :param times: 时间序列
+        :param text: 中文文本（用于确定分段数量）
         :return: 声调序列 [1,2,3,4,0] 对应 [阴平,阳平,上声,去声,轻声]
         """
-        # 简化版声调映射 - 实际应用中可接入更精确的拼音库
-        tone_mapping = {
-            # 常见字的声调映射（示例）
-            '你': 3, '好': 3, '我': 3, '是': 4, '的': 0,
-            '一': 1, '二': 4, '三': 1, '四': 4, '五': 3,
-            '六': 4, '七': 1, '八': 1, '九': 3, '十': 2,
-            '妈': 1, '麻': 2, '马': 3, '骂': 4,
-            '天': 1, '气': 4, '很': 3, '好': 3,
-            '今': 1, '天': 1, '晴': 2, '朗': 3,
-            '学': 2, '习': 2, '中': 1, '文': 2,
-            '声': 1, '调': 4, '练': 4, '习': 2
-        }
+        if len(pitch_values) < 5 or len(text.strip()) == 0:
+            return [1] * len(text.strip())  # 默认返回阴平
         
-        tones = []
-        for char in text:
-            if char in tone_mapping:
-                tones.append(tone_mapping[char])
+        # 过滤有效音高
+        valid_mask = ~np.isnan(pitch_values)
+        if np.sum(valid_mask) < 3:
+            return [1] * len(text.strip())
+        
+        valid_pitch = pitch_values[valid_mask]
+        valid_times = times[valid_mask]
+        
+        # 音高归一化（相对音高）
+        normalized_pitch = self._normalize_pitch_for_tone_analysis(valid_pitch)
+        
+        # 按字符数分段分析
+        char_count = len(text.strip())
+        segments = self._segment_pitch_by_characters(
+            normalized_pitch, valid_times, char_count
+        )
+        
+        detected_tones = []
+        for segment in segments:
+            if len(segment['pitch']) > 2:
+                tone_info = self._detect_tone_from_segment(segment)
+                detected_tones.append(tone_info['tone_type'])
             else:
-                # 默认声调（可根据实际需求调整）
-                tones.append(1)  # 默认阴平
+                detected_tones.append(0)  # 默认轻声
         
-        return tones
+        return detected_tones
     
     def analyze_pitch_tones(self, pitch_values: np.ndarray, 
                            times: np.ndarray, 
@@ -160,7 +171,7 @@ class ChineseToneAnalyzer:
         features = self._extract_tone_features(pitch, times)
         
         # 声调分类
-        tone_type, confidence = self._classify_tone(features)
+        tone_type, confidence = self._classify_tone(features, pitch, times)
         
         return {
             'tone_type': tone_type,
@@ -205,35 +216,75 @@ class ChineseToneAnalyzer:
             'duration': times[-1] - times[0] if len(times) > 1 else 0
         }
     
-    def _classify_tone(self, features: Dict) -> Tuple[int, float]:
-        """基于特征分类声调"""
+    def _classify_tone(self, features: Dict, pitch: np.ndarray = None, times: np.ndarray = None) -> Tuple[int, float]:
+        """基于特征分类声调 - 改进的算法"""
         slope = features['linear_slope']
         complexity = features['complexity']
         monotonic_ratio = features['monotonic_ratio']
         total_change = features['total_change']
         peak_pos = features['peak_position']
+        valley_pos = features['valley_position']
+        pitch_range = features['pitch_range']
         
-        # 声调分类逻辑
-        if abs(total_change) < self.thresholds['flat_tolerance']:
-            # 平调（阴平）
-            return 1, 0.8
-        elif slope > self.thresholds['rising_slope'] and monotonic_ratio > 0.7:
-            # 升调（阳平）
+        print(f"🔍 声调分类特征: slope={slope:.3f}, complexity={complexity:.3f}, "
+              f"monotonic_ratio={monotonic_ratio:.3f}, total_change={total_change:.3f}")
+        
+        # 声调分类逻辑 - 基于中文声调的实际特征
+        
+        # 1. 阴平（第一声）- 高平调，音高相对平稳
+        if (abs(total_change) < 0.2 and complexity < 0.3 and 
+            abs(slope) < 0.15):
+            return 1, 0.85
+        
+        # 2. 阳平（第二声）- 升调，从中低音升到高音
+        elif (slope > 0.2 and monotonic_ratio > 0.6 and 
+              total_change > 0.15 and complexity < 0.4):
             return 2, 0.9
-        elif slope < self.thresholds['falling_slope'] and monotonic_ratio < 0.3:
-            # 降调（去声）
+        
+        # 3. 上声（第三声）- 降升调，先降后升，最复杂
+        # 分析前半部分和后半部分的趋势
+        mid_point = len(times) // 2
+        if mid_point > 2:
+            first_half = pitch[:mid_point] if len(pitch) > mid_point else pitch
+            second_half = pitch[mid_point:] if len(pitch) > mid_point else pitch
+            
+            first_trend = np.polyfit(range(len(first_half)), first_half, 1)[0] if len(first_half) > 1 else 0
+            second_trend = np.polyfit(range(len(second_half)), second_half, 1)[0] if len(second_half) > 1 else 0
+            
+            # 上声特征：前半下降，后半上升，有明显谷点
+            is_dipping = (first_trend < -0.05 and second_trend > 0.05 and 
+                         0.2 < valley_pos < 0.8 and pitch_range > 0.15)
+            
+            print(f"🔍 上声检测: first_trend={first_trend:.3f}, second_trend={second_trend:.3f}, "
+                  f"valley_pos={valley_pos:.3f}, is_dipping={is_dipping}")
+            
+            if is_dipping:
+                return 3, 0.9
+        
+        # 备选上声检测：基于复杂度和变化范围
+        high_complexity = complexity > 0.4
+        mid_valley = 0.2 < valley_pos < 0.8
+        moderate_range = pitch_range > 0.25
+        
+        if (high_complexity and mid_valley and moderate_range):
+            return 3, 0.75
+        
+        # 4. 去声（第四声）- 降调，从高音快速下降
+        elif (slope < -0.2 and monotonic_ratio < 0.4 and 
+              total_change < -0.15 and complexity < 0.4):
             return 4, 0.9
-        elif complexity > self.thresholds['dipping_complexity'] and peak_pos < 0.3:
-            # 降升调（上声）
-            return 3, 0.7
+        
+        # 备选判断逻辑
         else:
-            # 根据总体变化判断
-            if total_change > 0:
-                return 2, 0.5  # 倾向升调
-            elif total_change < 0:
-                return 4, 0.5  # 倾向降调
+            # 基于主要特征的次要判断
+            if total_change > 0.1 and slope > 0:
+                return 2, 0.6  # 倾向阳平（升调）
+            elif total_change < -0.1 and slope < 0:
+                return 4, 0.6  # 倾向去声（降调）
+            elif complexity > 0.3:
+                return 3, 0.5  # 倾向上声（复杂变化）
             else:
-                return 1, 0.4  # 默认平调
+                return 1, 0.5  # 默认阴平（平调）
     
     def _compare_tones(self, detected: int, expected: int) -> Dict:
         """比较检测声调与期望声调"""

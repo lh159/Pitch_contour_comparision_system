@@ -36,6 +36,14 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 # 启用跨域支持
 CORS(app)
 
+# 添加缓存控制
+@app.after_request
+def after_request(response):
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 # 初始化WebSocket实时同步
 try:
     from realtime_sync import init_socketio
@@ -435,7 +443,16 @@ def extract_pitch():
         chart_path = os.path.join(Config.OUTPUT_FOLDER, chart_filename)
         
         title = "标准发音音高曲线" if file_type == 'standard' else "用户发音音高曲线"
+        
+        # 🔍 调试输出
+        print(f"🔍 DEBUG: file_type={file_type}, text='{text}', len(text)={len(text)}")
+        print(f"🔍 DEBUG: text.strip()='{text.strip()}', len(text.strip())={len(text.strip())}")
+        print(f"🚨 WEB: About to call visualizer.plot_individual_pitch")
+        print(f"🚨 WEB: visualizer type = {type(visualizer)}")
+        
         chart_success = visualizer.plot_individual_pitch(pitch_data, chart_path, title, text)
+        
+        print(f"🚨 WEB: plot_individual_pitch returned {chart_success}")
         
         # 安全计算音高统计
         pitch_values = pitch_data.get('pitch_values', [0])
@@ -469,7 +486,12 @@ def extract_pitch():
 def serve_temp_file(filename):
     """提供临时文件访问"""
     try:
-        return send_file(os.path.join(Config.TEMP_FOLDER, filename))
+        response = send_file(os.path.join(Config.TEMP_FOLDER, filename))
+        # 添加缓存控制头，防止浏览器缓存图片
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     except Exception:
         return "File not found", 404
 
@@ -477,7 +499,12 @@ def serve_temp_file(filename):
 def serve_output_file(filename):
     """提供输出文件访问"""
     try:
-        return send_file(os.path.join(Config.OUTPUT_FOLDER, filename))
+        response = send_file(os.path.join(Config.OUTPUT_FOLDER, filename))
+        # 添加缓存控制头，防止浏览器缓存图片
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     except Exception:
         return "File not found", 404
 

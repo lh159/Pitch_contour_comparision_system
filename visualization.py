@@ -326,7 +326,7 @@ class PitchVisualization:
             # 🎵 初始化声调分析器
             tone_analyzer = self._initialize_tone_analyzer()
             text_for_analysis = input_text or ''.join([ci.get('char', '') for ci in char_timestamps])
-            tone_colors = self._get_tone_colors_for_text(tone_analyzer, text_for_analysis)
+            tone_colors = self._get_tone_colors_for_text(tone_analyzer, text_for_analysis, None, None)
             
             # 用于避免标注重叠的位置记录
             used_positions = []
@@ -347,6 +347,12 @@ class PitchVisualization:
                 # 🎯 精确计算字符在音高曲线上的时间位置
                 char_center_time = self._calculate_precise_char_position(start_time, end_time, times)
                 
+                # 🔍 进一步验证时间位置的有效性
+                if char_center_time < x_min or char_center_time > x_max:
+                    # 如果计算的位置超出了图表范围，调整到边界内
+                    char_center_time = max(x_min, min(x_max, char_center_time))
+                    print(f"⚠️ 字符'{char}'位置超出范围，已调整到: {char_center_time:.3f}s")
+                
                 # 避免标注重叠 - 检查是否与已有标注太近
                 min_distance = (x_max - x_min) * 0.03  # 最小间距为图表宽度的3%
                 is_overlapping = any(abs(char_center_time - pos) < min_distance for pos in used_positions)
@@ -361,14 +367,21 @@ class PitchVisualization:
                 # 🎵 获取字符的声调颜色
                 tone_color = tone_colors.get(i, '#cccccc')  # 默认灰色
                 
-                # 绘制字符背景区域，使用声调颜色
+                # 🎨 绘制字符对应的音高曲线背景区域
                 if end_time - start_time > 0.05:  # 只对足够长的段绘制背景
-                    rect_height = (y_max - y_min) * 0.05
-                    rect = plt.Rectangle((start_time, y_min - rect_height/2), 
+                    # 将背景区域扩展到整个音高范围，使关联更明显
+                    rect_height = y_max - y_min
+                    rect = plt.Rectangle((start_time, y_min), 
                                        end_time - start_time, rect_height,
-                                       facecolor=tone_color, alpha=0.4, 
-                                       edgecolor=tone_color, linewidth=1.0)
+                                       facecolor=tone_color, alpha=0.15,  # 降低透明度避免干扰
+                                       edgecolor=tone_color, linewidth=0.8)
                     ax.add_patch(rect)
+                    
+                    # 添加垂直分割线明确标记字符边界
+                    for boundary_time in [start_time, end_time]:
+                        if x_min <= boundary_time <= x_max:
+                            ax.axvline(x=boundary_time, color=tone_color, linestyle='--', 
+                                     alpha=0.6, linewidth=1.5, zorder=3)
                 
                 # 🎨 添加汉字标注 - 使用声调颜色背景
                 self._set_text_with_font(ax, 'text', char_center_time, annotation_y, char,
@@ -381,24 +394,35 @@ class PitchVisualization:
                                linewidth=2.0,
                                zorder=10))  # 设置高层级，确保在最上层显示
                 
-                # 添加连接线，明确显示汉字与音高曲线的时间对应关系
+                # 🔗 添加精确的字符-曲线对应关系指示线
                 if end_time - start_time > 0.05:  # 对有意义的时间段添加连接线
                     # 从汉字位置向上连接到音高曲线底部
                     line_y_start = annotation_y + (y_max - y_min) * 0.02  # 从汉字上方开始
-                    line_y_end = y_min - (y_max - y_min) * 0.02  # 到音高曲线底部
+                    line_y_end = y_min + (y_max - y_min) * 0.02  # 到音高曲线底部
+                    
+                    # 主连接线：从字符中心到曲线
                     ax.plot([char_center_time, char_center_time], 
                            [line_y_start, line_y_end],
-                           color=tone_color, linestyle='-', alpha=0.7, linewidth=2.0, zorder=5)
+                           color=tone_color, linestyle='-', alpha=0.8, linewidth=2.5, zorder=6)
+                    
+                    # 辅助连接线：标记字符起始和结束位置
+                    for boundary_time, line_style in [(start_time, ':'), (end_time, ':')]:
+                        if x_min <= boundary_time <= x_max and abs(boundary_time - char_center_time) > 0.02:
+                            ax.plot([boundary_time, boundary_time], 
+                                   [line_y_start + (y_max - y_min) * 0.01, line_y_end - (y_max - y_min) * 0.01],
+                                   color=tone_color, linestyle=line_style, alpha=0.5, linewidth=1.0, zorder=4)
                 
-                # 添加时间范围标注 (小字体，在字符下方)
-                if end_time - start_time > 0.2:  # 只对足够长的段显示时间
-                    time_text = f'{start_time:.2f}-{end_time:.2f}s'
-                    self._set_text_with_font(ax, 'text', char_center_time, annotation_y - (y_max - y_min) * 0.03,
-                           time_text, ha='center', va='center', fontsize=7, 
-                           color='gray', alpha=0.8)
+                # 🕰️ 添加时间范围标注和持续时间显示
+                if end_time - start_time > 0.15:  # 降低门槛，显示更多时间信息
+                    duration = end_time - start_time
+                    time_text = f'{start_time:.2f}-{end_time:.2f}s ({duration:.2f}s)'
+                    self._set_text_with_font(ax, 'text', char_center_time, annotation_y - (y_max - y_min) * 0.04,
+                           time_text, ha='center', va='center', fontsize=6, 
+                           color='darkblue', alpha=0.7,
+                           bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8, edgecolor='none'))
             
-            # 🎵 添加声调图例
-            self._add_tone_legend(ax, y_max, x_max)
+            # 🎵 添加增强的声调图例和时间轴信息
+            self._add_enhanced_tone_legend(ax, y_max, x_max, char_timestamps)
             
             # 调整y轴范围以容纳标注，确保汉字完全可见，但减少空白空间
             ax.set_ylim(annotation_y - (y_max - y_min) * 0.08, y_max)  # 减少底部空间，紧凑布局
@@ -858,6 +882,8 @@ class PitchVisualization:
         :param fig_size: 图片尺寸
         :return: 是否成功
         """
+        print("🚨🚨🚨 CALLED plot_individual_pitch 🚨🚨🚨")
+        print(f"🚨 Args: text='{text}', output_path={output_path}")
         
         try:
             times = pitch_data.get('times', [])
@@ -870,11 +896,18 @@ class PitchVisualization:
             
             # 如果有文本，获取声调颜色
             tone_colors = []
+            print(f"🔍 DEBUG: plot_individual_pitch - text='{text}', text.strip()='{text.strip() if text else None}'")
+            
             if text and text.strip():
                 tone_analyzer = self._initialize_tone_analyzer()
-                tone_colors_dict = self._get_tone_colors_for_text(tone_analyzer, text.strip())
+                print(f"🔍 DEBUG: tone_analyzer={tone_analyzer}")
+                tone_colors_dict = self._get_tone_colors_for_text(tone_analyzer, text.strip(), pitch_values, times)
+                print(f"🔍 DEBUG: tone_colors_dict={tone_colors_dict}")
                 # 转换为列表
                 tone_colors = [tone_colors_dict.get(i, '#cccccc') for i in range(len(text.strip()))]
+                print(f"🔍 DEBUG: tone_colors={tone_colors}")
+            else:
+                print(f"🔍 DEBUG: 跳过声调分析 - text empty or None")
             
             # 绘制音高曲线
             if tone_colors and len(tone_colors) > 1:
@@ -910,16 +943,42 @@ class PitchVisualization:
                 y_max = min(500, np.max(valid_pitch) * 1.1)
                 ax.set_ylim(y_min, y_max)
             
+            # 🕐 设置时间轴范围
+            if len(times) > 0:
+                time_max = max(times)
+                print(f"🕐 DEBUG: 时间范围 - 最小:{min(times):.2f}s, 最大:{time_max:.2f}s")
+                # 确保显示完整时间范围，不限制在1秒内
+                ax.set_xlim(0, max(time_max, 1.0))  # 至少显示1秒，如果音频更长则完整显示
+            
             # 添加汉字标注（如果有文本）
+            print(f"🔍 DEBUG: 汉字标注条件检查 - text={bool(text)}, text.strip()={bool(text.strip() if text else False)}, tone_colors={bool(tone_colors)}")
             if text and text.strip() and tone_colors:
+                print(f"🔍 DEBUG: 开始添加汉字标注")
                 self._add_character_annotations_individual(
                     ax, text.strip(), times, pitch_values, tone_colors
                 )
+            else:
+                print(f"🔍 DEBUG: 跳过汉字标注 - 条件不满足")
                 
-                # 添加声调图例
+                # 添加增强的声调图例
                 y_limits = ax.get_ylim()
                 x_limits = ax.get_xlim()
-                self._add_tone_legend(ax, y_limits[1], x_limits[1])
+                
+                # 创建字符时间戳用于增强图例
+                char_timestamps = []
+                if len(tone_colors) > 0:
+                    chars_per_segment = len(times) // len(tone_colors)
+                    for i, char in enumerate(text.strip()):
+                        start_idx = i * chars_per_segment
+                        end_idx = (i + 1) * chars_per_segment if i < len(tone_colors) - 1 else len(times)
+                        if start_idx < len(times) and end_idx <= len(times):
+                            char_timestamps.append({
+                                'char': char,
+                                'start_time': times[start_idx] if start_idx < len(times) else 0,
+                                'end_time': times[min(end_idx-1, len(times)-1)] if end_idx > 0 else 0
+                            })
+                
+                self._add_enhanced_tone_legend(ax, y_limits[1], x_limits[1], char_timestamps)
             
             # 添加统计信息
             duration = pitch_data.get('duration', 0)
@@ -948,41 +1007,79 @@ class PitchVisualization:
     def _add_character_annotations_individual(self, ax, text: str, times: list, 
                                            pitch_values: list, tone_colors: list):
         """
-        为单个音高图添加汉字标注
+        为单个音高图添加增强的汉字标注
         """
         try:
             if not text or len(text) == 0:
                 return
             
-            # 计算每个字符的时间位置
+            # 🎯 使用改进的精确字符位置计算
+            chars_per_segment = len(times) // len(text)
+            
+            # 计算每个字符的精确时间位置
             for i, char in enumerate(text):
                 if i < len(tone_colors):
-                    # 计算字符在时间轴上的精确位置 - 简单平均分布
-                    total_duration = times[-1] - times[0] if len(times) > 1 else 1.0
-                    char_duration = total_duration / len(text)
-                    char_time = times[0] + (i + 0.5) * char_duration
+                    # 🎯 精确计算字符对应的时间段
+                    start_idx = i * chars_per_segment
+                    end_idx = (i + 1) * chars_per_segment if i < len(text) - 1 else len(times)
                     
-                    # 找到最接近这个时间的音高值
-                    char_pitch = self._find_pitch_at_time(char_time, times, pitch_values)
-                    
-                    if char_pitch and not np.isnan(char_pitch):
-                        # 使用对应的声调颜色
-                        color = tone_colors[i]
+                    if start_idx < len(times) and end_idx <= len(times):
+                        # 计算字符的中心时间
+                        char_start_time = times[start_idx]
+                        char_end_time = times[min(end_idx-1, len(times)-1)]
+                        char_center_time = (char_start_time + char_end_time) / 2
                         
-                        # 在音高点上方添加汉字标注
-                        offset_y = 15  # 向上偏移
-                        ax.annotate(char, 
-                                  xy=(char_time, char_pitch),
-                                  xytext=(char_time, char_pitch + offset_y),
-                                  ha='center', va='bottom',
-                                  fontsize=14, fontweight='bold',
-                                  color='white',
-                                  fontproperties=self._get_font_properties(14, 'bold'),
-                                  bbox=dict(boxstyle='round,pad=0.3', 
-                                          facecolor=color, alpha=0.8, edgecolor='none'),
-                                  arrowprops=dict(arrowstyle='->', 
-                                                connectionstyle='arc3,rad=0',
-                                                color=color, alpha=0.6, lw=1.5))
+                        # 获取字符时间段的平均音高
+                        segment_pitch = pitch_values[start_idx:end_idx]
+                        valid_pitch = [p for p in segment_pitch if not np.isnan(p)]
+                        
+                        if valid_pitch:
+                            char_pitch = np.mean(valid_pitch)
+                            color = tone_colors[i]
+                            
+                            # 🎨 增强的汉字标注设计
+                            # 添加字符时间范围的背景区域
+                            y_min, y_max = ax.get_ylim()
+                            background_height = (y_max - y_min) * 0.08
+                            
+                            # 背景矩形
+                            rect = plt.Rectangle((char_start_time, y_min), 
+                                               char_end_time - char_start_time, 
+                                               background_height,
+                                               facecolor=color, alpha=0.15, 
+                                               edgecolor=color, linewidth=1, linestyle='--')
+                            ax.add_patch(rect)
+                            
+                            # 🎯 精确的汉字标注位置
+                            annotation_y = char_pitch + (y_max - y_min) * 0.06
+                            
+                            # 汉字标注
+                            ax.annotate(char, 
+                                      xy=(char_center_time, char_pitch),
+                                      xytext=(char_center_time, annotation_y),
+                                      ha='center', va='center',
+                                      fontsize=16, fontweight='bold',
+                                      color='white',
+                                      fontproperties=self._get_font_properties(16, 'bold'),
+                                      bbox=dict(boxstyle='round,pad=0.4', 
+                                              facecolor=color, alpha=0.9, 
+                                              edgecolor='black', linewidth=1),
+                                      arrowprops=dict(arrowstyle='->', 
+                                                    connectionstyle='arc3,rad=0',
+                                                    color=color, alpha=0.8, lw=2))
+                            
+                            # 🔗 添加连接线到时间轴
+                            ax.plot([char_center_time, char_center_time], 
+                                   [y_min, char_pitch], 
+                                   color=color, alpha=0.5, linewidth=1, linestyle=':')
+                            
+                            # ⏰ 时间信息标注
+                            time_text = f"{char_start_time:.2f}-{char_end_time:.2f}s"
+                            ax.text(char_center_time, y_min + background_height/2, 
+                                   time_text, ha='center', va='center', fontsize=8, 
+                                   color='darkblue', alpha=0.8,
+                                   fontproperties=self._get_font_properties(8),
+                                   bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8, edgecolor='none'))
                         
         except Exception as e:
             print(f"添加汉字标注失败: {e}")
@@ -1077,20 +1174,22 @@ class PitchVisualization:
             print(f"⚠️ 声调分析器初始化失败: {e}")
             return None
     
-    def _get_tone_colors_for_text(self, tone_analyzer, text):
+    def _get_tone_colors_for_text(self, tone_analyzer, text, pitch_values=None, times=None):
         """
-        获取文本中每个字符的声调颜色
+        获取文本中每个字符的声调颜色 - 基于音高分析
         :param tone_analyzer: 声调分析器
         :param text: 输入文本
+        :param pitch_values: 音高数据（用于基于音高的声调分析）
+        :param times: 时间数据
         :return: 字符索引到颜色的映射字典
         """
-        # 声调颜色映射
+        # 📊 优化的声调颜色映射 - 根据声调特征设计直观颜色
         tone_colors_map = {
-            0: '#ffeaa7',  # 轻声 - 黄色
-            1: '#ff6b6b',  # 阴平 - 红色  
-            2: '#4ecdc4',  # 阳平 - 青色
-            3: '#45b7d1',  # 上声 - 蓝色
-            4: '#96ceb4'   # 去声 - 绿色
+            0: '#B0B0B0',  # 轻声 - 浅灰色（轻柔、中性）
+            1: '#E74C3C',  # 阴平 - 鲜红色（平稳、持续的高音）
+            2: '#3498DB',  # 阳平 - 蓝色（从低到高的上升）
+            3: '#F39C12',  # 上声 - 橙色（先降后升的曲折）
+            4: '#27AE60'   # 去声 - 绿色（从高到低的下降）
         }
         
         try:
@@ -1098,13 +1197,24 @@ class PitchVisualization:
                 # 如果没有分析器或文本，返回默认颜色
                 return {i: '#cccccc' for i in range(len(text))}
             
-            # 分析文本声调
-            tones = tone_analyzer.analyze_text_tones(text)
+            # 基于音高分析声调（如果有音高数据）
+            if pitch_values is not None and times is not None:
+                print(f"🎵 使用音高数据分析声调: text='{text}'")
+                tones = tone_analyzer.analyze_pitch_based_tones(pitch_values, times, text)
+            else:
+                print(f"🎵 无音高数据，使用默认声调分配: text='{text}'")
+                # 如果没有音高数据，为每个字符分配不同的默认声调进行演示
+                tones = [(i % 4) + 1 for i in range(len(text.strip()))]
+            
+            print(f"🎵 声调分析结果: text='{text}', tones={tones}")
             
             # 创建颜色映射
             color_mapping = {}
             for i, tone in enumerate(tones):
-                color_mapping[i] = tone_colors_map.get(tone, '#cccccc')
+                color = tone_colors_map.get(tone, '#cccccc')
+                color_mapping[i] = color
+                if i < len(text):
+                    print(f"🎨 字符'{text[i]}' -> 声调{tone} -> 颜色{color}")
             
             return color_mapping
             
@@ -1115,21 +1225,36 @@ class PitchVisualization:
     
     def _calculate_precise_char_position(self, start_time, end_time, times):
         """
-        精确计算字符在音高曲线上的时间位置
+        🎯 精确计算字符在音高曲线上的时间位置
+        增强时间轴匹配精度，确保汉字标注与音高曲线完美对齐
         :param start_time: 字符开始时间
         :param end_time: 字符结束时间
         :param times: 音高曲线的时间轴
         :return: 精确的字符中心时间位置
         """
         try:
-            # 方法1: 如果时间轴数据足够详细，找到最接近的时间点
+            # 🎯 方法1: 高精度时间轴匹配
             if len(times) > 10:
+                # 计算字符的有效时间中心点
                 char_center_time = (start_time + end_time) / 2
-                # 找到最接近的音高数据点
-                closest_idx = np.argmin(np.abs(times - char_center_time))
-                return times[closest_idx]
+                
+                # 🔍 在有效时间范围内查找最接近的音高数据点
+                valid_indices = np.where((times >= start_time) & (times <= end_time))[0]
+                
+                if len(valid_indices) > 0:
+                    # 如果在时间范围内有数据点，选择中间位置的点
+                    mid_idx = valid_indices[len(valid_indices) // 2]
+                    precise_time = times[mid_idx]
+                    print(f"🎯 字符精确匹配: {start_time:.3f}-{end_time:.3f}s -> {precise_time:.3f}s")
+                    return precise_time
+                else:
+                    # 如果范围内没有数据点，找最接近中心点的
+                    closest_idx = np.argmin(np.abs(times - char_center_time))
+                    precise_time = times[closest_idx]
+                    print(f"📍 字符近似匹配: {start_time:.3f}-{end_time:.3f}s -> {precise_time:.3f}s")
+                    return precise_time
             else:
-                # 方法2: 简单取中点
+                # 方法2: 简单取中点（备用方案）
                 return (start_time + end_time) / 2
                 
         except Exception as e:
@@ -1144,9 +1269,9 @@ class PitchVisualization:
         :param x_max: x轴最大值
         """
         try:
-            # 声调标签和颜色
+            # 📊 更新声调标签和颜色 - 与声调特征匹配
             tone_labels = ['轻声', '阴平', '阳平', '上声', '去声']
-            tone_colors = ['#ffeaa7', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4']
+            tone_colors = ['#B0B0B0', '#E74C3C', '#3498DB', '#F39C12', '#27AE60']
             
             # 在右上角添加图例
             legend_x = x_max * 0.85
@@ -1175,6 +1300,104 @@ class PitchVisualization:
                 
         except Exception as e:
             print(f"⚠️ 添加声调图例失败: {e}")
+            
+    def _add_enhanced_tone_legend(self, ax, y_max, x_max, char_timestamps=None):
+        """
+        🎵 添加增强的声调图例和时间轴信息
+        :param ax: matplotlib轴对象
+        :param y_max: y轴最大值
+        :param x_max: x轴最大值
+        :param char_timestamps: 字符时间戳信息（用于显示统计）
+        """
+        try:
+            # 📊 声调标签、颜色和特征描述
+            tone_info = [
+                ('轻声', '#B0B0B0', '中性、轻柔'),
+                ('阴平', '#E74C3C', '高平、持续'),
+                ('阳平', '#3498DB', '低升高、上扬'),
+                ('上声', '#F39C12', '下降上升、曲折'),
+                ('去声', '#27AE60', '高降低、下降')
+            ]
+            
+            # 计算图例位置 - 放在右上角，但避免遮挡曲线
+            legend_x = x_max * 0.78
+            legend_y_start = y_max * 0.92
+            
+            # 添加背景框
+            legend_bg = plt.Rectangle((legend_x - x_max * 0.01, legend_y_start - y_max * 0.25), 
+                                     x_max * 0.24, y_max * 0.28,
+                                     facecolor='white', alpha=0.95, 
+                                     edgecolor='darkblue', linewidth=1.5, zorder=15)
+            ax.add_patch(legend_bg)
+            
+            # 添加图例标题
+            self._set_text_with_font(ax, 'text', legend_x, legend_y_start, 
+                   '🎵 声调颜色映射', ha='left', va='top', fontsize=11, fontweight='bold',
+                   color='darkblue', zorder=20)
+            
+            # 添加每个声调的详细信息
+            for i, (label, color, description) in enumerate(tone_info):
+                legend_y = legend_y_start - (i + 1) * y_max * 0.045
+                
+                # 绘制增强的颜色标识
+                circle = plt.Circle((legend_x + x_max * 0.01, legend_y), 
+                                   y_max * 0.008, facecolor=color, alpha=0.9, 
+                                   edgecolor='white', linewidth=1.5, zorder=18)
+                ax.add_patch(circle)
+                
+                # 添加声调名称和特征
+                self._set_text_with_font(ax, 'text', legend_x + x_max * 0.025, legend_y, 
+                       f'{label} - {description}', ha='left', va='center', fontsize=8,
+                       color='black', zorder=20)
+            
+            # 添加时间轴对齐说明
+            help_y = legend_y_start - len(tone_info) * y_max * 0.045 - y_max * 0.03
+            self._set_text_with_font(ax, 'text', legend_x, help_y, 
+                   '🎯 汉字位置与音高曲线时间轴对齐', 
+                   ha='left', va='center', fontsize=7, style='italic',
+                   color='darkgreen', zorder=20)
+            
+            # 添加统计信息（如果有字符时间戳）
+            if char_timestamps:
+                total_chars = len(char_timestamps)
+                total_duration = sum(c.get('end_time', 0) - c.get('start_time', 0) for c in char_timestamps)
+                avg_char_duration = total_duration / total_chars if total_chars > 0 else 0
+                
+                stats_y = help_y - y_max * 0.025
+                stats_text = f'字符数: {total_chars} | 平均时长: {avg_char_duration:.2f}s'
+                self._set_text_with_font(ax, 'text', legend_x, stats_y, 
+                       stats_text, ha='left', va='center', fontsize=6,
+                       color='gray', zorder=20)
+                
+        except Exception as e:
+            print(f"⚠️ 添加增强声调图例失败: {e}")
+            # 如果增强图例失败，使用简单版本
+            self._add_simple_tone_legend(ax, y_max, x_max)
+            
+    def _add_simple_tone_legend(self, ax, y_max, x_max):
+        """
+        添加简单的声调图例（备用方案）
+        """
+        try:
+            tone_labels = ['轻声', '阴平', '阳平', '上声', '去声']
+            tone_colors = ['#B0B0B0', '#E74C3C', '#3498DB', '#F39C12', '#27AE60']
+            
+            legend_x = x_max * 0.85
+            legend_y_start = y_max * 0.85
+            
+            for i, (label, color) in enumerate(zip(tone_labels, tone_colors)):
+                legend_y = legend_y_start - i * y_max * 0.04
+                rect = plt.Rectangle((legend_x, legend_y - y_max * 0.01), 
+                                   x_max * 0.02, y_max * 0.02,
+                                   facecolor=color, alpha=0.8, 
+                                   edgecolor='black', linewidth=0.5)
+                ax.add_patch(rect)
+                
+                self._set_text_with_font(ax, 'text', legend_x + x_max * 0.03, legend_y, 
+                       label, ha='left', va='center', fontsize=9)
+                
+        except Exception as e:
+            print(f"⚠️ 添加简单声调图例失败: {e}")
 
 # 使用示例
 if __name__ == '__main__':

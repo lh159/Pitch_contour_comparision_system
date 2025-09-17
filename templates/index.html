@@ -1594,8 +1594,8 @@
                     chartLoading.style.display = 'none';
                 }
                 
-                // 设置图表源并显示
-                chart.src = data.chart_url;
+                // 设置图表源并显示（添加时间戳破坏缓存）
+                chart.src = data.chart_url + '?t=' + new Date().getTime();
                 
                 // 图表加载完成后显示容器
                 chart.onload = function() {
@@ -2481,9 +2481,9 @@
             // 隐藏加载动画
             chartLoading.style.display = 'none';
             
-            // 设置图表
+            // 设置图表（添加时间戳破坏缓存）
             if (data.chart_url) {
-                chart.src = data.chart_url;
+                chart.src = data.chart_url + '?t=' + new Date().getTime();
                 chart.onload = function() {
                     chartContent.style.display = 'block';
                 };
