@@ -15,9 +15,12 @@ import traceback
 # 导入系统模块
 from config import Config
 from tts_module import TTSManager
+from enhanced_tts_manager import EnhancedTTSManager
 from pitch_comparison import PitchComparator
 from scoring_algorithm import ScoringSystem, DetailedAnalyzer
 from visualization import PitchVisualization
+from character_voice_manager import CharacterVoiceManager
+from dialogue_emotion_analyzer import DialogueEmotionAnalyzer
 
 # 导入数值处理
 import numpy as np
@@ -67,17 +70,20 @@ def safe_json_serialize(obj):
 
 # 初始化系统组件
 tts_manager = None
+enhanced_tts_manager = None
 comparator = None
 scoring_system = None
 analyzer = None
 visualizer = None
+voice_manager = None
+emotion_analyzer = None
 
 # 场景对话会话存储
 dialogue_sessions = {}
 
 def init_system():
     """初始化系统组件"""
-    global tts_manager, comparator, scoring_system, analyzer, visualizer
+    global tts_manager, enhanced_tts_manager, comparator, scoring_system, analyzer, visualizer, voice_manager, emotion_analyzer
     
     try:
         print("正在初始化系统组件...")
@@ -86,11 +92,31 @@ def init_system():
         Config.create_directories()
         
         # 初始化各个模块
-        tts_manager = TTSManager()
+        tts_manager = TTSManager()  # 保留原有TTS管理器用于兼容
+        
+        # 初始化增强型TTS管理器
+        try:
+            enhanced_tts_manager = EnhancedTTSManager()
+            print("✓ 增强型TTS管理器初始化成功")
+        except Exception as e:
+            print(f"⚠ 增强型TTS管理器初始化失败，使用标准TTS管理器: {e}")
+            enhanced_tts_manager = None
+        
+        # 初始化其他组件
         comparator = PitchComparator()
         scoring_system = ScoringSystem()
         analyzer = DetailedAnalyzer()
         visualizer = PitchVisualization()
+        
+        # 初始化场景对话相关组件
+        try:
+            voice_manager = CharacterVoiceManager()
+            emotion_analyzer = DialogueEmotionAnalyzer()
+            print("✓ 场景对话组件初始化成功")
+        except Exception as e:
+            print(f"⚠ 场景对话组件初始化失败: {e}")
+            voice_manager = None
+            emotion_analyzer = None
         
         print("✓ 系统初始化完成")
         return True
@@ -111,10 +137,23 @@ def index():
 def get_tts_engines():
     """获取可用的TTS引擎列表"""
     try:
-        engines = tts_manager.get_available_engines() if tts_manager else []
+        # 优先使用增强型TTS管理器
+        if enhanced_tts_manager:
+            engines = enhanced_tts_manager.get_available_engines()
+            current_engine = enhanced_tts_manager.current_engine
+            features = {}
+            for engine in engines:
+                features[engine] = enhanced_tts_manager.get_engine_features(engine)
+        else:
+            engines = tts_manager.get_available_engines() if tts_manager else []
+            current_engine = 'baidu'  # 默认引擎
+            features = {}
+        
         return jsonify({
             'success': True,
-            'engines': engines
+            'engines': engines,
+            'current_engine': current_engine,
+            'features': features
         })
     except Exception as e:
         return jsonify({
@@ -828,6 +867,282 @@ def clear_cache():
             'error': str(e)
         }), 500
 
+# === 增强TTS API端点 ===
+
+@app.route('/api/tts/switch_engine', methods=['POST'])
+def switch_tts_engine():
+    """切换TTS引擎"""
+    try:
+        data = request.get_json()
+        engine_name = data.get('engine')
+        
+        if not engine_name:
+            return jsonify({
+                'success': False,
+                'error': '请指定引擎名称'
+            }), 400
+        
+        if enhanced_tts_manager:
+            success = enhanced_tts_manager.switch_engine(engine_name)
+            if success:
+                return jsonify({
+                    'success': True,
+                    'current_engine': enhanced_tts_manager.current_engine
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'引擎切换失败: {engine_name}'
+                }), 400
+        else:
+            return jsonify({
+                'success': False,
+                'error': '增强型TTS管理器未初始化'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/tts/dialogue/generate', methods=['POST'])
+def generate_dialogue_audio():
+    """生成场景对话音频"""
+    try:
+        data = request.get_json()
+        text = data.get('text', '').strip()
+        character = data.get('character')
+        emotion = data.get('emotion')
+        auto_emotion = data.get('auto_emotion', True)
+        engine = data.get('engine')
+        
+        if not text:
+            return jsonify({
+                'success': False,
+                'error': '请输入要合成的文本'
+            }), 400
+        
+        if enhanced_tts_manager:
+            # 使用增强型TTS管理器生成对话音频
+            audio_path, synthesis_info = enhanced_tts_manager.synthesize_dialogue(
+                text=text,
+                character=character,
+                emotion=emotion,
+                auto_emotion=auto_emotion,
+                engine=engine
+            )
+            
+            if audio_path and synthesis_info['success']:
+                # 生成文件ID和URL
+                import uuid
+                file_id = str(uuid.uuid4())
+                filename = os.path.basename(audio_path)
+                
+                return jsonify({
+                    'success': True,
+                    'audio_url': url_for('serve_cache_file', filename=filename),
+                    'file_id': file_id,
+                    'synthesis_info': safe_json_serialize(synthesis_info)
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': '对话音频生成失败',
+                    'synthesis_info': safe_json_serialize(synthesis_info)
+                }), 500
+        else:
+            # 回退到标准TTS
+            file_id = str(uuid.uuid4())
+            filename = f"dialogue_{file_id}.wav"
+            output_path = os.path.join(Config.TEMP_FOLDER, filename)
+            
+            success = tts_manager.generate_standard_audio(text, output_path)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'audio_url': url_for('serve_temp_file', filename=filename),
+                    'file_id': file_id,
+                    'synthesis_info': {
+                        'character': character,
+                        'emotion': emotion,
+                        'engine_used': 'baidu',
+                        'success': True
+                    }
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'TTS生成失败'
+                }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'服务器错误: {str(e)}'
+        }), 500
+
+@app.route('/api/tts/voice_clone', methods=['POST'])
+def clone_voice():
+    """语音克隆"""
+    try:
+        data = request.get_json()
+        text = data.get('text', '').strip()
+        reference_audio = data.get('reference_audio')
+        engine = data.get('engine')
+        
+        if not text:
+            return jsonify({
+                'success': False,
+                'error': '请输入要合成的文本'
+            }), 400
+        
+        if not reference_audio:
+            return jsonify({
+                'success': False,
+                'error': '请提供参考音频文件'
+            }), 400
+        
+        if enhanced_tts_manager:
+            # 生成输出路径
+            import uuid
+            file_id = str(uuid.uuid4())
+            filename = f"cloned_{file_id}.wav"
+            output_path = os.path.join('cache/tts', filename)
+            
+            success = enhanced_tts_manager.clone_voice(
+                text=text,
+                reference_audio=reference_audio,
+                output_path=output_path,
+                engine=engine
+            )
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'audio_url': url_for('serve_cache_file', filename=filename),
+                    'file_id': file_id
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': '语音克隆失败'
+                }), 500
+        else:
+            return jsonify({
+                'success': False,
+                'error': '语音克隆功能需要增强型TTS管理器'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'服务器错误: {str(e)}'
+        }), 500
+
+@app.route('/api/characters', methods=['GET'])
+def get_characters():
+    """获取所有角色"""
+    try:
+        if voice_manager:
+            characters = []
+            for name in voice_manager.get_all_characters():
+                profile = voice_manager.get_character_voice_config(name)
+                characters.append({
+                    'name': name,
+                    'type': profile.type,
+                    'description': profile.description,
+                    'default_emotion': profile.default_emotion,
+                    'available_emotions': voice_manager.get_character_emotions(name)
+                })
+            
+            return jsonify({
+                'success': True,
+                'characters': characters
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'characters': []
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/emotions/analyze', methods=['POST'])
+def analyze_text_emotion():
+    """分析文本情感"""
+    try:
+        data = request.get_json()
+        text = data.get('text', '').strip()
+        context = data.get('context', '')
+        
+        if not text:
+            return jsonify({
+                'success': False,
+                'error': '请输入要分析的文本'
+            }), 400
+        
+        if emotion_analyzer:
+            emotion, confidence = emotion_analyzer.analyze_emotion(text, context)
+            description = emotion_analyzer.get_emotion_description(emotion)
+            
+            return jsonify({
+                'success': True,
+                'emotion': emotion,
+                'confidence': confidence,
+                'description': description,
+                'available_emotions': emotion_analyzer.get_available_emotions()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': '情感分析器未初始化'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/tts/stats', methods=['GET'])
+def get_tts_stats():
+    """获取TTS统计信息"""
+    try:
+        if enhanced_tts_manager:
+            stats = enhanced_tts_manager.get_stats()
+            return jsonify({
+                'success': True,
+                'stats': safe_json_serialize(stats)
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'stats': {
+                    'message': '增强型TTS管理器未启用',
+                    'available_engines': tts_manager.get_available_engines() if tts_manager else []
+                }
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/cache/tts/<filename>')
+def serve_cache_file(filename):
+    """提供TTS缓存文件访问"""
+    try:
+        return send_file(os.path.join('cache/tts', filename))
+    except Exception:
+        return "File not found", 404
+
 # === 场景对话API端点 ===
 
 @app.route('/api/scenario/generate', methods=['POST'])
@@ -913,6 +1228,70 @@ def get_next_dialogue():
                 break
         
         if next_dialogue:
+            # 调试：打印下一句对话的完整信息
+            print(f"🔍 获取到下一句对话: {next_dialogue}")
+            print(f"🔍 Speaker字段值: '{next_dialogue.get('speaker', 'MISSING')}'")
+            print(f"🔍 Speaker字段类型: {type(next_dialogue.get('speaker', 'MISSING'))}")
+            
+            # 如果是AI角色台词，生成带角色语音的TTS音频
+            if next_dialogue['speaker'] == 'ai':
+                print(f"🎭 检测到AI角色台词: {next_dialogue['text']}")
+                try:
+                    # 导入必要的模块
+                    from dialogue_voice_mapper import DialogueVoiceMapper
+                    
+                    # 初始化语音映射器
+                    voice_mapper = DialogueVoiceMapper()
+                    print(f"✓ 语音映射器初始化成功")
+                    
+                    # 分析角色并分配语音类型
+                    scenario_description = dialogue_data.get('scenario', '')
+                    role_data = {
+                        'ai_role': dialogue_data.get('ai_role', ''),
+                        'user_role': dialogue_data.get('user_role', '')
+                    }
+                    print(f"🎯 场景描述: {scenario_description}")
+                    print(f"🎯 角色数据: {role_data}")
+                    
+                    # 获取角色语音映射
+                    voice_mapping = voice_mapper.analyze_scenario_roles(scenario_description, role_data)
+                    ai_role = dialogue_data.get('ai_role', '')
+                    voice_type = voice_mapping.get(ai_role, 'adult_female')
+                    print(f"🎵 语音映射结果: {voice_mapping}")
+                    print(f"🎵 AI角色 '{ai_role}' 分配语音类型: {voice_type}")
+                    
+                    # 生成角色语音
+                    import uuid
+                    file_id = str(uuid.uuid4())
+                    filename = f"ai_dialogue_{file_id}.wav"
+                    output_path = os.path.join(Config.TEMP_FOLDER, filename)
+                    print(f"📁 音频输出路径: {output_path}")
+                    
+                    # 使用TTS管理器生成角色语音
+                    if tts_manager:
+                        print(f"🔊 开始生成角色语音...")
+                        success = tts_manager.generate_dialogue_audio(
+                            next_dialogue['text'], output_path, voice_type
+                        )
+                        print(f"🔊 语音生成结果: {success}")
+                        
+                        if success and os.path.exists(output_path):
+                            # 添加音频信息到对话数据
+                            next_dialogue['audio_url'] = url_for('serve_temp_file', filename=filename)
+                            next_dialogue['voice_type'] = voice_type
+                            next_dialogue['voice_description'] = voice_mapper.get_voice_description(voice_type)
+                            print(f"✅ 为AI角色 '{ai_role}' 生成语音成功: {voice_type}")
+                            print(f"✅ 音频URL: {next_dialogue['audio_url']}")
+                        else:
+                            print(f"❌ AI角色语音生成失败: TTS生成返回{success}, 文件存在: {os.path.exists(output_path)}")
+                    else:
+                        print(f"❌ AI角色语音生成失败: tts_manager未初始化")
+                        
+                except Exception as e:
+                    print(f"❌ 生成AI角色语音时出错: {e}")
+                    import traceback
+                    print(f"详细错误信息: {traceback.format_exc()}")
+            
             # 检查是否是对话结束
             is_complete = current_order + 1 >= len(dialogue_data['dialogues'])
             

@@ -64,6 +64,42 @@ class Config:
     DEFAULT_DIALOGUE_ROUNDS = 6  # 默认对话轮数
     DIALOGUE_SESSION_TIMEOUT = 3600  # 对话会话超时时间（秒）
     
+    # === IndexTTS2配置 ===
+    INDEXTTS2_CONFIG = {
+        'model_dir': 'third_party/index-tts/checkpoints',
+        'use_fp16': True,  # 使用半精度推理
+        'use_cuda_kernel': True,  # 使用CUDA内核加速
+        'use_deepspeed': False,  # DeepSpeed加速（可选）
+        'cache_dir': 'cache/indextts2',
+        'max_text_length': 500,  # 最大文本长度
+        'default_emo_alpha': 0.8  # 默认情感强度
+    }
+    
+    # === 增强TTS配置 ===
+    ENHANCED_TTS_CONFIG = {
+        'default_engine': 'indextts2',  # 默认使用IndexTTS2
+        'fallback_engine': 'baidu',    # 备用引擎
+        'auto_emotion': True,          # 自动情感分析
+        'emotion_confidence_threshold': 0.5,  # 情感置信度阈值
+        'cache_enabled': True,         # 启用音频缓存
+        'max_cache_size': 100,         # 最大缓存数量
+        'cache_cleanup_interval': 3600  # 缓存清理间隔（秒）
+    }
+    
+    # === 百度TTS语音配置 ===
+    BAIDU_VOICE_PROFILES = {
+        'standard': 4,      # 度丫丫，标准女声
+        'child': 5,         # 度小娇，可爱童声  
+        'adult_male': 1,    # 度小宇，标准男声
+        'adult_female': 0,  # 度小美，标准女声
+        'elderly': 4,       # 度丫丫，温和女声
+        'professional': 3   # 度小博，专业男声
+    }
+    
+    # === 对话语音缓存配置 ===
+    DIALOGUE_AUDIO_CACHE_SIZE = 100  # 缓存的对话音频数量
+    DIALOGUE_AUDIO_CACHE_TTL = 3600  # 缓存过期时间（秒）
+    
     @classmethod
     def create_directories(cls):
         """创建必要的目录"""

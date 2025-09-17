@@ -127,7 +127,9 @@ class TTSManager:
     
     def __init__(self):
         self.tts_engines = []
+        self.voice_profiles = {}  # 新增：语音配置文件
         self._init_engines()
+        self._init_voice_profiles()  # 新增：初始化语音配置
     
     def _init_engines(self):
         """初始化可用的TTS引擎"""
@@ -161,6 +163,38 @@ class TTSManager:
         
         print(f"共初始化了 {len(self.tts_engines)} 个TTS引擎")
     
+    def _init_voice_profiles(self):
+        """初始化不同角色的语音配置"""
+        self.voice_profiles = {
+            # 标准发音（用户练习用）
+            'standard': {
+                'baidu_per': 4,  # 度丫丫，标准女声
+                'description': '标准女声，用于用户练习'
+            },
+            
+            # AI角色语音配置
+            'child': {
+                'baidu_per': 5,  # 度小娇，可爱童声
+                'description': '儿童角色语音'
+            },
+            'adult_male': {
+                'baidu_per': 1,  # 度小宇，标准男声
+                'description': '成年男性角色语音'
+            },
+            'adult_female': {
+                'baidu_per': 0,  # 度小美，标准女声
+                'description': '成年女性角色语音'
+            },
+            'elderly': {
+                'baidu_per': 4,  # 度丫丫，温和女声
+                'description': '老年角色语音'
+            },
+            'professional': {
+                'baidu_per': 3,  # 度小博，专业男声
+                'description': '专业人士角色语音'
+            }
+        }
+    
     def generate_standard_audio(self, text: str, output_path: str) -> bool:
         """
         生成标准发音音频
@@ -191,6 +225,61 @@ class TTSManager:
         
         print("✗ 所有TTS引擎都无法生成音频")
         return False
+    
+    def generate_dialogue_audio(self, text: str, output_path: str, 
+                               role_type: str = 'standard') -> bool:
+        """
+        为对话角色生成语音
+        :param text: 要合成的文本
+        :param output_path: 输出音频文件路径
+        :param role_type: 角色类型，决定使用的语音
+        :return: 是否成功
+        """
+        
+        # 获取角色语音配置
+        voice_config = self.voice_profiles.get(role_type, self.voice_profiles['standard'])
+        target_per = voice_config['baidu_per']
+        
+        print(f"为角色 '{role_type}' 生成语音: {text}")
+        print(f"使用语音配置: {voice_config['description']} (per={target_per})")
+        
+        # 确保输出目录存在
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # 依次尝试各个TTS引擎，优先使用百度TTS以保持一致性
+        for engine_name, engine in self.tts_engines:
+            try:
+                # 如果是百度TTS，设置特定的语音
+                if isinstance(engine, BaiduTTS):
+                    # 临时修改语音配置
+                    original_per = engine.voice_per
+                    engine.voice_per = target_per
+                    
+                    success = engine.synthesize(text, output_path)
+                    
+                    # 恢复原始配置
+                    engine.voice_per = original_per
+                    
+                    if success and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                        print(f"✓ 使用百度TTS成功生成角色语音: {role_type}")
+                        return True
+                else:
+                    # 其他TTS引擎使用默认配置
+                    if engine.synthesize(text, output_path):
+                        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                            print(f"✓ 使用 {engine_name} 成功生成角色语音")
+                            return True
+                            
+            except Exception as e:
+                print(f"✗ {engine_name} 生成角色语音失败: {e}")
+                continue
+        
+        print("✗ 所有TTS引擎都无法生成角色语音")
+        return False
+    
+    def get_available_voice_profiles(self) -> dict:
+        """获取可用的语音配置文件"""
+        return self.voice_profiles.copy()
     
     def get_available_engines(self) -> list:
         """获取可用的TTS引擎列表"""

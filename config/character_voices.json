@@ -1,0 +1,196 @@
+{
+  "小明": {
+    "name": "小明",
+    "type": "child",
+    "age": 8,
+    "gender": "male",
+    "personality": "活泼开朗",
+    "description": "8岁男孩，活泼好动，充满好奇心",
+    "voice_sample": "examples/voice_01.wav",
+    "default_emotion": "happy",
+    "common_emotions": [
+      "happy",
+      "surprised",
+      "calm",
+      "excited"
+    ],
+    "custom_emotions": {
+      "excited": [
+        0.9,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.5,
+        0.2
+      ]
+    },
+    "engine_specific_config": {
+      "indextts2": {
+        "voice_sample": "examples/voice_01.wav",
+        "emo_alpha": 0.8
+      },
+      "baidu": {
+        "per": 5,
+        "spd": 6,
+        "pit": 6
+      }
+    },
+    "created_at": "2025-09-15T22:23:41.377632",
+    "updated_at": "2025-09-15T22:23:41.377797"
+  },
+  "李老师": {
+    "name": "李老师",
+    "type": "adult_female",
+    "age": 35,
+    "gender": "female",
+    "personality": "温和耐心",
+    "description": "35岁女教师，温和亲切，有耐心",
+    "voice_sample": "examples/voice_07.wav",
+    "default_emotion": "calm",
+    "common_emotions": [
+      "calm",
+      "happy",
+      "gentle",
+      "encouraging"
+    ],
+    "custom_emotions": {
+      "encouraging": [
+        0.3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.2,
+        0.7
+      ],
+      "patient": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.1,
+        0.9
+      ]
+    },
+    "engine_specific_config": {
+      "indextts2": {
+        "voice_sample": "examples/voice_07.wav",
+        "emo_alpha": 0.7
+      },
+      "baidu": {
+        "per": 0,
+        "spd": 4,
+        "pit": 4
+      }
+    },
+    "created_at": "2025-09-15T22:23:41.377656",
+    "updated_at": "2025-09-15T22:23:41.377831"
+  },
+  "王爸爸": {
+    "name": "王爸爸",
+    "type": "adult_male",
+    "age": 40,
+    "gender": "male",
+    "personality": "严肃负责",
+    "description": "40岁男性，严肃但关爱家人",
+    "voice_sample": "examples/voice_10.wav",
+    "default_emotion": "calm",
+    "common_emotions": [
+      "calm",
+      "serious",
+      "happy",
+      "proud"
+    ],
+    "custom_emotions": {
+      "serious": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1.0
+      ],
+      "proud": [
+        0.5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.3,
+        0.4
+      ]
+    },
+    "engine_specific_config": {
+      "indextts2": {
+        "voice_sample": "examples/voice_10.wav",
+        "emo_alpha": 0.6
+      },
+      "baidu": {
+        "per": 1,
+        "spd": 5,
+        "pit": 3
+      }
+    },
+    "created_at": "2025-09-15T22:23:41.377662",
+    "updated_at": "2025-09-15T22:23:41.377847"
+  },
+  "奶奶": {
+    "name": "奶奶",
+    "type": "elderly",
+    "age": 70,
+    "gender": "female",
+    "personality": "慈祥温暖",
+    "description": "70岁老奶奶，慈祥温暖，充满智慧",
+    "voice_sample": "examples/voice_04.wav",
+    "default_emotion": "gentle",
+    "common_emotions": [
+      "gentle",
+      "calm",
+      "happy",
+      "caring"
+    ],
+    "custom_emotions": {
+      "caring": [
+        0.2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.1,
+        0.8
+      ],
+      "wise": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.2,
+        0,
+        0.8
+      ]
+    },
+    "engine_specific_config": {
+      "indextts2": {
+        "voice_sample": "examples/voice_04.wav",
+        "emo_alpha": 0.9
+      },
+      "baidu": {
+        "per": 4,
+        "spd": 4,
+        "pit": 4
+      }
+    },
+    "created_at": "2025-09-15T22:23:41.377666",
+    "updated_at": "2025-09-15T22:23:41.377861"
+  }
+}
