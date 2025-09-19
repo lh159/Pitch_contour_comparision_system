@@ -123,10 +123,17 @@ class PitchComparisonSystem:
                 f"comparison_{text}_{int(datetime.now().timestamp())}.png"
             )
             
-            # 强制使用桌面端完整布局尺寸
+            # 提取文本对齐数据
+            text_alignment_data = None
+            if comparison_result.get('vad_result') and comparison_result['vad_result'].get('text_alignment_result'):
+                text_alignment_data = comparison_result['vad_result']['text_alignment_result']
+            
+            # 强制使用桌面端完整布局尺寸，传递文本对齐数据和TTS音频路径
             chart_success = self.visualizer.plot_pitch_comparison(
                 comparison_result, score_result, chart_path, 
-                fig_size=(18, 12), dpi=150, input_text=text
+                fig_size=(18, 12), dpi=150, input_text=text,
+                text_alignment_data=text_alignment_data,
+                standard_audio_path=standard_audio_path  # 🎯 传递TTS音频路径用于时间戳分析
             )
             
             # 6. 记录到历史

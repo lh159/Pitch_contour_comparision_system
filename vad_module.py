@@ -92,7 +92,10 @@ class VADProcessor:
                     print(f"正在加载本地ASR模型: {self.asr_model_name}")
                     self.local_asr_model = AutoModel(
                         model=self.asr_model_name,
-                        model_revision="v2.0.4"
+                        model_revision="v2.0.4",
+                        # 启用时间戳输出
+                        disable_pbar=True,
+                        disable_update=True
                     )
                     self.asr_available = True
                     print("✓ 本地ASR模型加载成功")
@@ -303,10 +306,11 @@ class VADProcessor:
             print(f"获取详细时间戳失败: {e}")
             return None
     
-    def recognize_speech_with_timestamps(self, audio_path: str) -> Optional[Dict]:
+    def recognize_speech_with_timestamps(self, audio_path: str, text: str = None) -> Optional[Dict]:
         """
         使用ASR模型识别语音并获取时间戳
         :param audio_path: 音频文件路径
+        :param text: 可选的文本，用于强制对齐获取更精确的时间戳
         :return: 识别结果和时间戳信息
         """
         if not self.asr_available:
@@ -315,35 +319,118 @@ class VADProcessor:
         
         try:
             print("正在进行语音识别...")
-            result = self.local_asr_model.generate(
-                input=audio_path,
-                batch_size_s=300,  # 批处理大小
-                hotword=""  # 热词
-            )
+            
+            # 读取音频文件数据
+            import soundfile as sf
+            if isinstance(audio_path, str) and os.path.exists(audio_path):
+                print(f"从文件读取音频: {audio_path}")
+                try:
+                    # 尝试使用soundfile读取
+                    audio_data, sample_rate = sf.read(audio_path)
+                    print(f"音频数据形状: {audio_data.shape}, 采样率: {sample_rate}")
+                    audio_input = audio_data
+                except Exception as e:
+                    print(f"soundfile读取失败，尝试直接使用文件路径: {e}")
+                    audio_input = audio_path
+            else:
+                audio_input = audio_path
+                
+            # 准备ASR参数
+            asr_params = {
+                "input": audio_input,
+                "cache": {},
+                "language": "auto",  # 自动检测语言
+                "use_itn": True,  # 启用反向文本规范化
+                "batch_size_s": 300,  # 批处理大小
+                "merge_vad": True,  # 合并VAD结果 
+                "merge_length_s": 15,  # 合并段落长度
+                "word_timestamp": True,  # 启用词级时间戳
+                "return_raw_text": False,  # 返回结构化结果
+                "is_final": True,  # 最终结果
+                "output_dir": None  # 不输出到文件
+            }
+            
+            # 如果提供了文本，添加强制对齐参数
+            if text:
+                print(f"使用强制对齐模式，目标文本: {text}")
+                asr_params["text"] = text
+                asr_params["hotword"] = text  # 添加热词提高准确度
+            
+            # funasr的generate方法调用
+            result = self.local_asr_model.generate(**asr_params)
             
             if isinstance(result, list) and len(result) > 0:
                 # 处理识别结果
                 recognition_result = result[0]
+                
+                # 调试输出：打印完整结果结构
+                print("🔍 ASR识别结果结构:")
+                print(f"结果类型: {type(recognition_result)}")
+                print(f"结果键: {list(recognition_result.keys()) if isinstance(recognition_result, dict) else '非字典类型'}")
+                if isinstance(recognition_result, dict):
+                    for key, value in recognition_result.items():
+                        print(f"  {key}: {type(value)} - {str(value)[:100]}{'...' if len(str(value)) > 100 else ''}")
+                        # 如果值是字典或列表，进一步探索
+                        if isinstance(value, dict):
+                            print(f"    字典键: {list(value.keys())}")
+                            for sub_key, sub_value in value.items():
+                                print(f"      {sub_key}: {type(sub_value)} - {str(sub_value)[:50]}{'...' if len(str(sub_value)) > 50 else ''}")
+                        elif isinstance(value, list) and len(value) > 0:
+                            print(f"    列表长度: {len(value)}")
+                            if len(value) > 0:
+                                print(f"    第一个元素: {type(value[0])} - {str(value[0])[:50]}{'...' if len(str(value[0])) > 50 else ''}")
+                
+                # 同时打印整个result的结构
+                print("\n🔍 完整result结构:")
+                print(f"result类型: {type(result)}")
+                print(f"result长度: {len(result) if isinstance(result, list) else 'N/A'}")
                 
                 # 提取文本
                 recognized_text = recognition_result.get('text', '')
                 
                 # 提取时间戳 (如果可用)
                 timestamps = []
-                if 'timestamp' in recognition_result:
-                    timestamp_data = recognition_result['timestamp']
+                
+                # 尝试多种时间戳格式
+                timestamp_fields = ['timestamp', 'timestamps', 'word_info', 'word_timestamp']
+                timestamp_data = None
+                
+                for field in timestamp_fields:
+                    if field in recognition_result:
+                        timestamp_data = recognition_result[field]
+                        print(f"找到时间戳字段: {field}")
+                        break
+                
+                if timestamp_data:
+                    print(f"时间戳数据类型: {type(timestamp_data)}")
+                    print(f"时间戳数据内容: {timestamp_data}")
+                    
                     if isinstance(timestamp_data, list):
-                        for ts_item in timestamp_data:
-                            if isinstance(ts_item, list) and len(ts_item) >= 3:
-                                # [word, start_time, end_time]
-                                word = ts_item[0]
-                                start_time = ts_item[1] / 1000.0  # 转换为秒
-                                end_time = ts_item[2] / 1000.0
-                                timestamps.append({
-                                    'word': word,
-                                    'start': start_time,
-                                    'end': end_time
-                                })
+                        for i, ts_item in enumerate(timestamp_data):
+                            try:
+                                if isinstance(ts_item, list) and len(ts_item) >= 3:
+                                    # 格式1: [word, start_time, end_time]
+                                    word = str(ts_item[0])
+                                    start_time = float(ts_item[1]) / 1000.0  # 转换为秒
+                                    end_time = float(ts_item[2]) / 1000.0
+                                    timestamps.append({
+                                        'word': word,
+                                        'start': start_time,
+                                        'end': end_time
+                                    })
+                                elif isinstance(ts_item, dict):
+                                    # 格式2: {'word': 'xxx', 'start': xxx, 'end': xxx}
+                                    word = str(ts_item.get('word', ts_item.get('text', '')))
+                                    start_time = float(ts_item.get('start', ts_item.get('start_time', 0))) / 1000.0
+                                    end_time = float(ts_item.get('end', ts_item.get('end_time', 0))) / 1000.0
+                                    timestamps.append({
+                                        'word': word,
+                                        'start': start_time,
+                                        'end': end_time
+                                    })
+                            except (ValueError, KeyError, IndexError) as e:
+                                print(f"解析时间戳项 {i} 失败: {e}, 内容: {ts_item}")
+                                continue
                 
                 print(f"识别文本: {recognized_text}")
                 print(f"时间戳数量: {len(timestamps)}")
@@ -375,8 +462,8 @@ class VADProcessor:
             # 1. 获取VAD结果
             vad_segments = self.detect_speech_segments(audio_path)
             
-            # 2. 获取ASR识别结果
-            asr_result = self.recognize_speech_with_timestamps(audio_path)
+            # 2. 获取ASR识别结果（使用期望文本进行强制对齐）
+            asr_result = self.recognize_speech_with_timestamps(audio_path, expected_text)
             
             # 3. 准备文本对齐
             aligned_result = {
@@ -386,13 +473,22 @@ class VADProcessor:
                 'text_alignment': []
             }
             
-            if asr_result and asr_result['timestamps']:
-                # 4. 执行文本对齐
-                alignment = self._align_expected_with_recognized(
-                    expected_text, 
-                    asr_result['text'],
-                    asr_result['timestamps']
-                )
+            if asr_result:
+                if asr_result['timestamps'] and len(asr_result['timestamps']) > 0:
+                    # 4a. 有详细时间戳时的精确对齐
+                    alignment = self._align_expected_with_recognized(
+                        expected_text, 
+                        asr_result['text'],
+                        asr_result['timestamps']
+                    )
+                else:
+                    # 4b. 无详细时间戳时的基础对齐
+                    alignment = self._create_basic_text_alignment(
+                        expected_text,
+                        asr_result['text'],
+                        vad_segments
+                    )
+                
                 aligned_result['text_alignment'] = alignment
                 
                 # 5. 将对齐结果映射到VAD段
@@ -516,6 +612,93 @@ class VADProcessor:
             
         except Exception as e:
             print(f"文本对齐处理失败: {e}")
+            return []
+    
+    def _create_basic_text_alignment(self, expected: str, recognized: str, vad_segments: List[Tuple]) -> List[Dict]:
+        """
+        创建基础文本对齐（无详细时间戳时使用）
+        :param expected: 期望文本
+        :param recognized: 识别文本
+        :param vad_segments: VAD语音段
+        :return: 基础对齐结果
+        """
+        try:
+            print("🔤 使用基础文本对齐（无详细时间戳）")
+            
+            # 清理和分词
+            if JIEBA_AVAILABLE:
+                expected_words = list(jieba.cut(expected.strip()))
+                recognized_words = list(jieba.cut(recognized.strip()))
+            else:
+                # 简单按字符分割
+                expected_words = list(expected.strip())
+                recognized_words = list(recognized.strip())
+            
+            alignment = []
+            
+            # 如果有VAD段，将文本均匀分布到语音段中
+            if vad_segments and len(vad_segments) > 0:
+                # 计算总的语音时长
+                total_speech_duration = sum(end - start for start, end in vad_segments)
+                
+                # 按字符数量分配时间
+                total_chars = len(expected.replace(' ', ''))
+                if total_chars > 0:
+                    char_duration = total_speech_duration / total_chars
+                    
+                    current_time = vad_segments[0][0]  # 从第一个语音段开始
+                    segment_idx = 0
+                    segment_time_left = vad_segments[0][1] - vad_segments[0][0]
+                    
+                    for word in expected_words:
+                        word_duration = len(word) * char_duration
+                        
+                        # 检查当前语音段是否有足够时间
+                        while segment_time_left < word_duration and segment_idx < len(vad_segments) - 1:
+                            # 移动到下一个语音段
+                            segment_idx += 1
+                            current_time = vad_segments[segment_idx][0]
+                            segment_time_left = vad_segments[segment_idx][1] - vad_segments[segment_idx][0]
+                        
+                        start_time = current_time
+                        end_time = min(current_time + word_duration, vad_segments[segment_idx][1])
+                        
+                        # 确定匹配类型
+                        if word in recognized:
+                            match_type = 'exact'
+                        elif any(char in recognized for char in word):
+                            match_type = 'partial'
+                        else:
+                            match_type = 'mismatch'
+                        
+                        alignment.append({
+                            'expected_word': word,
+                            'recognized_word': word if match_type == 'exact' else '?',
+                            'start_time': start_time,
+                            'end_time': end_time,
+                            'match_type': match_type
+                        })
+                        
+                        current_time = end_time
+                        segment_time_left -= word_duration
+            
+            else:
+                # 如果没有VAD段，创建简单的匹配记录
+                for word in expected_words:
+                    match_type = 'exact' if word in recognized else 'mismatch'
+                    alignment.append({
+                        'expected_word': word,
+                        'recognized_word': word if match_type == 'exact' else '?',
+                        'start_time': 0,
+                        'end_time': 1,
+                        'match_type': match_type
+                    })
+            
+            print(f"✓ 基础文本对齐完成，生成 {len(alignment)} 个对齐项")
+            return alignment
+            
+        except Exception as e:
+            print(f"基础文本对齐失败: {e}")
             return []
     
     def _map_text_to_vad_segments(self, alignment: List[Dict], vad_segments: List[Tuple[float, float]]) -> List[Dict]:

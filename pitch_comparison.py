@@ -24,6 +24,14 @@ except ImportError:
     VAD_AVAILABLE = False
     print("警告: VAD模块未可用，将使用传统音高比对方法")
 
+try:
+    from fun_asr_module import FunASRProcessor
+    from visualization import PitchVisualizationWithFunASR
+    FUN_ASR_AVAILABLE = True
+except ImportError:
+    FUN_ASR_AVAILABLE = False
+    print("警告: Fun-ASR模块未可用，将使用标准可视化方法")
+
 class PitchExtractor:
     """音高提取器"""
     
@@ -491,6 +499,18 @@ class PitchComparator:
             except Exception as e:
                 print(f"⚠️ VAD功能初始化失败: {e}")
                 self.use_vad = False
+        
+        # 集成Fun-ASR功能
+        self.fun_asr_processor = None
+        self.use_fun_asr = FUN_ASR_AVAILABLE
+        
+        if self.use_fun_asr:
+            try:
+                self.fun_asr_processor = FunASRProcessor()
+                print("✓ Fun-ASR时间戳功能已启用")
+            except Exception as e:
+                print(f"⚠️ Fun-ASR功能初始化失败: {e}")
+                self.use_fun_asr = False
     
     def compare_pitch_curves(self, standard_audio: str, user_audio: str, 
                            expected_text: str = None, enable_text_alignment: bool = True) -> dict:
@@ -846,6 +866,116 @@ class PitchComparator:
             'total_enhancement': total_enhancement,
             'speech_ratio_consistency': 1.0 - ratio_diff if ratio_diff < 1.0 else 0.0
         }
+    
+    def compare_with_fun_asr_visualization(self, standard_audio: str, user_audio: str, 
+                                         original_text: str, output_path: str) -> dict:
+        """
+        使用Fun-ASR进行TTS音频时间戳分析并生成可视化结果
+        :param standard_audio: 标准发音音频路径（TTS生成）
+        :param user_audio: 用户发音音频路径
+        :param original_text: 生成TTS时使用的原始文本
+        :param output_path: 可视化结果输出路径
+        :return: 完整的比对结果
+        """
+        try:
+            print(f"🎯 开始Fun-ASR增强音高比对分析...")
+            print(f"标准音频: {standard_audio}")
+            print(f"用户音频: {user_audio}")
+            print(f"原始文本: {original_text}")
+            
+            # 1. 执行标准音高比对
+            comparison_result = self.compare_pitch_curves(
+                standard_audio, user_audio, original_text, True
+            )
+            
+            if not comparison_result:
+                print("❌ 基础音高比对失败")
+                return None
+            
+            # 2. 计算评分
+            from scoring_algorithm import ScoringSystem
+            scorer = ScoringSystem()
+            score_result = scorer.calculate_score(comparison_result.get('metrics', {}), original_text)
+            
+            # 3. 生成Fun-ASR增强可视化
+            if self.use_fun_asr and FUN_ASR_AVAILABLE:
+                try:
+                    print("📊 正在生成Fun-ASR时间戳可视化...")
+                    visualizer = PitchVisualizationWithFunASR()
+                    
+                    success = visualizer.plot_comparison_with_fun_asr_timestamps(
+                        comparison_result=comparison_result,
+                        score_result=score_result,
+                        output_path=output_path,
+                        tts_audio_path=standard_audio,  # TTS音频用于时间戳分析
+                        original_text=original_text
+                    )
+                    
+                    if success:
+                        print(f"✅ Fun-ASR增强可视化完成: {output_path}")
+                    else:
+                        print("⚠️ Fun-ASR可视化失败，使用标准可视化")
+                        self._fallback_to_standard_visualization(
+                            comparison_result, score_result, output_path, original_text
+                        )
+                        
+                except Exception as e:
+                    print(f"⚠️ Fun-ASR可视化过程出错: {e}")
+                    self._fallback_to_standard_visualization(
+                        comparison_result, score_result, output_path, original_text
+                    )
+            else:
+                print("⚠️ Fun-ASR不可用，使用标准可视化")
+                self._fallback_to_standard_visualization(
+                    comparison_result, score_result, output_path, original_text
+                )
+            
+            # 4. 构建完整结果
+            result = {
+                'comparison_result': comparison_result,
+                'score_result': score_result,
+                'visualization_path': output_path,
+                'original_text': original_text,
+                'fun_asr_enabled': self.use_fun_asr,
+                'timestamp': comparison_result.get('timestamp')
+            }
+            
+            print(f"🎉 Fun-ASR增强音高比对分析完成!")
+            return result
+            
+        except Exception as e:
+            print(f"❌ Fun-ASR增强音高比对失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def _fallback_to_standard_visualization(self, comparison_result, score_result, 
+                                          output_path, original_text):
+        """
+        回退到标准可视化方法
+        """
+        try:
+            from visualization import PitchVisualization
+            visualizer = PitchVisualization()
+            
+            text_alignment_data = comparison_result.get('text_alignment_data')
+            
+            success = visualizer.plot_pitch_comparison(
+                comparison_result=comparison_result,
+                score_result=score_result,
+                output_path=output_path,
+                input_text=original_text,
+                text_alignment_data=text_alignment_data
+            )
+            
+            if success:
+                print(f"✅ 标准可视化完成: {output_path}")
+            else:
+                print("❌ 标准可视化也失败了")
+                
+        except Exception as e:
+            print(f"❌ 标准可视化回退失败: {e}")
+
 
 # 使用示例
 if __name__ == '__main__':

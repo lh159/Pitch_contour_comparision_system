@@ -394,15 +394,11 @@ class ChineseToneAnalyzer:
 if __name__ == '__main__':
     analyzer = ChineseToneAnalyzer()
     
-    # 测试文本声调分析
-    test_text = "你好"
-    tones = analyzer.analyze_text_tones(test_text)
-    print(f"文本 '{test_text}' 的声调序列: {tones}")
-    
     # 测试音高声调分析
-    # 模拟音高数据
+    # 模拟音高数据 - 模拟上升调（第三声）
     test_pitch = np.array([200, 210, 220, 215, 210, 205, 200])
     test_times = np.linspace(0, 1, len(test_pitch))
     
-    result = analyzer.analyze_pitch_tones(test_pitch, test_times, [3, 3])
+    # 直接分析音高，不需要预设期望声调
+    result = analyzer.analyze_pitch_tones(test_pitch, test_times, expected_tones=None)
     print(f"音高声调分析结果: {result}")

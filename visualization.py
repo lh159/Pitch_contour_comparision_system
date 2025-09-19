@@ -12,6 +12,7 @@ from matplotlib.patches import Rectangle
 import seaborn as sns
 import os
 from config import Config
+from fun_asr_module import FunASRProcessor
 
 class PitchVisualization:
     """音高可视化类"""
@@ -19,6 +20,7 @@ class PitchVisualization:
     def __init__(self):
         self.font_name = self._detect_chinese_font()
         self._setup_matplotlib()
+        self.fun_asr = FunASRProcessor()  # 初始化Fun-ASR处理器
     
     def _detect_chinese_font(self):
         """检测可用的中文字体"""
@@ -133,9 +135,10 @@ class PitchVisualization:
             return ax.text(*args, **kwargs)
     
     def plot_pitch_comparison(self, comparison_result: dict, score_result: dict, 
-                            output_path: str, fig_size=(14, 9), dpi=150, input_text: str = None) -> bool:
+                            output_path: str, fig_size=(14, 9), dpi=150, input_text: str = None, 
+                            text_alignment_data: dict = None, standard_audio_path: str = None) -> bool:
         """
-        绘制音高曲线对比图 - 简洁美观的设计
+        绘制音高曲线对比图 - 简洁美观的设计，支持TTS文本标注
         """
         
         if 'error' in comparison_result:
@@ -151,22 +154,53 @@ class PitchVisualization:
             if len(standard_pitch) == 0 or len(user_pitch) == 0:
                 return self._plot_error_message("音高数据为空", output_path)
             
-            # 🎨 创建简洁的两栏布局
+            # 🎯 尝试获取TTS音频的ASR时间戳
+            tts_timestamp_data = None
+            if standard_audio_path and input_text:
+                tts_timestamp_data = self._get_tts_timestamps(standard_audio_path, input_text)
+            
+            # 🎨 创建布局 - 根据是否有文本对齐数据调整
             fig = plt.figure(figsize=fig_size, facecolor='white')
-            gs = fig.add_gridspec(2, 2, height_ratios=[4, 1], width_ratios=[3, 1], 
-                                 hspace=0.25, wspace=0.2)
             
-            # 1. 主音高对比图 (左侧，占据主要空间)
-            ax_main = fig.add_subplot(gs[0, 0])
-            self._plot_beautiful_comparison(ax_main, times, standard_pitch, user_pitch, input_text)
-            
-            # 2. 评分仪表盘 (右上)
-            ax_score = fig.add_subplot(gs[0, 1])
-            self._plot_clean_score_dashboard(ax_score, score_result)
-            
-            # 3. 评价与建议 (底部，跨两列)
-            ax_feedback = fig.add_subplot(gs[1, :])
-            self._plot_concise_feedback(ax_feedback, score_result, comparison_result)
+            if text_alignment_data and text_alignment_data.get('text_alignment'):
+                # 有文本对齐数据时，使用3行布局
+                gs = fig.add_gridspec(3, 2, height_ratios=[3, 1, 1], width_ratios=[3, 1], 
+                                     hspace=0.3, wspace=0.2)
+                
+                # 1. 主音高对比图 (左上) - 增强版，支持TTS文本标注
+                ax_main = fig.add_subplot(gs[0, 0])
+                self._plot_enhanced_comparison_with_tts_text(ax_main, times, standard_pitch, 
+                                                          user_pitch, input_text, text_alignment_data, 
+                                                          tts_timestamp_data)
+                
+                # 2. 评分仪表盘 (右上)
+                ax_score = fig.add_subplot(gs[0, 1])
+                self._plot_clean_score_dashboard(ax_score, score_result)
+                
+                # 3. 文本时域对齐图 (左中)
+                ax_text = fig.add_subplot(gs[1, 0])
+                self._plot_text_time_alignment(ax_text, text_alignment_data)
+                
+                # 4. 评价与建议 (底部，跨两列)
+                ax_feedback = fig.add_subplot(gs[2, :])
+                self._plot_concise_feedback(ax_feedback, score_result, comparison_result)
+            else:
+                # 无文本对齐数据时，使用原始2行布局，但仍支持TTS文本标注
+                gs = fig.add_gridspec(2, 2, height_ratios=[4, 1], width_ratios=[3, 1], 
+                                     hspace=0.25, wspace=0.2)
+                
+                # 1. 主音高对比图 (左侧，占据主要空间) - 增强版
+                ax_main = fig.add_subplot(gs[0, 0])
+                self._plot_beautiful_comparison_with_tts_text(ax_main, times, standard_pitch, 
+                                                           user_pitch, input_text, tts_timestamp_data)
+                
+                # 2. 评分仪表盘 (右上)
+                ax_score = fig.add_subplot(gs[0, 1])
+                self._plot_clean_score_dashboard(ax_score, score_result)
+                
+                # 3. 评价与建议 (底部，跨两列)
+                ax_feedback = fig.add_subplot(gs[1, :])
+                self._plot_concise_feedback(ax_feedback, score_result, comparison_result)
             
             # 设置整体标题
             total_score = score_result['total_score']
@@ -190,6 +224,280 @@ class PitchVisualization:
             import traceback
             traceback.print_exc()
             return False
+    
+    def _get_tts_timestamps(self, audio_path: str, text: str) -> dict:
+        """
+        获取TTS音频的时间戳数据
+        :param audio_path: TTS音频文件路径
+        :param text: 原始文本
+        :return: 时间戳数据
+        """
+        try:
+            print(f"🔤 正在获取TTS音频时间戳: {audio_path}")
+            
+            # 检查Fun-ASR是否可用
+            if hasattr(self, 'fun_asr') and self.fun_asr:
+                result = self.fun_asr.process_tts_audio_with_text(audio_path, text)
+                if result:
+                    print(f"✅ TTS时间戳获取成功: {len(result.get('aligned_chars', []))}个字符")
+                    return result
+                else:
+                    print("⚠️ Fun-ASR处理TTS音频失败")
+            else:
+                print("⚠️ Fun-ASR不可用，将生成估算时间戳")
+            
+            # 回退方案：生成估算的时间戳
+            return self._generate_estimated_tts_timestamps(audio_path, text)
+            
+        except Exception as e:
+            print(f"获取TTS时间戳失败: {e}")
+            return self._generate_estimated_tts_timestamps(audio_path, text)
+    
+    def _generate_estimated_tts_timestamps(self, audio_path: str, text: str) -> dict:
+        """
+        为TTS音频生成估算的时间戳
+        :param audio_path: 音频文件路径
+        :param text: 原始文本
+        :return: 估算的时间戳数据
+        """
+        try:
+            import parselmouth
+            
+            # 获取音频时长
+            sound = parselmouth.Sound(audio_path)
+            duration = sound.duration
+            
+            # 清理文本，只保留有意义的字符
+            chars = [char for char in text.strip() if char.strip() and char not in '，。！？、']
+            if not chars:
+                return {'aligned_chars': [], 'alignment_quality': 0.0}
+            
+            # 估算每个字符的时间
+            char_duration = duration / len(chars)
+            
+            aligned_chars = []
+            for i, char in enumerate(chars):
+                start_time = i * char_duration
+                end_time = (i + 1) * char_duration
+                
+                aligned_chars.append({
+                    'char': char,
+                    'timestamp': start_time,
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'confidence': 0.8  # 估算置信度
+                })
+            
+            print(f"📝 生成估算时间戳: {len(aligned_chars)}个字符，总时长{duration:.2f}s")
+            
+            return {
+                'aligned_chars': aligned_chars,
+                'alignment_quality': 0.6,  # 估算质量
+                'asr_result': {
+                    'text': ''.join(chars),
+                    'word_timestamps': []
+                }
+            }
+            
+        except Exception as e:
+            print(f"生成估算时间戳失败: {e}")
+            return {'aligned_chars': [], 'alignment_quality': 0.0}
+    
+    def _plot_beautiful_comparison_with_tts_text(self, ax, times, standard_pitch, user_pitch, 
+                                               input_text, tts_timestamp_data=None):
+        """
+        绘制带有TTS文本标注的美观音高对比图
+        """
+        # 先绘制基础的音高对比
+        self._plot_beautiful_comparison(ax, times, standard_pitch, user_pitch, input_text)
+        
+        # 添加TTS文本标注
+        if tts_timestamp_data and tts_timestamp_data.get('aligned_chars'):
+            self._add_tts_text_annotations(ax, times, standard_pitch, tts_timestamp_data, input_text)
+    
+    def _plot_enhanced_comparison_with_tts_text(self, ax, times, standard_pitch, user_pitch, 
+                                              input_text, text_alignment_data, tts_timestamp_data):
+        """
+        绘制带有TTS文本标注的增强版音高对比图
+        """
+        # 先绘制带文本标记的对比图
+        self._plot_beautiful_comparison_with_text_markers(ax, times, standard_pitch, 
+                                                        user_pitch, input_text, text_alignment_data)
+        
+        # 再添加TTS文本标注
+        if tts_timestamp_data and tts_timestamp_data.get('aligned_chars'):
+            self._add_tts_text_annotations(ax, times, standard_pitch, tts_timestamp_data, input_text)
+    
+    def _add_tts_text_annotations(self, ax, times, standard_pitch, tts_timestamp_data, original_text):
+        """
+        在音高图上添加TTS音频对应的文本标注
+        :param ax: matplotlib轴对象
+        :param times: 时间轴
+        :param standard_pitch: 标准音高数据
+        :param tts_timestamp_data: TTS时间戳数据
+        :param original_text: 原始文本
+        """
+        try:
+            aligned_chars = tts_timestamp_data.get('aligned_chars', [])
+            if not aligned_chars:
+                return
+            
+            print(f"🎨 正在添加TTS文本标注: {len(aligned_chars)}个字符")
+            
+            # 获取图表范围
+            ylim = ax.get_ylim()
+            xlim = ax.get_xlim()
+            y_range = ylim[1] - ylim[0]
+            x_range = xlim[1] - xlim[0]
+            
+            # 🎯 TTS文本标注位置：在标准音高曲线上方
+            tts_annotation_y_offset = y_range * 0.15  # 在标准曲线上方15%的位置
+            
+            # 🎨 初始化声调分析器，为TTS文本着色
+            tone_analyzer = self._initialize_tone_analyzer()
+            tts_tone_colors = self._get_tone_colors_for_text(tone_analyzer, original_text, 
+                                                           standard_pitch, times)
+            
+            # 用于避免标注重叠
+            used_positions = []
+            min_distance = x_range * 0.03  # 最小间距
+            
+            for i, char_info in enumerate(aligned_chars):
+                char = char_info.get('char', '')
+                start_time = char_info.get('start_time', 0)
+                end_time = char_info.get('end_time', start_time + 0.1)
+                confidence = char_info.get('confidence', 1.0)
+                
+                if not char or start_time >= end_time:
+                    continue
+                
+                # 检查时间是否在图表范围内
+                if end_time < xlim[0] or start_time > xlim[1]:
+                    continue
+                
+                # 计算字符中心时间
+                char_center_time = (start_time + end_time) / 2
+                
+                # 避免重叠
+                is_overlapping = any(abs(char_center_time - pos) < min_distance for pos in used_positions)
+                if is_overlapping:
+                    offset = min_distance * (1 if i % 2 == 0 else -1)
+                    char_center_time = max(xlim[0], min(xlim[1], char_center_time + offset))
+                
+                used_positions.append(char_center_time)
+                
+                # 🎨 获取字符对应位置的标准音高
+                char_pitch = self._find_pitch_at_time_in_range(char_center_time, times, standard_pitch)
+                if char_pitch is None or np.isnan(char_pitch):
+                    char_pitch = ylim[0] + y_range * 0.2  # 默认位置
+                
+                # 计算标注位置
+                annotation_y = char_pitch + tts_annotation_y_offset
+                
+                # 获取声调颜色
+                tone_color = tts_tone_colors.get(i, '#2E86AB')  # 默认使用标准音高颜色
+                
+                # 根据置信度调整透明度
+                alpha = max(0.6, confidence)
+                
+                # 🔤 绘制TTS文本标注
+                # 1. 添加背景区域指示字符时间范围
+                if end_time - start_time > 0.02:  # 只对有意义的时间段绘制背景
+                    rect = plt.Rectangle((start_time, char_pitch), 
+                                       end_time - start_time, tts_annotation_y_offset * 0.5,
+                                       facecolor=tone_color, alpha=0.1, 
+                                       edgecolor=tone_color, linewidth=0.8, linestyle=':')
+                    ax.add_patch(rect)
+                
+                # 2. 添加汉字标注
+                bbox_props = dict(boxstyle='round,pad=0.3', 
+                                facecolor=tone_color, alpha=alpha, 
+                                edgecolor='white', linewidth=1.5)
+                
+                self._set_text_with_font(ax, 'text', char_center_time, annotation_y, char,
+                       ha='center', va='center', fontsize=14, fontweight='bold',
+                       color='white', alpha=alpha,
+                       bbox=bbox_props, zorder=12)
+                
+                # 3. 添加连接线到标准音高曲线
+                ax.plot([char_center_time, char_center_time], 
+                       [char_pitch + tts_annotation_y_offset * 0.1, annotation_y - y_range * 0.02], 
+                       color=tone_color, alpha=alpha * 0.7, linewidth=1.5, 
+                       linestyle='--', zorder=8)
+                
+                # 4. 在标准音高曲线上添加精确定位点
+                ax.plot(char_center_time, char_pitch, 'o', 
+                       color=tone_color, markersize=6, alpha=alpha, 
+                       markeredgecolor='white', markeredgewidth=1, zorder=10)
+                
+                # 5. 添加时间信息（为较长的字符）
+                if end_time - start_time > 0.15 and confidence > 0.7:
+                    time_text = f'{start_time:.2f}s'
+                    ax.text(char_center_time, annotation_y + y_range * 0.03, time_text,
+                           ha='center', va='bottom', fontsize=7, 
+                           color=tone_color, alpha=0.8, 
+                           fontproperties=self._get_font_properties(7))
+            
+            # 🏷️ 添加TTS文本标注说明
+            ax.text(0.02, 0.95, '🎯 蓝色标注: TTS标准发音文本', 
+                   transform=ax.transAxes, fontsize=10, fontweight='600',
+                   color=self.colors['standard'], alpha=0.9,
+                   bbox=dict(boxstyle='round,pad=0.4', facecolor='white', 
+                           alpha=0.9, edgecolor=self.colors['standard'], linewidth=1))
+            
+            # 📊 添加时间戳质量指示
+            alignment_quality = tts_timestamp_data.get('alignment_quality', 0.0)
+            quality_text = f"时间戳质量: {alignment_quality:.1%}"
+            quality_color = self.colors['good'] if alignment_quality > 0.7 else self.colors['warning']
+            
+            ax.text(0.98, 0.95, quality_text, 
+                   transform=ax.transAxes, fontsize=9, ha='right',
+                   color=quality_color, alpha=0.8,
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
+                           alpha=0.8, edgecolor=quality_color, linewidth=1))
+            
+            print(f"✅ TTS文本标注添加完成: {len(aligned_chars)}个字符")
+            
+        except Exception as e:
+            print(f"添加TTS文本标注失败: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _find_pitch_at_time_in_range(self, target_time: float, times: np.ndarray, 
+                                   pitch_values: np.ndarray) -> float:
+        """
+        在指定时间范围内找到对应的音高值
+        """
+        try:
+            if len(times) == 0 or len(pitch_values) == 0:
+                return None
+            
+            # 确保时间在有效范围内
+            if target_time < times[0] or target_time > times[-1]:
+                return None
+            
+            # 找到最接近的时间索引
+            time_diffs = np.abs(times - target_time)
+            min_idx = np.argmin(time_diffs)
+            
+            # 检查音高值是否有效
+            pitch_value = pitch_values[min_idx]
+            if np.isnan(pitch_value):
+                # 如果当前点无效，尝试找附近的有效点
+                for offset in range(1, min(10, len(pitch_values) // 4)):
+                    # 先检查左侧
+                    if min_idx - offset >= 0 and not np.isnan(pitch_values[min_idx - offset]):
+                        return pitch_values[min_idx - offset]
+                    # 再检查右侧
+                    if min_idx + offset < len(pitch_values) and not np.isnan(pitch_values[min_idx + offset]):
+                        return pitch_values[min_idx + offset]
+                return None
+            
+            return pitch_value
+            
+        except Exception as e:
+            print(f"查找时间点音高失败: {e}")
+            return None
     
     def _get_score_color(self, score):
         """根据分数返回颜色"""
@@ -1577,6 +1885,184 @@ class PitchVisualization:
         self._set_text_with_font(ax, 'text', 0.95, 0.5, decoration_text, 
                ha='right', va='center', fontsize=12, fontweight='bold',
                color=decoration_color, transform=ax.transAxes, alpha=0.7)
+    
+    def _plot_beautiful_comparison_with_text_markers(self, ax, times, standard_pitch, user_pitch, 
+                                                   input_text, text_alignment_data):
+        """
+        绘制带有文本标注的音高对比图
+        """
+        # 先绘制基础的音高对比
+        self._plot_beautiful_comparison(ax, times, standard_pitch, user_pitch, input_text)
+        
+        # 添加文本标注
+        if text_alignment_data and text_alignment_data.get('text_alignment'):
+            self._add_text_markers_to_pitch_plot(ax, times, text_alignment_data)
+    
+    def _add_text_markers_to_pitch_plot(self, ax, times, text_alignment_data):
+        """
+        在音高图上添加文本标注
+        """
+        try:
+            text_alignment = text_alignment_data.get('text_alignment', [])
+            if not text_alignment:
+                return
+            
+            # 获取y轴范围用于放置文本
+            ylim = ax.get_ylim()
+            y_range = ylim[1] - ylim[0]
+            text_y_offset = y_range * 0.1  # 文本位置偏移
+            
+            # 遍历对齐的文本并添加标注
+            for i, alignment in enumerate(text_alignment):
+                if alignment.get('match_type') in ['exact', 'partial']:
+                    expected_word = alignment.get('expected_word', '')
+                    start_time = alignment.get('start_time', 0)
+                    end_time = alignment.get('end_time', 0)
+                    
+                    if start_time is not None and end_time is not None and expected_word:
+                        # 计算文本在时间轴上的中间位置
+                        text_time = (start_time + end_time) / 2
+                        
+                        # 确保时间在显示范围内
+                        if times[0] <= text_time <= times[-1]:
+                            # 根据匹配质量选择颜色
+                            if alignment.get('match_type') == 'exact':
+                                color = self.colors['good']
+                                alpha = 0.9
+                            else:
+                                color = self.colors['warning']
+                                alpha = 0.7
+                            
+                            # 计算文本y位置 (在图的上方)
+                            text_y = ylim[1] - text_y_offset * (1 + i % 3)
+                            
+                            # 添加文本标注
+                            self._set_text_with_font(ax, 'text', text_time, text_y, expected_word,
+                                   ha='center', va='center', fontsize=11, fontweight='bold',
+                                   color=color, alpha=alpha,
+                                   bbox=dict(boxstyle="round,pad=0.3", facecolor='white', 
+                                           edgecolor=color, alpha=0.8))
+                            
+                            # 添加指示线
+                            ax.axvline(x=text_time, color=color, linestyle='--', 
+                                     alpha=0.5, linewidth=1)
+        
+        except Exception as e:
+            print(f"添加文本标注失败: {e}")
+    
+    def _plot_text_time_alignment(self, ax, text_alignment_data):
+        """
+        绘制文本时域对齐图
+        """
+        try:
+            ax.clear()
+            
+            # 设置标题
+            self._set_text_with_font(ax, 'title', "🔤 文本时域对齐分析", 
+                   fontsize=14, fontweight='bold', color=self.colors['text'], pad=15)
+            
+            text_alignment = text_alignment_data.get('text_alignment', [])
+            vad_segments = text_alignment_data.get('vad_segments', [])
+            
+            if not text_alignment:
+                self._set_text_with_font(ax, 'text', 0.5, 0.5, '未检测到文本对齐数据', 
+                       ha='center', va='center', fontsize=12, color=self.colors['accent'],
+                       transform=ax.transAxes)
+                ax.set_xlim(0, 1)
+                ax.set_ylim(0, 1)
+                ax.axis('off')
+                return
+            
+            # 计算时间范围
+            max_time = 0
+            for alignment in text_alignment:
+                if alignment.get('end_time'):
+                    max_time = max(max_time, alignment.get('end_time', 0))
+            
+            if max_time == 0:
+                max_time = 1
+            
+            # 绘制文本段
+            y_pos = 0
+            text_height = 0.8
+            
+            for i, alignment in enumerate(text_alignment):
+                expected_word = alignment.get('expected_word', '')
+                recognized_word = alignment.get('recognized_word', '')
+                start_time = alignment.get('start_time', 0)
+                end_time = alignment.get('end_time', 0)
+                match_type = alignment.get('match_type', 'unknown')
+                
+                if start_time is not None and end_time is not None:
+                    # 选择颜色
+                    if match_type == 'exact':
+                        color = self.colors['good']
+                        confidence_text = "✓"
+                    elif match_type == 'partial':
+                        color = self.colors['warning']  
+                        confidence_text = "≈"
+                    else:
+                        color = self.colors['error']
+                        confidence_text = "✗"
+                    
+                    # 绘制时间段矩形
+                    width = end_time - start_time
+                    rect = Rectangle((start_time, y_pos), width, text_height, 
+                                   facecolor=color, alpha=0.3, edgecolor=color, linewidth=2)
+                    ax.add_patch(rect)
+                    
+                    # 添加文本标签
+                    text_x = start_time + width / 2
+                    text_y = y_pos + text_height / 2
+                    
+                    # 期望文本
+                    self._set_text_with_font(ax, 'text', text_x, text_y + 0.2, expected_word,
+                           ha='center', va='center', fontsize=12, fontweight='bold',
+                           color=color)
+                    
+                    # 识别文本
+                    if recognized_word and recognized_word != expected_word:
+                        self._set_text_with_font(ax, 'text', text_x, text_y - 0.1, 
+                               f"({recognized_word})", ha='center', va='center', 
+                               fontsize=10, color=self.colors['accent'], style='italic')
+                    
+                    # 时间标签
+                    self._set_text_with_font(ax, 'text', text_x, text_y - 0.3, 
+                           f"{start_time:.2f}s-{end_time:.2f}s", ha='center', va='center',
+                           fontsize=9, color=self.colors['accent'])
+                    
+                    # 匹配指示
+                    self._set_text_with_font(ax, 'text', start_time - 0.1, text_y, confidence_text,
+                           ha='center', va='center', fontsize=14, fontweight='bold',
+                           color=color)
+                
+                y_pos += 1.2
+            
+            # 设置坐标轴
+            ax.set_xlim(-0.5, max_time + 0.5)
+            ax.set_ylim(-0.2, y_pos)
+            ax.set_xlabel('时间 (秒)', fontsize=11, color=self.colors['text'])
+            ax.set_ylabel('识别文本', fontsize=11, color=self.colors['text'])
+            
+            # 添加网格
+            ax.grid(True, alpha=0.3, linestyle=':')
+            ax.set_facecolor(self.colors['background'])
+            
+            # 添加统计信息
+            total_words = len(text_alignment)
+            exact_matches = sum(1 for a in text_alignment if a.get('match_type') == 'exact')
+            accuracy = (exact_matches / total_words * 100) if total_words > 0 else 0
+            
+            stats_text = f"匹配度: {accuracy:.1f}% ({exact_matches}/{total_words})"
+            self._set_text_with_font(ax, 'text', 0.02, 0.98, stats_text,
+                   ha='left', va='top', fontsize=10, color=self.colors['accent'],
+                   transform=ax.transAxes, bbox=dict(boxstyle="round,pad=0.3", 
+                   facecolor='white', alpha=0.8))
+        
+        except Exception as e:
+            print(f"绘制文本时域对齐图失败: {e}")
+            import traceback
+            traceback.print_exc()
 
 # 使用示例
 if __name__ == '__main__':
@@ -1624,3 +2110,335 @@ if __name__ == '__main__':
         print("可视化测试成功！")
     else:
         print("可视化测试失败！")
+
+
+# Fun-ASR时间戳可视化扩展
+class PitchVisualizationWithFunASR(PitchVisualization):
+    """扩展版音高可视化类，支持Fun-ASR时间戳"""
+    
+    def plot_comparison_with_fun_asr_timestamps(self, comparison_result: dict, score_result: dict,
+                                               output_path: str, tts_audio_path: str, original_text: str,
+                                               fig_size=(16, 10), dpi=150) -> bool:
+        """
+        绘制带有Fun-ASR时间戳标注的音高对比图
+        :param comparison_result: 音高对比结果
+        :param score_result: 评分结果  
+        :param output_path: 输出图片路径
+        :param tts_audio_path: TTS生成的音频文件路径
+        :param original_text: 原始文本
+        :param fig_size: 图片尺寸
+        :param dpi: 图片分辨率
+        :return: 是否成功
+        """
+        try:
+            print("🎯 开始绘制带Fun-ASR时间戳的音高对比图...")
+            
+            # 1. 使用Fun-ASR处理TTS音频获取时间戳
+            print("📝 正在使用Fun-ASR获取时间戳...")
+            timestamp_result = self.fun_asr.process_tts_audio_with_text(tts_audio_path, original_text)
+            
+            if not timestamp_result:
+                print("⚠️ Fun-ASR时间戳获取失败，使用标准绘图方式")
+                return self.plot_pitch_comparison(comparison_result, score_result, output_path, 
+                                                fig_size, dpi, original_text)
+            
+            # 2. 准备绘图数据
+            times = comparison_result['times']
+            standard_pitch = comparison_result['standard_pitch']  
+            user_pitch = comparison_result['user_pitch']
+            
+            # 3. 创建图形
+            plt.style.use('seaborn-v0_8-whitegrid')
+            fig = plt.figure(figsize=fig_size, dpi=dpi, facecolor='white')
+            
+            # 创建主要布局
+            gs = fig.add_gridspec(3, 2, height_ratios=[3, 1, 1], width_ratios=[3, 1], 
+                                hspace=0.3, wspace=0.2)
+            
+            # 主要音高对比图 (占据大部分空间)
+            ax_main = fig.add_subplot(gs[:2, 0])
+            
+            # 4. 绘制带时间戳标注的音高对比
+            self._plot_pitch_comparison_with_fun_asr(ax_main, times, standard_pitch, user_pitch, 
+                                                   timestamp_result, original_text)
+            
+            # 5. 绘制评分和反馈信息
+            ax_score = fig.add_subplot(gs[:2, 1])
+            self._plot_score_panel_with_timestamps(ax_score, score_result, timestamp_result)
+            
+            # 6. 绘制时间戳详情表 
+            ax_timeline = fig.add_subplot(gs[2, :])
+            self._plot_timestamp_timeline(ax_timeline, timestamp_result, times[-1])
+            
+            # 7. 设置整体标题和样式
+            fig.suptitle('🎵 音高曲线对比分析 (Fun-ASR时间戳版)', 
+                        fontsize=18, fontweight='bold', y=0.95, fontname=self.font_name)
+            
+            # 8. 保存图片
+            plt.tight_layout()
+            plt.savefig(output_path, dpi=dpi, bbox_inches='tight', 
+                       facecolor='white', edgecolor='none')
+            plt.close()
+            
+            print(f"✅ Fun-ASR时间戳音高对比图已保存: {output_path}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 绘制Fun-ASR时间戳音高对比图失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def _plot_pitch_comparison_with_fun_asr(self, ax, times, standard_pitch, user_pitch, 
+                                          timestamp_result, original_text):
+        """
+        绘制带有Fun-ASR时间戳标注的音高对比曲线
+        """
+        try:
+            # 1. 绘制基础音高曲线
+            self._plot_beautiful_comparison(ax, times, standard_pitch, user_pitch, original_text)
+            
+            # 2. 添加Fun-ASR时间戳标注
+            if timestamp_result and timestamp_result.get('aligned_chars'):
+                self._add_fun_asr_text_markers(ax, times, timestamp_result)
+            
+            # 3. 添加时间戳质量指示器
+            alignment_quality = timestamp_result.get('alignment_quality', 0.0) if timestamp_result else 0.0
+            self._add_alignment_quality_indicator(ax, alignment_quality)
+            
+        except Exception as e:
+            print(f"绘制Fun-ASR时间戳音高图失败: {e}")
+    
+    def _add_fun_asr_text_markers(self, ax, times, timestamp_result):
+        """
+        在音高图上添加Fun-ASR的时间戳标注
+        """
+        try:
+            aligned_chars = timestamp_result.get('aligned_chars', [])
+            if not aligned_chars:
+                return
+            
+            # 获取y轴范围
+            ylim = ax.get_ylim()
+            y_range = ylim[1] - ylim[0]
+            
+            # 收集连续的词或短语
+            current_word = ""
+            word_start_time = None
+            word_end_time = None
+            
+            for i, char_info in enumerate(aligned_chars):
+                char = char_info.get('char', '')
+                timestamp = char_info.get('timestamp')
+                
+                if timestamp is not None:
+                    if word_start_time is None:
+                        word_start_time = timestamp
+                        current_word = char
+                    else:
+                        current_word += char
+                    word_end_time = timestamp
+                else:
+                    # 遇到没有时间戳的字符，输出当前词
+                    if current_word and word_start_time is not None:
+                        self._add_word_marker(ax, current_word, word_start_time, word_end_time, ylim, y_range)
+                    current_word = ""
+                    word_start_time = None
+                    word_end_time = None
+                
+                # 如果是词的结束或空格，输出当前词
+                if char in ['，', '。', '！', '？', ' ', '\n'] and current_word and word_start_time is not None:
+                    self._add_word_marker(ax, current_word, word_start_time, word_end_time, ylim, y_range)
+                    current_word = ""
+                    word_start_time = None
+                    word_end_time = None
+            
+            # 处理最后一个词
+            if current_word and word_start_time is not None:
+                self._add_word_marker(ax, current_word, word_start_time, word_end_time, ylim, y_range)
+                
+        except Exception as e:
+            print(f"添加Fun-ASR时间戳标注失败: {e}")
+    
+    def _add_word_marker(self, ax, word, start_time, end_time, ylim, y_range):
+        """
+        添加单个词的时间戳标注
+        """
+        try:
+            if not word.strip():
+                return
+                
+            # 计算词的中心时间
+            center_time = (start_time + end_time) / 2
+            
+            # 文本位置 (稍微在曲线上方)
+            text_y = ylim[1] - y_range * 0.05
+            
+            # 添加文本标注
+            ax.annotate(word.strip(), 
+                       xy=(center_time, text_y),
+                       xytext=(center_time, text_y + y_range * 0.08),
+                       fontsize=10,
+                       fontname=self.font_name,
+                       ha='center',
+                       va='bottom',
+                       bbox=dict(boxstyle='round,pad=0.3', 
+                               facecolor='lightblue', 
+                               alpha=0.7,
+                               edgecolor='steelblue'),
+                       arrowprops=dict(arrowstyle='->', 
+                                     connectionstyle='arc3,rad=0',
+                                     color='steelblue',
+                                     alpha=0.6))
+            
+            # 添加时间区间标记 
+            duration = end_time - start_time
+            if duration > 0.1:  # 只为足够长的词添加区间标记
+                ax.axvspan(start_time, end_time, 
+                          ymin=0.95, ymax=1.0,
+                          alpha=0.3, 
+                          color='lightblue',
+                          label=f'{word}: {duration:.2f}s' if duration > 0.5 else None)
+                
+        except Exception as e:
+            print(f"添加词标记失败: {e}")
+    
+    def _add_alignment_quality_indicator(self, ax, alignment_quality):
+        """
+        添加对齐质量指示器
+        """
+        try:
+            # 在图的右上角添加质量指示器
+            quality_text = f"时间戳对齐质量: {alignment_quality:.1%}"
+            if alignment_quality >= 0.8:
+                color = self.colors['good']
+                emoji = "🟢"
+            elif alignment_quality >= 0.6:
+                color = self.colors['warning'] 
+                emoji = "🟡"
+            else:
+                color = self.colors['error']
+                emoji = "🔴"
+            
+            ax.text(0.98, 0.98, f"{emoji} {quality_text}",
+                   transform=ax.transAxes,
+                   fontsize=10,
+                   fontname=self.font_name,
+                   ha='right', va='top',
+                   bbox=dict(boxstyle='round,pad=0.4',
+                           facecolor=color,
+                           alpha=0.2,
+                           edgecolor=color))
+                           
+        except Exception as e:
+            print(f"添加对齐质量指示器失败: {e}")
+    
+    def _plot_score_panel_with_timestamps(self, ax, score_result, timestamp_result):
+        """
+        绘制包含时间戳信息的评分面板
+        """
+        try:
+            # 复用现有的评分面板绘制方法
+            self._plot_clean_score_dashboard(ax, score_result)
+            
+            # 添加时间戳统计信息
+            if timestamp_result:
+                asr_result = timestamp_result.get('asr_result', {})
+                word_count = len(asr_result.get('word_timestamps', []))
+                alignment_quality = timestamp_result.get('alignment_quality', 0.0)
+                
+                # 在评分面板底部添加时间戳信息
+                ax.text(0.05, 0.15, f"📝 词级时间戳: {word_count}个",
+                       transform=ax.transAxes,
+                       fontsize=9,
+                       fontname=self.font_name,
+                       color='darkblue')
+                
+                ax.text(0.05, 0.05, f"🎯 对齐准确度: {alignment_quality:.1%}",
+                       transform=ax.transAxes,
+                       fontsize=9,
+                       fontname=self.font_name,
+                       color='darkgreen' if alignment_quality > 0.7 else 'orange')
+                       
+        except Exception as e:
+            print(f"绘制时间戳评分面板失败: {e}")
+    
+    def _plot_timestamp_timeline(self, ax, timestamp_result, total_duration):
+        """
+        绘制时间戳时间线详情
+        """
+        try:
+            ax.clear()
+            
+            if not timestamp_result or not timestamp_result.get('aligned_chars'):
+                ax.text(0.5, 0.5, "⚠️ 未获取到时间戳数据", 
+                       transform=ax.transAxes, ha='center', va='center',
+                       fontname=self.font_name, fontsize=12)
+                ax.set_title("时间戳时间线", fontname=self.font_name, fontsize=12)
+                ax.axis('off')
+                return
+            
+            # 提取词级时间戳用于时间线展示
+            asr_result = timestamp_result.get('asr_result', {})
+            word_timestamps = asr_result.get('word_timestamps', [])
+            
+            if not word_timestamps:
+                ax.text(0.5, 0.5, "📝 正在处理时间戳数据...", 
+                       transform=ax.transAxes, ha='center', va='center',
+                       fontname=self.font_name, fontsize=12)
+                ax.set_title("时间戳时间线", fontname=self.font_name, fontsize=12)
+                ax.axis('off')
+                return
+            
+            # 绘制时间线
+            y_pos = 0.5
+            
+            for i, word_info in enumerate(word_timestamps[:20]):  # 限制显示前20个词
+                word = word_info.get('word', '')
+                start_time = word_info.get('start_time', 0)
+                end_time = word_info.get('end_time', 0)
+                confidence = word_info.get('confidence', 1.0)
+                
+                if word.strip():
+                    # 计算在时间轴上的相对位置
+                    start_pos = start_time / total_duration if total_duration > 0 else 0
+                    end_pos = end_time / total_duration if total_duration > 0 else 0
+                    
+                    # 根据置信度选择颜色
+                    if confidence >= 0.9:
+                        color = 'green'
+                        alpha = 0.8
+                    elif confidence >= 0.7:
+                        color = 'orange'
+                        alpha = 0.7
+                    else:
+                        color = 'red'
+                        alpha = 0.6
+                    
+                    # 绘制词的时间区间
+                    ax.barh(y_pos, end_pos - start_pos, left=start_pos, height=0.3,
+                           color=color, alpha=alpha, edgecolor='black', linewidth=0.5)
+                    
+                    # 添加词文本
+                    text_pos = (start_pos + end_pos) / 2
+                    ax.text(text_pos, y_pos, word, ha='center', va='center',
+                           fontsize=8, fontname=self.font_name, color='white', weight='bold')
+            
+            # 设置坐标轴
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.set_xlabel("时间进度", fontname=self.font_name, fontsize=10)
+            ax.set_title("📊 Fun-ASR词级时间戳时间线", fontname=self.font_name, fontsize=12)
+            
+            # 添加时间刻度
+            time_ticks = [0, 0.25, 0.5, 0.75, 1.0]
+            time_labels = [f"{tick * total_duration:.1f}s" for tick in time_ticks]
+            ax.set_xticks(time_ticks)
+            ax.set_xticklabels(time_labels)
+            ax.set_yticks([])
+            
+        except Exception as e:
+            print(f"绘制时间戳时间线失败: {e}")
+            ax.text(0.5, 0.5, f"❌ 时间线绘制错误: {str(e)[:50]}", 
+                   transform=ax.transAxes, ha='center', va='center',
+                   fontname=self.font_name, fontsize=10)

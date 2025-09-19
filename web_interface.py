@@ -376,10 +376,12 @@ def compare_audio():
         chart_filename = f"comparison_{user_file_id}_{int(time.time())}.png"
         chart_path = os.path.join(Config.OUTPUT_FOLDER, chart_filename)
         
-        # 强制使用桌面端完整布局尺寸
+        # 强制使用桌面端完整布局尺寸，传递TTS音频路径
+        standard_audio_path = comparison_result.get('processed_audio_paths', {}).get('standard')
         chart_success = visualizer.plot_pitch_comparison(
             comparison_result, score_result, chart_path, 
-            fig_size=(18, 12), dpi=150, input_text=text
+            fig_size=(18, 12), dpi=150, input_text=text,
+            standard_audio_path=standard_audio_path  # 🎯 传递TTS音频路径
         )
         
         # 准备返回数据，使用安全序列化

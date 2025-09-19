@@ -60,15 +60,12 @@ def test_tone_analyzer():
     for case_name, case_data in test_cases.items():
         print(f"\n📊 测试用例: {case_name}")
         
-        # 文本声调分析
-        expected_tones = analyzer.analyze_text_tones(case_data["text"])
-        print(f"  期望声调: {expected_tones}")
-        
-        # 音高声调分析
+        # 直接分析音高声调，不需要预设的期望声调
+        # 对于音高曲线对比分析，我们只从音频中检测声调
         result = analyzer.analyze_pitch_tones(
             case_data["pitch"], 
             case_data["times"], 
-            expected_tones
+            expected_tones=None
         )
         
         if result and 'tone_analysis' in result:

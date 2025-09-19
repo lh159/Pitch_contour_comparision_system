@@ -159,12 +159,10 @@ class ScoringSystem:
             if len(user_pitch) == 0:
                 return None
             
-            # 获取期望声调
-            expected_tones = self.tone_analyzer.analyze_text_tones(text)
-            
-            # 分析音高声调
+            # 直接分析音高声调，不需要预设的期望声调
+            # 对于音高曲线对比分析，我们只需要从音频中检测声调
             tone_result = self.tone_analyzer.analyze_pitch_tones(
-                user_pitch, user_times, expected_tones
+                user_pitch, user_times, expected_tones=None
             )
             
             return tone_result

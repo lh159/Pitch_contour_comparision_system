@@ -12,6 +12,9 @@ BAIDU_VOICE_PER=0
 # === 阿里达摩院语音配置 ===
 ALIBABA_PARAFORMER_API_KEY=your_alibaba_api_key_here
 
+# === DashScope API配置（Fun-ASR云端服务）===
+DASHSCOPE_API_KEY=sk-9e49538010c3439a8dfe13a9541b29d0
+
 # === 系统配置 ===
 SECRET_KEY=your_secret_key_here
 DEBUG=true
@@ -24,6 +27,10 @@ PORT=9999
 # 2. 百度TTS（推荐）: https://cloud.baidu.com/product/speech
 #    - 免费额度大，性价比高
 #    - 申请流程简单，审核快
-# 3. 如果不配置百度TTS，系统会自动尝试其他免费TTS引擎（Edge TTS、离线TTS）
-# 4. 将此文件复制为 .env 文件并填入真实配置值
-# 5. .env 文件已在 .gitignore 中，不会被提交到版本控制
+# 3. DashScope API: https://dashscope.aliyun.com/
+#    - 用于Fun-ASR云端语音识别服务
+#    - 提供精确的词级时间戳功能
+#    - 上面已经填入了有效的API密钥
+# 4. 如果不配置百度TTS，系统会自动尝试其他免费TTS引擎（Edge TTS、离线TTS）
+# 5. 将此文件复制为 .env 文件并填入真实配置值
+# 6. .env 文件已在 .gitignore 中，不会被提交到版本控制
