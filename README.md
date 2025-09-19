@@ -20,6 +20,9 @@
 - 🎯 **智能评分**: 四维度评分体系，提供个性化改进建议
 - 🔊 **多TTS支持**: 百度TTS、Edge TTS、离线TTS多重选择
 - 🌐 **Web界面**: 现代化响应式设计，支持在线录音
+- 🚀 **增强对齐**: VAD语音检测 + ASR时间轴对齐，精确同步用户发音
+- 🛡️ **录音质量验证**: 智能检测真实录音，拒绝静音和假音频
+- ✂️ **精确时长截断**: 音高曲线显示精准匹配TTS实际语音时长
 
 ## 🚀 快速开始
 
@@ -98,14 +101,17 @@ print(f"得分: {result['score']['total_score']}")
 
 ```
 音高曲线比对系统
-├── 🎤 TTS模块 (tts_module.py)           # 多TTS服务支持
-├── 🎵 音频处理 (audio_plot.py)          # 基于parselmouth
-├── 🔍 比对算法 (pitch_comparison.py)    # DTW对齐 + 相似度计算  
-├── 📊 评分系统 (scoring_algorithm.py)   # 四维度智能评分
-├── 📈 可视化 (visualization.py)         # 图表生成
-├── 🌐 Web界面 (web_interface.py)        # Flask后端
-├── 🎯 主控制器 (main_controller.py)     # 系统集成
-└── ⚙️ 配置管理 (config.py)              # 系统配置
+├── 🎤 TTS模块 (tts_module.py)                    # 多TTS服务支持
+├── 🎵 音频处理 (audio_plot.py)                   # 基于parselmouth
+├── 🔍 比对算法 (pitch_comparison.py)             # DTW对齐 + 相似度计算  
+├── 🚀 增强对齐 (enhanced_pitch_alignment.py)     # VAD + ASR增强对齐
+├── 🛡️ VAD模块 (vad_module.py)                   # 语音活动检测
+├── 🎯 ASR模块 (fun_asr_module.py)               # Fun-ASR时间戳对齐
+├── 📊 评分系统 (scoring_algorithm.py)            # 四维度智能评分
+├── 📈 可视化 (visualization.py)                  # 图表生成
+├── 🌐 Web界面 (web_interface.py)                 # Flask后端
+├── 🎯 主控制器 (main_controller.py)              # 系统集成
+└── ⚙️ 配置管理 (config.py)                       # 系统配置
 ```
 
 ## 🎯 评分体系
@@ -127,7 +133,60 @@ print(f"得分: {result['score']['total_score']}")
 - 📚 **及格** (60-69分): 基础掌握
 - 💪 **需要改进** (<60分): 建议多练习
 
+## 🚀 增强功能详解
+
+### VAD语音活动检测
+
+系统集成Fun-ASR的VAD模块，能够：
+- 🎯 **精确检测语音段落**：自动识别TTS和用户录音的有效语音时间
+- ✂️ **智能截断显示**：音高曲线图只显示实际说话时间，不包含静音
+- 🔍 **质量验证**：检测录音是否包含真实语音内容
+
+### ASR时间轴对齐
+
+基于Fun-ASR的高精度语音识别：
+- 📐 **字级别时间戳**：获取每个字的准确发音时间
+- 🎯 **智能对齐策略**：用户发音与TTS标准发音精确同步
+- 🔄 **多重降级方案**：ASR失败时自动使用VAD对齐
+
+### 录音质量验证
+
+多维度检测确保录音真实性：
+- 🛡️ **静音检测**：拒绝空白或静音录音
+- 📊 **能量分析**：检测音频动态范围和信号强度
+- ⏱️ **时长验证**：确保录音时长合理（>0.3秒）
+- 🎵 **音高有效性**：验证是否能提取到有效音高数据
+
+### 增强可视化
+
+- 📈 **精确时间轴**：图表X轴精确对应实际语音时长
+- 🎨 **智能标注**：TTS文本标注准确对应音高曲线位置
+- 🔍 **对齐状态显示**：实时显示使用的对齐方法和效果
+
 ## 🔧 高级配置
+
+### 增强功能开关
+
+```python
+# config.py中的增强功能配置
+ENABLE_VAD = True                    # 语音活动检测
+ENABLE_ENHANCED_ALIGNMENT = True     # 增强对齐功能
+ENABLE_FUNASR = True                # Fun-ASR时间戳功能
+
+# VAD配置
+VAD_CONFIG = {
+    'model': 'iic/speech_fsmn_vad_zh-cn-16k-common-pytorch',
+    'model_revision': 'v2.0.4',
+    'mode': 'offline'
+}
+
+# ASR配置  
+ASR_CONFIG = {
+    'model': 'iic/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404',
+    'model_revision': 'v2.0.4',
+    'mode': 'offline'
+}
+```
 
 ### TTS服务配置
 
@@ -223,8 +282,40 @@ python pitch_comparison.py
 # 测试评分系统
 python scoring_algorithm.py
 
+# 测试增强功能
+python test_enhanced_pitch_comparison.py
+
+# 测试VAD模块
+python vad_module.py
+
+# 测试ASR功能
+python fun_asr_module.py
+
 # 完整系统测试
 python main_controller.py "你好" "test_audio.wav"
+```
+
+### 增强功能测试
+
+```bash
+# 测试增强音高对齐功能
+python test_enhanced_pitch_comparison.py
+
+# 测试录音质量验证
+python -c "
+from enhanced_pitch_alignment import EnhancedPitchAligner
+aligner = EnhancedPitchAligner()
+result = aligner.validate_user_audio('your_audio.wav')
+print(f'录音质量: {result}')
+"
+
+# 测试VAD检测
+python -c "
+from vad_module import VADProcessor
+vad = VADProcessor()
+result = vad.detect_speech('your_audio.wav')
+print(f'语音段落: {result}')
+"
 ```
 
 ### 性能基准

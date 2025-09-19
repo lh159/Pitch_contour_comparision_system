@@ -151,6 +151,13 @@ class PitchVisualization:
             user_pitch = aligned_data['aligned_user']
             times = aligned_data['aligned_times']
             
+            # 🚀 检查是否使用了增强对齐，获取TTS有效时长
+            enhanced_alignment_result = comparison_result.get('enhanced_alignment_result')
+            tts_effective_duration = None
+            if enhanced_alignment_result and enhanced_alignment_result.get('success'):
+                tts_effective_duration = enhanced_alignment_result.get('tts_effective_duration')
+                print(f"✓ 使用增强对齐结果，TTS有效时长: {tts_effective_duration:.3f}s")
+            
             if len(standard_pitch) == 0 or len(user_pitch) == 0:
                 return self._plot_error_message("音高数据为空", output_path)
             
@@ -171,7 +178,7 @@ class PitchVisualization:
                 ax_main = fig.add_subplot(gs[0, 0])
                 self._plot_enhanced_comparison_with_tts_text(ax_main, times, standard_pitch, 
                                                           user_pitch, input_text, text_alignment_data, 
-                                                          tts_timestamp_data)
+                                                          tts_timestamp_data, tts_effective_duration)
                 
                 # 2. 评分仪表盘 (右上)
                 ax_score = fig.add_subplot(gs[0, 1])
@@ -192,7 +199,8 @@ class PitchVisualization:
                 # 1. 主音高对比图 (左侧，占据主要空间) - 增强版
                 ax_main = fig.add_subplot(gs[0, 0])
                 self._plot_beautiful_comparison_with_tts_text(ax_main, times, standard_pitch, 
-                                                           user_pitch, input_text, tts_timestamp_data)
+                                                           user_pitch, input_text, tts_timestamp_data, 
+                                                           tts_effective_duration)
                 
                 # 2. 评分仪表盘 (右上)
                 ax_score = fig.add_subplot(gs[0, 1])
@@ -304,7 +312,7 @@ class PitchVisualization:
             return {'aligned_chars': [], 'alignment_quality': 0.0}
     
     def _plot_beautiful_comparison_with_tts_text(self, ax, times, standard_pitch, user_pitch, 
-                                               input_text, tts_timestamp_data=None):
+                                               input_text, tts_timestamp_data=None, tts_effective_duration=None):
         """
         绘制带有TTS文本标注的美观音高对比图
         """
@@ -314,9 +322,14 @@ class PitchVisualization:
         # 添加TTS文本标注
         if tts_timestamp_data and tts_timestamp_data.get('aligned_chars'):
             self._add_tts_text_annotations(ax, times, standard_pitch, tts_timestamp_data, input_text)
+        
+        # 🚀 截断显示到TTS有效时长
+        if tts_effective_duration is not None and len(times) > 0:
+            ax.set_xlim(0, tts_effective_duration)
+            print(f"✂️ 图表时间轴截断到TTS有效时长: {tts_effective_duration:.3f}s")
     
     def _plot_enhanced_comparison_with_tts_text(self, ax, times, standard_pitch, user_pitch, 
-                                              input_text, text_alignment_data, tts_timestamp_data):
+                                              input_text, text_alignment_data, tts_timestamp_data, tts_effective_duration=None):
         """
         绘制带有TTS文本标注的增强版音高对比图
         """
@@ -327,6 +340,11 @@ class PitchVisualization:
         # 再添加TTS文本标注
         if tts_timestamp_data and tts_timestamp_data.get('aligned_chars'):
             self._add_tts_text_annotations(ax, times, standard_pitch, tts_timestamp_data, input_text)
+        
+        # 🚀 截断显示到TTS有效时长
+        if tts_effective_duration is not None and len(times) > 0:
+            ax.set_xlim(0, tts_effective_duration)
+            print(f"✂️ 图表时间轴截断到TTS有效时长: {tts_effective_duration:.3f}s")
     
     def _add_tts_text_annotations(self, ax, times, standard_pitch, tts_timestamp_data, original_text):
         """
@@ -1732,8 +1750,19 @@ class PitchVisualization:
         # 📝 添加简洁的统计信息
         pitch_diff = np.abs(user_pitch - standard_pitch)
         avg_diff = np.nanmean(pitch_diff)
-        correlation = np.corrcoef(standard_pitch[~np.isnan(standard_pitch)], 
-                                 user_pitch[~np.isnan(user_pitch)])[0,1] if len(all_pitch) > 10 else 0
+        # 计算相关性，确保数组维度匹配
+        try:
+            std_valid = standard_pitch[~np.isnan(standard_pitch)]
+            user_valid = user_pitch[~np.isnan(user_pitch)]
+            
+            # 确保两个数组长度一致
+            min_length = min(len(std_valid), len(user_valid))
+            if min_length > 10:
+                correlation = np.corrcoef(std_valid[:min_length], user_valid[:min_length])[0, 1]
+            else:
+                correlation = 0.0
+        except (ValueError, IndexError):
+            correlation = 0.0
         
         info_text = f'平均差异: {avg_diff:.1f} Hz\n相似度: {correlation:.2f}'
         ax.text(0.02, 0.98, info_text, transform=ax.transAxes,

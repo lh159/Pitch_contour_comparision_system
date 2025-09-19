@@ -32,6 +32,13 @@ except ImportError:
     FUN_ASR_AVAILABLE = False
     print("警告: Fun-ASR模块未可用，将使用标准可视化方法")
 
+try:
+    from enhanced_pitch_alignment import EnhancedPitchAligner
+    ENHANCED_ALIGNMENT_AVAILABLE = True
+except ImportError:
+    ENHANCED_ALIGNMENT_AVAILABLE = False
+    print("警告: 增强音高对齐模块未可用，将使用标准对齐方法")
+
 class PitchExtractor:
     """音高提取器"""
     
@@ -511,11 +518,23 @@ class PitchComparator:
             except Exception as e:
                 print(f"⚠️ Fun-ASR功能初始化失败: {e}")
                 self.use_fun_asr = False
+        
+        # 🚀 集成增强音高对齐功能
+        self.enhanced_aligner = None
+        self.use_enhanced_alignment = ENHANCED_ALIGNMENT_AVAILABLE
+        
+        if self.use_enhanced_alignment:
+            try:
+                self.enhanced_aligner = EnhancedPitchAligner()
+                print("✓ 增强音高对齐功能已启用")
+            except Exception as e:
+                print(f"⚠️ 增强音高对齐功能初始化失败: {e}")
+                self.use_enhanced_alignment = False
     
     def compare_pitch_curves(self, standard_audio: str, user_audio: str, 
                            expected_text: str = None, enable_text_alignment: bool = True) -> dict:
         """
-        比较两个音频的音高曲线
+        比较两个音频的音高曲线 - 增强版本
         :param standard_audio: 标准发音音频路径
         :param user_audio: 用户发音音频路径
         :param expected_text: 期望的文本（用于文本对齐）
@@ -525,9 +544,41 @@ class PitchComparator:
         vad_result = None
         actual_standard_audio = standard_audio
         actual_user_audio = user_audio
+        enhanced_alignment_result = None
         
-        # 1. VAD预处理（如果启用）
-        if self.use_vad and self.vad_comparator:
+        # 🚀 使用增强音高对齐（如果可用）
+        if self.use_enhanced_alignment and self.enhanced_aligner and expected_text:
+            print("🎯 执行增强音高对齐分析...")
+            
+            try:
+                # 1. 验证用户录音质量
+                user_quality = self.enhanced_aligner.validate_user_audio_quality(user_audio)
+                if not user_quality['is_valid']:
+                    return {
+                        'error': f"用户录音质量问题: {user_quality['reason']}",
+                        'details': user_quality['details'],
+                        'suggestion': '请重新录音，确保清晰发音并避免背景噪音'
+                    }
+                
+                # 2. 获取TTS有效时长
+                tts_duration = self.enhanced_aligner.get_tts_audio_duration(standard_audio, expected_text)
+                
+                # 3. ASR时间轴对齐
+                alignment_result = self.enhanced_aligner.align_user_audio_with_tts(
+                    user_audio, standard_audio, expected_text
+                )
+                
+                if alignment_result['success']:
+                    enhanced_alignment_result = alignment_result
+                    print(f"✓ 增强对齐成功，TTS有效时长: {tts_duration:.3f}s")
+                else:
+                    print(f"⚠️ 增强对齐失败: {alignment_result.get('error', '未知错误')}")
+                    
+            except Exception as e:
+                print(f"⚠️ 增强对齐处理失败，回退到标准处理: {e}")
+        
+        # 1. VAD预处理（如果启用且没有使用增强对齐）
+        if not enhanced_alignment_result and self.use_vad and self.vad_comparator:
             print("🎯 执行VAD增强预处理...")
             vad_result = self.vad_comparator.align_speech_regions(standard_audio, user_audio)
             
@@ -563,21 +614,38 @@ class PitchComparator:
         if user_pitch['valid_ratio'] < 0.1:
             return {'error': '用户发音音高提取失败，请检查录音质量'}
         
-        # 对齐音高曲线
-        print("对齐音高曲线...")
-        aligned_data = self.aligner.align_pitch_curves(standard_pitch, user_pitch)
+        # 3. 对齐音高曲线 - 使用增强对齐或标准对齐
+        if enhanced_alignment_result and enhanced_alignment_result['success']:
+            print("✂️ 执行增强音高曲线对齐...")
+            
+            # 使用增强对齐：截断到TTS时长并进行ASR对齐
+            tts_duration = enhanced_alignment_result['tts_effective_duration']
+            alignment_strategy = enhanced_alignment_result['alignment']
+            
+            aligned_data = self.enhanced_aligner.truncate_pitch_curves_to_tts_duration(
+                standard_pitch, user_pitch, tts_duration, alignment_strategy
+            )
+            
+            if not aligned_data['success']:
+                print("⚠️ 增强对齐失败，回退到标准对齐")
+                aligned_data = self.aligner.align_pitch_curves(standard_pitch, user_pitch)
+                # 增强对齐失败，清除增强对齐结果标记
+                enhanced_alignment_result = None
+        else:
+            print("对齐音高曲线（标准方法）...")
+            aligned_data = self.aligner.align_pitch_curves(standard_pitch, user_pitch)
         
         if len(aligned_data['aligned_standard']) == 0:
             return {'error': '音高曲线对齐失败'}
         
-        # 计算比较指标
+        # 4. 计算比较指标
         print("计算比较指标...")
         metrics = self._calculate_metrics(
             aligned_data['aligned_standard'],
             aligned_data['aligned_user']
         )
         
-        # 组合结果
+        # 5. 组合结果
         result = {
             'standard_pitch': standard_pitch,
             'user_pitch': user_pitch,
@@ -589,9 +657,12 @@ class PitchComparator:
                 'pitch_baseline_aligned': True,
                 'alignment_method': aligned_data.get('alignment_method', 'unknown'),
                 'vad_enabled': self.use_vad,
-                'vad_processing': vad_result is not None
+                'vad_processing': vad_result is not None,
+                'enhanced_alignment_enabled': self.use_enhanced_alignment,
+                'enhanced_alignment_used': enhanced_alignment_result is not None
             },
             'vad_result': vad_result,
+            'enhanced_alignment_result': enhanced_alignment_result,
             'processed_audio_paths': {
                 'standard': actual_standard_audio,
                 'user': actual_user_audio
