@@ -19,9 +19,9 @@ flask-cors>=3.0.10
 flask-socketio>=5.3.0
 redis>=4.5.0
 
-# TTS语音合成 (多个选项，可根据需要选择)
-# edge-tts>=6.1.0  # 免费的Edge TTS选项
-# pyttsx3>=2.90     # 离线TTS选项
+# TTS语音合成
+edge-tts>=6.1.0     # 免费的Edge TTS (备用)
+pyttsx3>=2.90       # 离线TTS (备用)
 
 # 其他工具库
 requests>=2.25.0

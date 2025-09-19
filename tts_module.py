@@ -1,156 +1,213 @@
 # -*- coding: utf-8 -*-
 """
 TTS模块 - 文本转语音功能
-支持多种TTS服务：百度TTS、Edge TTS、离线TTS
+支持阿里云情感TTS、Edge TTS、离线TTS
+优先级：阿里云TTS > Edge TTS > 离线TTS
 """
 import os
-import io
-import wave
+import logging
 from abc import ABC, abstractmethod
+from typing import Dict, List, Optional, Union
 from config import Config
+
+logger = logging.getLogger(__name__)
+
+# 导入TTS引擎
+try:
+    from tts_engines.alibaba_emotion_tts import AlibabaEmotionTTS, create_alibaba_tts
+    ALIBABA_TTS_AVAILABLE = True
+except ImportError:
+    ALIBABA_TTS_AVAILABLE = False
+    print("⚠️ 阿里云情感TTS不可用，请安装相关依赖")
+
+try:
+    import edge_tts
+    import asyncio
+    EDGE_TTS_AVAILABLE = True
+except ImportError:
+    EDGE_TTS_AVAILABLE = False
+    print("⚠️ Edge TTS不可用，请安装: pip install edge-tts")
 
 class TTSBase(ABC):
     """TTS基类"""
     
     @abstractmethod
-    def synthesize(self, text: str, output_path: str) -> bool:
+    def synthesize(self, text: str, output_path: str, **kwargs) -> bool:
         """
         合成语音
         :param text: 要合成的文本
         :param output_path: 输出音频文件路径
+        :param kwargs: 其他参数
         :return: 是否成功
         """
         pass
 
-class BaiduTTS(TTSBase):
-    """百度智能云TTS"""
-    
-    def __init__(self):
-        self.api_key = Config.BAIDU_API_KEY
-        self.secret_key = Config.BAIDU_SECRET_KEY
-        self.voice_per = Config.BAIDU_VOICE_PER
-        
-        if not self.api_key or not self.secret_key:
-            raise ValueError("百度TTS密钥未配置，请在.env文件中设置BAIDU_API_KEY和BAIDU_SECRET_KEY")
-    
-    def synthesize(self, text: str, output_path: str) -> bool:
-        """使用百度TTS合成语音"""
-        try:
-            from tts_engines.baidu_tts import BaiduTTS as BaiduTTSEngine
-            
-            engine = BaiduTTSEngine(self.api_key, self.secret_key)
-            result = engine.synthesize(text, output_path, per=self.voice_per)
-            
-            if result:
-                print(f"百度TTS成功合成: {text} -> {output_path}")
-                return True
-            else:
-                print(f"百度TTS合成失败")
-                return False
-                
-        except ImportError as e:
-            print(f"百度TTS引擎导入失败: {e}")
-            return False
-        except Exception as e:
-            print(f"百度TTS合成失败: {e}")
-            return False
-
-
 class EdgeTTS(TTSBase):
-    """Edge TTS (免费替代方案)"""
+    """Edge TTS免费服务"""
     
     def __init__(self):
-        self.voice = "zh-CN-XiaoxiaoNeural"
+        if not EDGE_TTS_AVAILABLE:
+            raise ImportError("Edge TTS 不可用，请安装: pip install edge-tts")
+        
+        self.voice = getattr(Config, 'EDGE_TTS_VOICE', 'zh-CN-XiaoxiaoNeural')
+        self.rate = getattr(Config, 'EDGE_TTS_RATE', '+0%')
+        self.volume = getattr(Config, 'EDGE_TTS_VOLUME', '+0%')
     
-    def synthesize(self, text: str, output_path: str) -> bool:
+    def synthesize(self, text: str, output_path: str, **kwargs) -> bool:
         """使用Edge TTS合成语音"""
         try:
-            import edge_tts
-            import asyncio
+            # 获取可选参数
+            voice = kwargs.get('voice', self.voice)
+            rate = kwargs.get('rate', self.rate)
+            volume = kwargs.get('volume', self.volume)
+            
+            # 临时文件路径（MP3格式）
+            temp_mp3_path = output_path.replace('.wav', '_temp.mp3')
             
             async def _synthesize():
-                communicate = edge_tts.Communicate(text, self.voice)
-                await communicate.save(output_path)
+                communicate = edge_tts.Communicate(text, voice, rate=rate, volume=volume)
+                await communicate.save(temp_mp3_path)
             
-            # 运行异步合成
-            asyncio.run(_synthesize())
-            print(f"Edge TTS成功合成: {text} -> {output_path}")
-            return True
+            # 运行异步函数
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(_synthesize())
+            loop.close()
             
-        except ImportError:
-            print("Edge TTS未安装，请安装: pip install edge-tts")
-            return False
+            # 验证临时文件
+            if not os.path.exists(temp_mp3_path) or os.path.getsize(temp_mp3_path) == 0:
+                logger.error("Edge TTS生成临时文件失败")
+                return False
+            
+            # 转换MP3到WAV格式
+            try:
+                import subprocess
+                # 使用ffmpeg转换格式
+                result = subprocess.run([
+                    'ffmpeg', '-i', temp_mp3_path, 
+                    '-acodec', 'pcm_s16le', '-ar', '22050', '-ac', '1',
+                    '-y', output_path
+                ], capture_output=True, text=True)
+                
+                # 清理临时文件
+                if os.path.exists(temp_mp3_path):
+                    os.remove(temp_mp3_path)
+                
+                if result.returncode == 0:
+                    if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                        logger.info(f"Edge TTS合成成功: {output_path}")
+                        return True
+                    else:
+                        logger.error("Edge TTS格式转换后文件为空")
+                        return False
+                else:
+                    logger.error(f"Edge TTS格式转换失败: {result.stderr}")
+                    return False
+                    
+            except FileNotFoundError:
+                # 如果没有ffmpeg，尝试使用pydub
+                try:
+                    from pydub import AudioSegment
+                    audio = AudioSegment.from_mp3(temp_mp3_path)
+                    audio.export(output_path, format="wav")
+                    
+                    # 清理临时文件
+                    if os.path.exists(temp_mp3_path):
+                        os.remove(temp_mp3_path)
+                    
+                    if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                        logger.info(f"Edge TTS合成成功: {output_path}")
+                        return True
+                    else:
+                        logger.error("Edge TTS格式转换后文件为空")
+                        return False
+                        
+                except ImportError:
+                    logger.error("Edge TTS格式转换失败：需要ffmpeg或pydub")
+                    # 清理临时文件
+                    if os.path.exists(temp_mp3_path):
+                        os.remove(temp_mp3_path)
+                    return False
+                
         except Exception as e:
-            print(f"Edge TTS合成失败: {e}")
+            logger.error(f"Edge TTS合成失败: {e}")
             return False
 
 class OfflineTTS(TTSBase):
-    """离线TTS (pyttsx3)"""
+    """离线TTS服务"""
     
     def __init__(self):
         try:
             import pyttsx3
             self.engine = pyttsx3.init()
-            
-            # 设置中文语音
-            voices = self.engine.getProperty('voices')
-            for voice in voices:
-                if 'chinese' in voice.name.lower() or 'zh' in voice.id.lower():
-                    self.engine.setProperty('voice', voice.id)
-                    break
-            
-            # 设置语速和音量
-            self.engine.setProperty('rate', 150)
-            self.engine.setProperty('volume', 0.9)
-            
+            self.engine.setProperty('rate', 200)  # 语速
+            self.engine.setProperty('volume', 0.8)  # 音量
         except ImportError:
-            raise ImportError("离线TTS未安装，请安装: pip install pyttsx3")
+            raise ImportError("离线TTS不可用，请安装: pip install pyttsx3")
     
-    def synthesize(self, text: str, output_path: str) -> bool:
+    def synthesize(self, text: str, output_path: str, **kwargs) -> bool:
         """使用离线TTS合成语音"""
         try:
-            import pyttsx3
-            
-            # 保存到文件
+            # 设置输出文件
             self.engine.save_to_file(text, output_path)
             self.engine.runAndWait()
             
-            print(f"离线TTS成功合成: {text} -> {output_path}")
-            return True
-            
+            # 验证文件
+            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                logger.info(f"离线TTS合成成功: {output_path}")
+                return True
+            else:
+                logger.error("离线TTS合成失败：文件未生成或为空")
+                return False
+                
         except Exception as e:
-            print(f"离线TTS合成失败: {e}")
+            logger.error(f"离线TTS合成失败: {e}")
             return False
 
 class TTSManager:
-    """TTS管理器，支持多种TTS服务的自动切换"""
+    """TTS管理器，优先使用阿里云情感TTS"""
     
     def __init__(self):
         self.tts_engines = []
-        self.voice_profiles = {}  # 新增：语音配置文件
+        self.emotion_engine = None  # 专门的情感TTS引擎
+        self.voice_profiles = {}
         self._init_engines()
-        self._init_voice_profiles()  # 新增：初始化语音配置
+        self._init_voice_profiles()
     
     def _init_engines(self):
-        """初始化可用的TTS引擎"""
+        """初始化可用的TTS引擎 - 优先级：阿里云 > Edge > 离线"""
         
-        # 尝试初始化百度TTS (优先级最高，免费额度大)
-        try:
-            baidu_tts = BaiduTTS()
-            self.tts_engines.append(("百度TTS", baidu_tts))
-            print("✓ 百度TTS 初始化成功")
-        except Exception as e:
-            print(f"✗ 百度TTS 初始化失败: {e}")
+        # 1. 尝试初始化阿里云情感TTS (最高优先级)
+        if ALIBABA_TTS_AVAILABLE and hasattr(Config, 'ALIBABA_TTS_CONFIG'):
+            alibaba_config = getattr(Config, 'ALIBABA_TTS_CONFIG', {})
+            if alibaba_config.get('enabled', False):
+                try:
+                    api_key = alibaba_config.get('api_key', '')
+                    if api_key:
+                        alibaba_tts = create_alibaba_tts(api_key)
+                        if alibaba_tts:
+                            self.emotion_engine = alibaba_tts
+                            self.tts_engines.append(("阿里云情感TTS", alibaba_tts))
+                            print("✓ 阿里云情感TTS 初始化成功")
+                        else:
+                            print("✗ 阿里云情感TTS 初始化失败")
+                    else:
+                        print("✗ 阿里云TTS API密钥未配置")
+                except Exception as e:
+                    print(f"✗ 阿里云情感TTS 初始化失败: {e}")
         
-        # 尝试初始化Edge TTS
-        try:
-            edge_tts = EdgeTTS()
-            self.tts_engines.append(("Edge TTS", edge_tts))
-            print("✓ Edge TTS 初始化成功")
-        except Exception as e:
-            print(f"✗ Edge TTS 初始化失败: {e}")
+        # 2. 尝试初始化Edge TTS (备用)
+        if EDGE_TTS_AVAILABLE:
+            edge_config = getattr(Config, 'EDGE_TTS_CONFIG', {})
+            if edge_config.get('enabled', True):
+                try:
+                    edge_tts = EdgeTTS()
+                    self.tts_engines.append(("Edge TTS", edge_tts))
+                    print("✓ Edge TTS 初始化成功")
+                except Exception as e:
+                    print(f"✗ Edge TTS 初始化失败: {e}")
         
-        # 尝试初始化离线TTS
+        # 3. 尝试初始化离线TTS (最后备用)
         try:
             offline_tts = OfflineTTS()
             self.tts_engines.append(("离线TTS", offline_tts))
@@ -166,143 +223,207 @@ class TTSManager:
     def _init_voice_profiles(self):
         """初始化不同角色的语音配置"""
         self.voice_profiles = {
-            # 标准发音（用户练习用）
             'standard': {
-                'baidu_per': 4,  # 度丫丫，标准女声
-                'description': '标准女声，用于用户练习'
+                'description': '标准发音',
+                'emotion': 'neutral',
+                'voice': 'zhimiao_emo'
             },
-            
-            # AI角色语音配置
-            'child': {
-                'baidu_per': 5,  # 度小娇，可爱童声
-                'description': '儿童角色语音'
+            'gentle': {
+                'description': '温柔女声',
+                'emotion': 'gentle',
+                'voice': 'zhimiao_emo'
             },
-            'adult_male': {
-                'baidu_per': 1,  # 度小宇，标准男声
-                'description': '成年男性角色语音'
+            'energetic': {
+                'description': '活力女声',
+                'emotion': 'happy',
+                'voice': 'zhimiao_emo'
             },
-            'adult_female': {
-                'baidu_per': 0,  # 度小美，标准女声
-                'description': '成年女性角色语音'
-            },
-            'elderly': {
-                'baidu_per': 4,  # 度丫丫，温和女声
-                'description': '老年角色语音'
-            },
-            'professional': {
-                'baidu_per': 3,  # 度小博，专业男声
-                'description': '专业人士角色语音'
+            'serious': {
+                'description': '严肃男声',
+                'emotion': 'serious',
+                'voice': 'zhifeng_emo'
             }
         }
     
-    def generate_standard_audio(self, text: str, output_path: str) -> bool:
+    def generate_standard_audio(self, text: str, output_path: str, voice_gender: str = 'female', voice_emotion: str = 'neutral', **kwargs) -> bool:
         """
         生成标准发音音频
-        :param text: 要合成的中文文本
-        :param output_path: 输出音频文件路径
-        :return: 是否成功
+        
+        Args:
+            text: 要合成的文本
+            output_path: 输出文件路径
+            voice_gender: 声音性别 ('female', 'male')
+            voice_emotion: 情感类型 ('neutral', 'happy', 'sad', etc.)
+            **kwargs: 其他参数
+                - quality: 音质要求 ('high', 'medium', 'low')
+        
+        Returns:
+            bool: 生成是否成功
         """
+        print(f"🎤 开始生成标准发音音频: {text} (性别: {voice_gender}, 情感: {voice_emotion})")
         
         # 确保输出目录存在
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        output_dir = os.path.dirname(output_path)
+        if output_dir:  # 只有当有目录部分时才创建
+            os.makedirs(output_dir, exist_ok=True)
         
-        # 依次尝试各个TTS引擎
-        for engine_name, engine in self.tts_engines:
-            print(f"尝试使用 {engine_name} 合成语音...")
-            
+        # 优先使用情感TTS
+        if self.emotion_engine:
             try:
-                if engine.synthesize(text, output_path):
-                    # 验证生成的音频文件
-                    if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                        print(f"✓ 使用 {engine_name} 成功生成标准发音: {text}")
-                        return True
-                    else:
-                        print(f"✗ {engine_name} 生成的音频文件无效")
-                        continue
+                # 根据性别选择声音
+                if voice_gender == 'male':
+                    voice = 'zhishuo'  # 男声
+                else:
+                    voice = 'zhimiao_emo'  # 女声（默认）
+                
+                # 使用用户选择的情感，如果没有则使用kwargs中的emotion，最后默认为neutral
+                emotion = voice_emotion or kwargs.get('emotion', 'neutral')
+                
+                print(f"🎵 使用阿里云情感TTS: voice={voice}, emotion={emotion}")
+                
+                success = self.emotion_engine.synthesize(
+                    text=text,
+                    output_path=output_path,
+                    emotion=emotion,
+                    voice=voice,
+                    **kwargs
+                )
+                
+                if success and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                    print(f"✓ 使用阿里云情感TTS成功生成音频")
+                    return True
             except Exception as e:
-                print(f"✗ {engine_name} 合成失败: {e}")
+                print(f"✗ 阿里云情感TTS生成失败: {e}")
+        
+        # 回退到其他TTS引擎
+        for engine_name, engine in self.tts_engines:
+            try:
+                if engine == self.emotion_engine:
+                    continue  # 跳过已经尝试的情感引擎
+                
+                success = engine.synthesize(text, output_path, **kwargs)
+                if success and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                    print(f"✓ 使用 {engine_name} 成功生成音频")
+                    return True
+                    
+            except Exception as e:
+                print(f"✗ {engine_name} 生成失败: {e}")
                 continue
         
         print("✗ 所有TTS引擎都无法生成音频")
         return False
     
-    def generate_dialogue_audio(self, text: str, output_path: str, 
-                               role_type: str = 'standard') -> bool:
+    def generate_emotion_audio(self, text: str, emotion: str, output_path: str, **kwargs) -> bool:
         """
-        为对话角色生成语音
-        :param text: 要合成的文本
-        :param output_path: 输出音频文件路径
-        :param role_type: 角色类型，决定使用的语音
-        :return: 是否成功
+        生成带情感的音频
+        
+        Args:
+            text: 要合成的文本
+            emotion: 情感类型
+            output_path: 输出文件路径
+            **kwargs: 其他参数
+        
+        Returns:
+            bool: 生成是否成功
         """
-        
-        # 获取角色语音配置
-        voice_config = self.voice_profiles.get(role_type, self.voice_profiles['standard'])
-        target_per = voice_config['baidu_per']
-        
-        print(f"为角色 '{role_type}' 生成语音: {text}")
-        print(f"使用语音配置: {voice_config['description']} (per={target_per})")
-        
-        # 确保输出目录存在
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
-        # 依次尝试各个TTS引擎，优先使用百度TTS以保持一致性
-        for engine_name, engine in self.tts_engines:
-            try:
-                # 如果是百度TTS，设置特定的语音
-                if isinstance(engine, BaiduTTS):
-                    # 临时修改语音配置
-                    original_per = engine.voice_per
-                    engine.voice_per = target_per
-                    
-                    success = engine.synthesize(text, output_path)
-                    
-                    # 恢复原始配置
-                    engine.voice_per = original_per
-                    
-                    if success and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                        print(f"✓ 使用百度TTS成功生成角色语音: {role_type}")
-                        return True
-                else:
-                    # 其他TTS引擎使用默认配置
-                    if engine.synthesize(text, output_path):
-                        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                            print(f"✓ 使用 {engine_name} 成功生成角色语音")
-                            return True
-                            
-            except Exception as e:
-                print(f"✗ {engine_name} 生成角色语音失败: {e}")
-                continue
-        
-        print("✗ 所有TTS引擎都无法生成角色语音")
-        return False
+        if self.emotion_engine:
+            return self.emotion_engine.synthesize(
+                text=text,
+                output_path=output_path,
+                emotion=emotion,
+                **kwargs
+            )
+        else:
+            # 回退到标准生成
+            print("⚠️ 情感TTS不可用，使用标准TTS")
+            return self.generate_standard_audio(text, output_path, **kwargs)
     
-    def get_available_voice_profiles(self) -> dict:
+    def generate_dialogue_audio(self, text: str, output_path: str, 
+                               role_type: str = 'standard', emotion: str = 'neutral', **kwargs) -> bool:
+        """
+        生成对话音频
+        
+        Args:
+            text: 对话文本
+            output_path: 输出文件路径
+            role_type: 角色类型
+            emotion: 情感
+            **kwargs: 其他参数
+        
+        Returns:
+            bool: 生成是否成功
+        """
+        print(f"🎭 生成角色对话音频: {role_type} ({emotion})")
+        
+        # 获取角色配置
+        role_config = self.voice_profiles.get(role_type, self.voice_profiles['standard'])
+        
+        # 合并配置
+        synthesis_params = {
+            'emotion': emotion,
+            'voice': role_config.get('voice', 'zhimiao_emo'),
+            **kwargs
+        }
+        
+        return self.generate_standard_audio(text, output_path, **synthesis_params)
+    
+    def get_available_emotions(self) -> List[str]:
+        """获取可用的情感类型"""
+        if self.emotion_engine:
+            return self.emotion_engine.get_available_emotions()
+        else:
+            return ['neutral']  # 默认只有中性
+    
+    def get_available_voices(self) -> Dict[str, Dict]:
+        """获取可用的发音人"""
+        if self.emotion_engine:
+            return self.emotion_engine.get_voice_info()
+        else:
+            return {}
+    
+    def get_available_voice_profiles(self) -> Dict[str, Dict]:
         """获取可用的语音配置文件"""
         return self.voice_profiles.copy()
     
-    def get_available_engines(self) -> list:
+    def get_available_engines(self) -> List[str]:
         """获取可用的TTS引擎列表"""
         return [name for name, _ in self.tts_engines]
+    
+    def is_emotion_supported(self) -> bool:
+        """检查是否支持情感TTS"""
+        return self.emotion_engine is not None
+
+# 全局TTS管理器实例
+_tts_manager = None
+
+def get_tts_manager() -> TTSManager:
+    """获取TTS管理器实例（单例模式）"""
+    global _tts_manager
+    if _tts_manager is None:
+        _tts_manager = TTSManager()
+    return _tts_manager
 
 # 使用示例
 if __name__ == '__main__':
-    # 创建必要目录
-    Config.create_directories()
+    # 测试TTS管理器
+    tts_manager = get_tts_manager()
     
-    # 测试TTS功能
-    tts_manager = TTSManager()
+    # 测试标准音频生成
+    success = tts_manager.generate_standard_audio(
+        text="你好，这是测试音频。",
+        output_path="test_output.mp3"
+    )
+    print(f"标准音频生成: {'成功' if success else '失败'}")
     
-    test_words = ["你好", "早上好", "欢迎光临"]
+    # 测试情感音频生成
+    if tts_manager.is_emotion_supported():
+        success = tts_manager.generate_emotion_audio(
+            text="我今天很开心！",
+            emotion="happy",
+            output_path="test_emotion.mp3"
+        )
+        print(f"情感音频生成: {'成功' if success else '失败'}")
     
-    print("\n=== 测试TTS功能 ===")
-    for word in test_words:
-        output_path = os.path.join(Config.TEMP_FOLDER, f"standard_{word}.wav")
-        success = tts_manager.generate_standard_audio(word, output_path)
-        
-        if success:
-            print(f"✓ 成功生成: {word} -> {output_path}")
-        else:
-            print(f"✗ 生成失败: {word}")
-    
-    print(f"\n可用的TTS引擎: {tts_manager.get_available_engines()}")
+    # 显示可用功能
+    print(f"可用引擎: {tts_manager.get_available_engines()}")
+    print(f"可用情感: {tts_manager.get_available_emotions()}")

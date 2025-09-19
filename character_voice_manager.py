@@ -88,10 +88,6 @@ class CharacterVoiceManager:
                     "excited": [0.9, 0, 0, 0, 0, 0, 0.5, 0.2]
                 },
                 engine_specific_config={
-                    "indextts2": {
-                        "voice_sample": "examples/voice_01.wav",
-                        "emo_alpha": 0.8
-                    },
                     "baidu": {
                         "per": 5,  # 度小娇
                         "spd": 6,
@@ -115,10 +111,6 @@ class CharacterVoiceManager:
                     "patient": [0, 0, 0, 0, 0, 0, 0.1, 0.9]
                 },
                 engine_specific_config={
-                    "indextts2": {
-                        "voice_sample": "examples/voice_07.wav",
-                        "emo_alpha": 0.7
-                    },
                     "baidu": {
                         "per": 0,  # 度小美
                         "spd": 4,
@@ -142,10 +134,6 @@ class CharacterVoiceManager:
                     "proud": [0.5, 0, 0, 0, 0, 0, 0.3, 0.4]
                 },
                 engine_specific_config={
-                    "indextts2": {
-                        "voice_sample": "examples/voice_10.wav",
-                        "emo_alpha": 0.6
-                    },
                     "baidu": {
                         "per": 1,  # 度小宇
                         "spd": 5,
@@ -169,10 +157,6 @@ class CharacterVoiceManager:
                     "wise": [0, 0, 0, 0, 0, 0.2, 0, 0.8]
                 },
                 engine_specific_config={
-                    "indextts2": {
-                        "voice_sample": "examples/voice_04.wav",
-                        "emo_alpha": 0.9
-                    },
                     "baidu": {
                         "per": 4,  # 度丫丫
                         "spd": 4,

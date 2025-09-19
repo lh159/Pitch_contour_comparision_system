@@ -10,8 +10,8 @@ import hashlib
 from typing import Dict, List, Optional, Tuple, Any
 from config import Config
 from tts_engines import TTSEngineBase, DialogueTTSEngine, VoiceCloningEngine
-from tts_engines.baidu_tts_engine import BaiduTTSEngine
-from tts_engines.index_tts2_engine import IndexTTS2Engine
+# 百度TTS引擎已移除
+# IndexTTS2引擎已移除
 from character_voice_manager import CharacterVoiceManager
 from dialogue_emotion_analyzer import DialogueEmotionAnalyzer
 
@@ -20,8 +20,8 @@ class EnhancedTTSManager:
     
     def __init__(self):
         self.engines: Dict[str, TTSEngineBase] = {}
-        self.current_engine = 'baidu'  # 默认引擎
-        self.fallback_engine = 'baidu'  # 备用引擎
+        self.current_engine = 'alibaba'  # 默认引擎
+        self.fallback_engine = 'edge'  # 备用引擎
         
         # 初始化管理器
         self.voice_manager = CharacterVoiceManager()
@@ -47,36 +47,6 @@ class EnhancedTTSManager:
         """初始化所有TTS引擎"""
         print("正在初始化TTS引擎...")
         
-        # 1. 初始化百度TTS引擎
-        try:
-            if Config.BAIDU_API_KEY and Config.BAIDU_SECRET_KEY:
-                baidu_engine = BaiduTTSEngine(Config.BAIDU_API_KEY, Config.BAIDU_SECRET_KEY)
-                if baidu_engine.initialize():
-                    self.engines['baidu'] = baidu_engine
-                    print("✓ 百度TTS引擎初始化成功")
-                else:
-                    print("✗ 百度TTS引擎初始化失败")
-            else:
-                print("⚠ 百度TTS密钥未配置，跳过初始化")
-        except Exception as e:
-            print(f"✗ 百度TTS引擎初始化异常: {e}")
-        
-        # 2. 初始化IndexTTS2引擎
-        try:
-            indextts2_config = getattr(Config, 'INDEXTTS2_CONFIG', {})
-            model_dir = indextts2_config.get('model_dir', 'third_party/index-tts/checkpoints')
-            use_fp16 = indextts2_config.get('use_fp16', True)
-            use_cuda_kernel = indextts2_config.get('use_cuda_kernel', True)
-            
-            indextts2_engine = IndexTTS2Engine(model_dir, use_fp16, use_cuda_kernel)
-            if indextts2_engine.initialize():
-                self.engines['indextts2'] = indextts2_engine
-                self.current_engine = 'indextts2'  # 优先使用IndexTTS2
-                print("✓ IndexTTS2引擎初始化成功")
-            else:
-                print("✗ IndexTTS2引擎初始化失败")
-        except Exception as e:
-            print(f"✗ IndexTTS2引擎初始化异常: {e}")
         
         # 3. 检查可用引擎
         if not self.engines:

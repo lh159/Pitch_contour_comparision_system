@@ -664,6 +664,47 @@
                                 </button>
                             </div>
                         </div>
+                        
+                        <!-- TTS声音选择区域 -->
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label for="voiceGender" class="form-label">
+                                    <i class="fas fa-user me-1"></i>选择声音性别:
+                                </label>
+                                <select class="form-select" id="voiceGender">
+                                    <option value="female">女声 (zhimiao_emo)</option>
+                                    <option value="male">男声 (zhichu_emo)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="voiceEmotion" class="form-label">
+                                    <i class="fas fa-heart me-1"></i>选择情感风格:
+                                </label>
+                                <select class="form-select" id="voiceEmotion">
+                                    <option value="neutral">中性 (自然)</option>
+                                    <option value="happy">开心 (愉悦)</option>
+                                    <option value="sad">难过 (低沉)</option>
+                                    <option value="angry">生气 (严厉)</option>
+                                    <option value="fearful">恐惧 (紧张)</option>
+                                    <option value="surprised">惊讶 (兴奋)</option>
+                                    <option value="disgusted">厌恶 (嫌弃)</option>
+                                    <option value="arousal">兴奋 (激动)</option>
+                                    <option value="valence">愉悦 (满意)</option>
+                                    <option value="cheerful">欢快 (活泼)</option>
+                                    <option value="depressed">沮丧 (失落)</option>
+                                    <option value="irritated">烦躁 (不耐烦)</option>
+                                    <option value="envious">嫉妒 (酸涩)</option>
+                                    <option value="embarrassed">尴尬 (羞涩)</option>
+                                    <option value="serious">严肃 (正式)</option>
+                                    <option value="gentle">温柔 (亲切)</option>
+                                    <option value="newscast">播音 (标准)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-text mt-1 text-center text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            选择不同的声音性别和情感风格，体验更丰富的发音练习
+                        </div>
                     </div>
                     
                     <!-- 场景对话模式输入区域 -->
@@ -1194,6 +1235,12 @@
                 return;
             }
             
+            // 获取用户选择的声音参数
+            const voiceGender = document.getElementById('voiceGender').value;
+            const voiceEmotion = document.getElementById('voiceEmotion').value;
+            
+            console.log('用户选择的声音参数:', { gender: voiceGender, emotion: voiceEmotion });
+            
             // 🔧 每次生成新的标准音频时重置用户文件ID
             console.log('生成新标准音频 - 重置userFileId');
             userFileId = null;
@@ -1214,7 +1261,9 @@
                     },
                     body: JSON.stringify({ 
                         text: text,
-                        method: 'auto'  // 自动选择最佳时间戳生成方法
+                        method: 'auto',  // 自动选择最佳时间戳生成方法
+                        voice_gender: voiceGender,  // 添加性别参数
+                        voice_emotion: voiceEmotion  // 添加情感参数
                     })
                 });
                 
@@ -1228,7 +1277,11 @@
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ text: text })
+                        body: JSON.stringify({ 
+                            text: text,
+                            voice_gender: voiceGender,  // 添加性别参数
+                            voice_emotion: voiceEmotion  // 添加情感参数
+                        })
                     });
                     data = await response.json();
                 }

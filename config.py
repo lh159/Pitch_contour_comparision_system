@@ -12,10 +12,23 @@ class Config:
     """系统配置类"""
     
     # === TTS配置 ===
-    # 百度TTS配置
-    BAIDU_API_KEY = os.getenv('BAIDU_API_KEY', '')
-    BAIDU_SECRET_KEY = os.getenv('BAIDU_SECRET_KEY', '')
-    BAIDU_VOICE_PER = int(os.getenv('BAIDU_VOICE_PER', '0'))  # 发音人，0=度小美
+    # 阿里云情感TTS配置
+    ALIBABA_TTS_CONFIG = {
+        'api_key': 'sk-26cd7fe2661444f2804896a590bdbbc0',
+        'default_voice': 'zhimiao_emo',      # 默认使用知妙女声（情感TTS）
+        'default_emotion': 'neutral',         # 默认中性情感
+        'sample_rate': 22050,                # 音频采样率（SDK推荐）
+        'format': 'mp3',                     # 音频格式
+        'enabled': True                      # 启用阿里云TTS
+    }
+    
+    # Edge TTS配置 (备用)
+    EDGE_TTS_CONFIG = {
+        'enabled': True,
+        'voice': 'zh-CN-XiaoxiaoNeural',
+        'rate': '+0%',
+        'volume': '+0%'
+    }
     
     # === 阿里达摩院语音配置 ===
     ALIBABA_PARAFORMER_API_KEY = os.getenv('ALIBABA_PARAFORMER_API_KEY', '')
@@ -77,7 +90,7 @@ class Config:
     # === Web配置 ===
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev_secret_key_change_in_production')
     DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
-    PORT = int(os.getenv('PORT', 9999))
+    PORT = int(os.getenv('PORT', 5001))
     
     # === DeepSeek API配置 ===
     DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
@@ -87,36 +100,27 @@ class Config:
     DEFAULT_DIALOGUE_ROUNDS = 6  # 默认对话轮数
     DIALOGUE_SESSION_TIMEOUT = 3600  # 对话会话超时时间（秒）
     
-    # === IndexTTS2配置 ===
-    INDEXTTS2_CONFIG = {
-        'model_dir': 'third_party/index-tts/checkpoints',
-        'use_fp16': True,  # 使用半精度推理
-        'use_cuda_kernel': True,  # 使用CUDA内核加速
-        'use_deepspeed': False,  # DeepSpeed加速（可选）
-        'cache_dir': 'cache/indextts2',
-        'max_text_length': 500,  # 最大文本长度
-        'default_emo_alpha': 0.8  # 默认情感强度
+    # IndexTTS2配置已移除
+    
+    # === 情感TTS配置 ===
+    AVAILABLE_EMOTIONS = {
+        'neutral': '中性',
+        'happy': '开心',
+        'sad': '悲伤', 
+        'angry': '生气',
+        'gentle': '温柔',
+        'serious': '严肃',
+        'surprise': '惊讶',
+        'fear': '害怕'
     }
     
-    # === 增强TTS配置 ===
-    ENHANCED_TTS_CONFIG = {
-        'default_engine': 'indextts2',  # 默认使用IndexTTS2
-        'fallback_engine': 'baidu',    # 备用引擎
-        'auto_emotion': True,          # 自动情感分析
-        'emotion_confidence_threshold': 0.5,  # 情感置信度阈值
-        'cache_enabled': True,         # 启用音频缓存
-        'max_cache_size': 100,         # 最大缓存数量
-        'cache_cleanup_interval': 3600  # 缓存清理间隔（秒）
-    }
-    
-    # === 百度TTS语音配置 ===
-    BAIDU_VOICE_PROFILES = {
-        'standard': 4,      # 度丫丫，标准女声
-        'child': 5,         # 度小娇，可爱童声  
-        'adult_male': 1,    # 度小宇，标准男声
-        'adult_female': 0,  # 度小美，标准女声
-        'elderly': 4,       # 度丫丫，温和女声
-        'professional': 3   # 度小博，专业男声
+    # 场景对话配置
+    DIALOGUE_CONFIG = {
+        'male_voice': 'zhifeng_emo',     # 男声发音人
+        'female_voice': 'zhimiao_emo',   # 女声发音人
+        'default_emotion': 'neutral',     # 默认情感
+        'volume': 70,                     # 音量
+        'speech_rate': 0                  # 语速
     }
     
     # === 对话语音缓存配置 ===

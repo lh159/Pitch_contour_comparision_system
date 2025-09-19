@@ -175,6 +175,8 @@ def generate_standard_audio():
     try:
         data = request.get_json()
         text = data.get('text', '').strip()
+        voice_gender = data.get('voice_gender', 'female')  # 默认女声
+        voice_emotion = data.get('voice_emotion', 'neutral')  # 默认中性情感
         
         if not text:
             return jsonify({
@@ -182,13 +184,15 @@ def generate_standard_audio():
                 'error': '请输入要合成的文本'
             }), 400
         
+        print(f"TTS请求参数: text='{text}', gender={voice_gender}, emotion={voice_emotion}")
+        
         # 生成唯一文件名
         file_id = str(uuid.uuid4())
         filename = f"standard_{file_id}.wav"
         output_path = os.path.join(Config.TEMP_FOLDER, filename)
         
-        # 调用TTS生成音频
-        success = tts_manager.generate_standard_audio(text, output_path)
+        # 调用TTS生成音频，传递性别和情感参数
+        success = tts_manager.generate_standard_audio(text, output_path, voice_gender, voice_emotion)
         
         if success:
             # 提取音高信息
@@ -525,6 +529,8 @@ def generate_standard_audio_with_timestamps():
         data = request.get_json()
         text = data.get('text', '').strip()
         method = data.get('method', 'auto')  # auto, vad_estimation, uniform
+        voice_gender = data.get('voice_gender', 'female')  # 默认女声
+        voice_emotion = data.get('voice_emotion', 'neutral')  # 默认中性情感
         
         if not text:
             return jsonify({
@@ -532,13 +538,15 @@ def generate_standard_audio_with_timestamps():
                 'error': '请输入要合成的文本'
             }), 400
         
+        print(f"TTS时间戳请求参数: text='{text}', method={method}, gender={voice_gender}, emotion={voice_emotion}")
+        
         # 生成唯一文件名
         file_id = str(uuid.uuid4())
         filename = f"standard_{file_id}.wav"
         output_path = os.path.join(Config.TEMP_FOLDER, filename)
         
-        # 1. 先生成TTS音频
-        success = tts_manager.generate_standard_audio(text, output_path)
+        # 1. 先生成TTS音频，传递性别和情感参数
+        success = tts_manager.generate_standard_audio(text, output_path, voice_gender, voice_emotion)
         
         if not success:
             return jsonify({
