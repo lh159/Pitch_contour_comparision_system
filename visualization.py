@@ -87,16 +87,18 @@ class PitchVisualization:
         except:
             plt.style.use('default')
         
-        # 设置色彩主题
+        # 🎨 优化色彩主题 - 更加现代和协调
         self.colors = {
-            'standard': '#1f77b4',      # 蓝色 - 标准发音
-            'user': '#ff7f0e',          # 橙色 - 用户发音
-            'difference': '#d62728',    # 红色 - 差异
-            'good': '#2ca02c',          # 绿色 - 良好
-            'warning': '#ff7f0e',       # 橙色 - 警告
-            'error': '#d62728',         # 红色 - 错误
-            'background': '#f5f5f5',    # 浅灰色 - 背景
-            'text': '#333333'           # 深灰色 - 文字
+            'standard': '#2E86AB',      # 深蓝色 - 标准发音（权威、稳定）
+            'user': '#A23B72',          # 深紫色 - 用户发音（个性、活力）
+            'difference': '#F18F01',    # 金橙色 - 差异（注意、对比）
+            'good': '#C73E1D',          # 深红色 - 良好（鼓励、成功）
+            'warning': '#F18F01',       # 金橙色 - 警告（提醒、改进）
+            'error': '#C73E1D',         # 深红色 - 错误（重要、需关注）
+            'background': '#F8F9FA',    # 极浅灰 - 背景（干净、现代）
+            'text': '#212529',          # 深灰色 - 文字（易读、专业）
+            'accent': '#6C757D',        # 中灰色 - 辅助色（平衡、低调）
+            'highlight': '#FFF3CD'      # 浅黄色 - 高亮（温和、突出）
         }
     
     def _get_font_properties(self, size=10, weight='normal'):
@@ -131,9 +133,9 @@ class PitchVisualization:
             return ax.text(*args, **kwargs)
     
     def plot_pitch_comparison(self, comparison_result: dict, score_result: dict, 
-                            output_path: str, fig_size=(16, 10), dpi=150, input_text: str = None) -> bool:
+                            output_path: str, fig_size=(14, 9), dpi=150, input_text: str = None) -> bool:
         """
-        绘制音高曲线对比图 - 全新设计，更加直观
+        绘制音高曲线对比图 - 简洁美观的设计
         """
         
         if 'error' in comparison_result:
@@ -149,70 +151,38 @@ class PitchVisualization:
             if len(standard_pitch) == 0 or len(user_pitch) == 0:
                 return self._plot_error_message("音高数据为空", output_path)
             
-            # 检查是否有VAD和文本对齐数据
-            has_text_alignment = (comparison_result.get('vad_result') and 
-                                comparison_result['vad_result'].get('text_alignment'))
+            # 🎨 创建简洁的两栏布局
+            fig = plt.figure(figsize=fig_size, facecolor='white')
+            gs = fig.add_gridspec(2, 2, height_ratios=[4, 1], width_ratios=[3, 1], 
+                                 hspace=0.25, wspace=0.2)
             
-            # 创建更清晰的布局：主图 + 侧边栏（删除反馈建议模块）
-            if has_text_alignment:
-                # 有文本对齐时，只显示主图、文本对齐图和评分 - 优化尺寸
-                fig = plt.figure(figsize=(fig_size[0], fig_size[1]), facecolor='white')
-                gs = fig.add_gridspec(2, 4, height_ratios=[3.5, 0.8], width_ratios=[2.5, 0.8, 0.8, 0.8], 
-                                     hspace=0.15, wspace=0.3)
-                
-                # 1. 主要音高对比图 (占据左侧大部分空间)
-                ax_main = fig.add_subplot(gs[0, :2])
-                self._plot_enhanced_comparison_with_text(ax_main, times, standard_pitch, user_pitch, 
-                                                       score_result, comparison_result['vad_result'])
-                
-                # 2. 文本时域对齐图
-                ax_text = fig.add_subplot(gs[1, :2])
-                self._plot_text_alignment(ax_text, comparison_result['vad_result'])
-                
-                # 调整评分子图位置 - 给右侧更多空间
-                score_row, components_row = 0, 1
-            else:
-                fig = plt.figure(figsize=(fig_size[0], fig_size[1] - 1), facecolor='white')
-                gs = fig.add_gridspec(1, 4, width_ratios=[2.5, 0.8, 0.8, 0.8], wspace=0.3)
-                
-                # 1. 主要音高对比图 (占据左侧大部分空间)
-                ax_main = fig.add_subplot(gs[0, :2])
-                # 为没有VAD数据的情况生成简单字符时间戳
-                char_timestamps = self._generate_simple_char_timestamps(input_text, times) if input_text else None
-                # 🎵 保存输入文本供声调分析使用
-                self._current_input_text = input_text
-                self._plot_enhanced_comparison(ax_main, times, standard_pitch, user_pitch, score_result, char_timestamps)
-                
-                score_row, components_row = 0, 0
+            # 1. 主音高对比图 (左侧，占据主要空间)
+            ax_main = fig.add_subplot(gs[0, 0])
+            self._plot_beautiful_comparison(ax_main, times, standard_pitch, user_pitch, input_text)
             
-            # 2. 评分总览 (右侧第一列)
-            ax_score = fig.add_subplot(gs[score_row, 2])
-            self._plot_score_overview(ax_score, score_result)
+            # 2. 评分仪表盘 (右上)
+            ax_score = fig.add_subplot(gs[0, 1])
+            self._plot_clean_score_dashboard(ax_score, score_result)
             
-            # 3. 各项能力评分 (右侧第二列)
-            if has_text_alignment:
-                ax_components = fig.add_subplot(gs[components_row, 3])
-            else:
-                # 没有文本对齐时，将组件评分放在评分总览右侧
-                ax_components = fig.add_subplot(gs[score_row, 3])
-            self._plot_component_scores(ax_components, score_result['component_scores'])
+            # 3. 评价与建议 (底部，跨两列)
+            ax_feedback = fig.add_subplot(gs[1, :])
+            self._plot_concise_feedback(ax_feedback, score_result, comparison_result)
             
             # 设置整体标题
             total_score = score_result['total_score']
             level = score_result['level']
-            title = f"🎵 音高曲线对比分析报告 - 总分: {total_score:.1f}分 ({level})"
-            if has_text_alignment:
-                title += " (含文本对齐分析)"
-            fig.suptitle(title, fontsize=16, weight='bold', y=0.97, 
+            title = f"♫ 音高曲线对比 - 总分: {total_score:.1f}分 ({level})"
+            fig.suptitle(title, fontsize=18, weight='bold', y=0.96, 
                         color=self._get_score_color(total_score))
             
             # 保存图片
-            plt.tight_layout(rect=[0, 0, 1, 0.94])
+            plt.tight_layout(rect=[0, 0, 1, 0.93])
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            plt.savefig(output_path, dpi=dpi, bbox_inches='tight', facecolor='white')
+            plt.savefig(output_path, dpi=dpi, bbox_inches='tight', facecolor='white', 
+                       edgecolor='none', pad_inches=0.1)
             plt.close(fig)
             
-            print(f"音高对比图已保存至: {output_path}")
+            print(f"🎨 美化的音高对比图已保存至: {output_path}")
             return True
             
         except Exception as e:
@@ -872,9 +842,10 @@ class PitchVisualization:
             return False
     
     def plot_individual_pitch(self, pitch_data: dict, output_path: str, 
-                            title: str = "音高曲线", text: str = "", fig_size=(14, 8)) -> bool:
+                            title: str = "音高曲线（真实特征）", text: str = "", fig_size=(14, 8)) -> bool:
         """
-        绘制单个音高曲线
+        绘制单个音高曲线 - 显示归一化后的真实语音特征
+        不进行平滑处理，保留音高的自然变化和分段特征
         :param pitch_data: 音高数据
         :param output_path: 输出路径
         :param title: 图表标题
@@ -887,7 +858,8 @@ class PitchVisualization:
         
         try:
             times = pitch_data.get('times', [])
-            pitch_values = pitch_data.get('smooth_pitch', [])
+            # 🎯 使用原始音高数据，不使用平滑处理的数据
+            pitch_values = pitch_data.get('pitch_values', [])
             
             if len(times) == 0 or len(pitch_values) == 0:
                 return self._plot_error_message("音高数据为空", output_path)
@@ -980,12 +952,12 @@ class PitchVisualization:
                 
                 self._add_enhanced_tone_legend(ax, y_limits[1], x_limits[1], char_timestamps)
             
-            # 添加统计信息
+            # 添加统计信息 - 反映原始音高曲线的真实特征
             duration = pitch_data.get('duration', 0)
             valid_ratio = pitch_data.get('valid_ratio', 0)
             mean_pitch = np.nanmean(pitch_array)
             
-            info_text = f"时长: {duration:.2f}s\n有效比例: {valid_ratio:.1%}\n平均音高: {mean_pitch:.1f}Hz"
+            info_text = f"时长: {duration:.2f}s\n有效比例: {valid_ratio:.1%}\n平均音高: {mean_pitch:.1f}Hz\n(原始特征，未平滑)"
             ax.text(0.02, 0.98, info_text, transform=ax.transAxes,
                    verticalalignment='top', fontsize=10,
                    fontproperties=self._get_font_properties(10),
@@ -1398,6 +1370,213 @@ class PitchVisualization:
                 
         except Exception as e:
             print(f"⚠️ 添加简单声调图例失败: {e}")
+    
+    def _plot_beautiful_comparison(self, ax, times, standard_pitch, user_pitch, input_text=None):
+        """
+        🎨 绘制美观的音高对比曲线 - 简洁现代风格
+        """
+        # 设置背景
+        ax.set_facecolor(self.colors['background'])
+        
+        # 🎯 绘制标准发音曲线 - 使用更粗的线条和优雅的样式
+        line_std = ax.plot(times, standard_pitch, color=self.colors['standard'], 
+                          linewidth=4, label='● 标准发音 (TTS)', alpha=0.9, 
+                          linestyle='-', marker='none', zorder=3)
+        
+        # 🎤 绘制用户发音曲线
+        line_user = ax.plot(times, user_pitch, color=self.colors['user'], 
+                           linewidth=4, label='◆ 您的发音', alpha=0.9,
+                           linestyle='-', marker='none', zorder=3)
+        
+        # 🌟 添加柔和的差异填充区域
+        ax.fill_between(times, standard_pitch, user_pitch, 
+                       color=self.colors['difference'], alpha=0.2, 
+                       interpolate=True, zorder=1, label='差异区域')
+        
+        # ✨ 设置优雅的图表属性
+        self._set_text_with_font(ax, 'xlabel', '时间 (秒)', fontsize=14, fontweight='600', 
+                               color=self.colors['text'])
+        self._set_text_with_font(ax, 'ylabel', '基频 (Hz)', fontsize=14, fontweight='600',
+                               color=self.colors['text'])
+        self._set_text_with_font(ax, 'title', '■ 音高曲线对比分析', fontsize=16, fontweight='bold', 
+                               color=self.colors['text'], pad=20)
+        
+        # 🎨 美化网格
+        ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.8, color=self.colors['accent'])
+        ax.set_axisbelow(True)
+        
+        # 📊 优化y轴范围，确保曲线清晰可见
+        all_pitch = np.concatenate([standard_pitch[~np.isnan(standard_pitch)], 
+                                   user_pitch[~np.isnan(user_pitch)]])
+        if len(all_pitch) > 0:
+            y_min = max(50, np.min(all_pitch) * 0.85)
+            y_max = min(500, np.max(all_pitch) * 1.15)
+            ax.set_ylim(y_min, y_max)
+        
+        # 🎭 美化图例
+        legend = ax.legend(fontsize=12, loc='upper right', 
+                          frameon=True, fancybox=True, shadow=True,
+                          prop=self._get_font_properties(12), 
+                          edgecolor=self.colors['accent'], facecolor='white',
+                          framealpha=0.95)
+        legend.get_frame().set_linewidth(1.5)
+        
+        # 📝 添加简洁的统计信息
+        pitch_diff = np.abs(user_pitch - standard_pitch)
+        avg_diff = np.nanmean(pitch_diff)
+        correlation = np.corrcoef(standard_pitch[~np.isnan(standard_pitch)], 
+                                 user_pitch[~np.isnan(user_pitch)])[0,1] if len(all_pitch) > 10 else 0
+        
+        info_text = f'平均差异: {avg_diff:.1f} Hz\n相似度: {correlation:.2f}'
+        ax.text(0.02, 0.98, info_text, transform=ax.transAxes,
+               verticalalignment='top', fontsize=11, fontweight='500',
+               fontproperties=self._get_font_properties(11),
+               bbox=dict(boxstyle='round,pad=0.6', facecolor=self.colors['highlight'], 
+                        alpha=0.9, edgecolor=self.colors['accent'], linewidth=1.2))
+        
+        # 🔧 调整边框和刻度
+        for spine in ax.spines.values():
+            spine.set_linewidth(1.5)
+            spine.set_color(self.colors['accent'])
+        
+        ax.tick_params(colors=self.colors['text'], labelsize=10)
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_fontproperties(self._get_font_properties(10))
+    
+    def _plot_clean_score_dashboard(self, ax, score_result):
+        """
+        🏆 绘制简洁的评分仪表盘
+        """
+        ax.clear()
+        ax.axis('off')
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        
+        total_score = score_result['total_score']
+        level = score_result['level']
+        component_scores = score_result.get('component_scores', {})
+        
+        # 🎯 中心大分数显示
+        score_color = self._get_score_color(total_score)
+        self._set_text_with_font(ax, 'text', 0.5, 0.7, f'{total_score:.0f}', 
+               ha='center', va='center', fontsize=48, fontweight='bold', 
+               color=score_color, transform=ax.transAxes)
+        
+        self._set_text_with_font(ax, 'text', 0.5, 0.55, '分', 
+               ha='center', va='center', fontsize=16, fontweight='600',
+               color=score_color, transform=ax.transAxes)
+        
+        self._set_text_with_font(ax, 'text', 0.5, 0.4, level, 
+               ha='center', va='center', fontsize=14, fontweight='bold',
+               color=score_color, transform=ax.transAxes,
+               bbox=dict(boxstyle='round,pad=0.4', facecolor=score_color, 
+                        alpha=0.1, edgecolor=score_color, linewidth=1.5))
+        
+        # 🎨 绘制评分环形图
+        circle_outer = plt.Circle((0.5, 0.65), 0.35, transform=ax.transAxes, 
+                                 fill=False, linewidth=8, color=score_color, alpha=0.2)
+        ax.add_patch(circle_outer)
+        
+        # 根据分数绘制进度弧
+        from matplotlib.patches import Arc
+        arc_length = (total_score / 100) * 360
+        arc = Arc((0.5, 0.65), 0.7, 0.7, angle=0, theta1=90, theta2=90+arc_length,
+                 linewidth=8, color=score_color, alpha=0.8, transform=ax.transAxes)
+        ax.add_patch(arc)
+        
+        # 📊 各项能力快速预览
+        categories = ['准确性', '流畅性', '稳定性', '适配性']
+        scores = [
+            component_scores.get('accuracy', 0),
+            component_scores.get('trend', 0),
+            component_scores.get('stability', 0),
+            component_scores.get('range', 0)
+        ]
+        
+        y_start = 0.25
+        for i, (cat, score) in enumerate(zip(categories, scores)):
+            y_pos = y_start - i * 0.05
+            score_color_mini = self._get_score_color(score)
+            
+            # 能力名称
+            self._set_text_with_font(ax, 'text', 0.05, y_pos, cat, 
+                   ha='left', va='center', fontsize=10, fontweight='500',
+                   color=self.colors['text'], transform=ax.transAxes)
+            
+            # 分数
+            self._set_text_with_font(ax, 'text', 0.95, y_pos, f'{score:.0f}', 
+                   ha='right', va='center', fontsize=10, fontweight='bold',
+                   color=score_color_mini, transform=ax.transAxes)
+        
+        # 标题
+        self._set_text_with_font(ax, 'title', '★ 综合评分', fontsize=14, fontweight='bold',
+                               color=self.colors['text'], pad=15)
+    
+    def _plot_concise_feedback(self, ax, score_result, comparison_result):
+        """
+        💡 绘制简洁的反馈和建议
+        """
+        ax.clear()
+        ax.axis('off')
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        
+        total_score = score_result['total_score']
+        component_scores = score_result.get('component_scores', {})
+        
+        # 🎯 根据分数生成建议
+        suggestions = []
+        
+        if total_score >= 85:
+            suggestions.append("🎉 您的发音表现优秀！继续保持这种水准。")
+        elif total_score >= 70:
+            suggestions.append("👍 您的发音表现良好，还有进步空间。")
+        else:
+            suggestions.append("💪 加油练习，您的发音会越来越好！")
+        
+        # 根据各项分数给出具体建议
+        if component_scores.get('accuracy', 0) < 70:
+            suggestions.append("🎯 注意音高准确度：多听标准发音，模仿音调变化")
+        
+        if component_scores.get('trend', 0) < 70:
+            suggestions.append("📈 改善音调变化：练习声调的起伏和变化规律")
+        
+        if component_scores.get('stability', 0) < 70:
+            suggestions.append("🎵 提高发音稳定性：保持匀速说话，避免音高剧烈跳动")
+        
+        if component_scores.get('range', 0) < 70:
+            suggestions.append("🎼 扩展音域适配：适当调整音高范围，使其更接近标准")
+        
+        # 限制建议数量
+        suggestions = suggestions[:3]
+        
+        # 📝 显示建议
+        self._set_text_with_font(ax, 'text', 0.02, 0.9, '◉ 评价与建议', 
+               ha='left', va='top', fontsize=14, fontweight='bold',
+               color=self.colors['text'], transform=ax.transAxes)
+        
+        for i, suggestion in enumerate(suggestions):
+            y_pos = 0.7 - i * 0.25
+            self._set_text_with_font(ax, 'text', 0.02, y_pos, suggestion, 
+                   ha='left', va='top', fontsize=11, fontweight='400',
+                   color=self.colors['text'], transform=ax.transAxes,
+                   wrap=True)
+        
+        # 🌟 添加鼓励性的背景装饰
+        if total_score >= 80:
+            decoration_color = self.colors['good']
+            decoration_text = "◆ 表现优秀"
+        elif total_score >= 60:
+            decoration_color = self.colors['warning']
+            decoration_text = "▲ 继续努力"
+        else:
+            decoration_color = self.colors['error']
+            decoration_text = "● 加油练习"
+        
+        # 右侧装饰
+        self._set_text_with_font(ax, 'text', 0.95, 0.5, decoration_text, 
+               ha='right', va='center', fontsize=12, fontweight='bold',
+               color=decoration_color, transform=ax.transAxes, alpha=0.7)
 
 # 使用示例
 if __name__ == '__main__':

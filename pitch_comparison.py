@@ -138,13 +138,13 @@ class PitchExtractor:
             # 处理无声段（0Hz -> NaN）
             pitch_values[pitch_values == 0] = np.nan
             
-            # 平滑处理，去除噪声
-            smooth_pitch = self._smooth_pitch(pitch_values)
+            # 🎯 保留原始音高曲线，不进行平滑处理
+            # 让曲线反映归一化后的真实语音特征
             
             return {
                 'times': times,
                 'pitch_values': pitch_values,
-                'smooth_pitch': smooth_pitch,
+                'smooth_pitch': pitch_values,  # 使用原始值，保持接口兼容性
                 'duration': times[-1] if len(times) > 0 else 0,
                 'valid_ratio': np.sum(~np.isnan(pitch_values)) / len(pitch_values) if len(pitch_values) > 0 else 0
             }
