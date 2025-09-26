@@ -1678,21 +1678,56 @@ if __name__ == '__main__':
         # 启动Flask应用（支持WebSocket）
         if WEBSOCKET_AVAILABLE and socketio:
             print("✓ 使用WebSocket支持启动服务器")
-            socketio.run(
-                app,
-                host='0.0.0.0',
-                port=Config.PORT,
-                debug=Config.DEBUG,
-                use_reloader=False  # WebSocket模式下禁用重载器
-            )
+            # 检查是否存在SSL证书文件
+            ssl_cert_path = '/opt/ssl/cert.pem'
+            ssl_key_path = '/opt/ssl/key.pem'
+            
+            if os.path.exists(ssl_cert_path) and os.path.exists(ssl_key_path):
+                print(f"🔒 启用HTTPS WebSocket，访问地址: https://8.148.200.151:{Config.PORT}")
+                socketio.run(
+                    app,
+                    host='0.0.0.0',
+                    port=Config.PORT,
+                    debug=Config.DEBUG,
+                    use_reloader=False,  # WebSocket模式下禁用重载器
+                    keyfile=ssl_key_path,
+                    certfile=ssl_cert_path
+                )
+            else:
+                print(f"⚠️ 未找到SSL证书，使用HTTP WebSocket模式")
+                print(f"📱 注意：手机录音需要HTTPS环境")
+                socketio.run(
+                    app,
+                    host='0.0.0.0',
+                    port=Config.PORT,
+                    debug=Config.DEBUG,
+                    use_reloader=False  # WebSocket模式下禁用重载器
+                )
         else:
             print("⚠ 使用标准HTTP模式启动服务器")
-            app.run(
-                host='0.0.0.0',
-                port=Config.PORT,
-                debug=Config.DEBUG,
-                threaded=True
-            )
+            # 检查是否存在SSL证书文件
+            ssl_cert_path = '/opt/ssl/cert.pem'
+            ssl_key_path = '/opt/ssl/key.pem'
+            
+            if os.path.exists(ssl_cert_path) and os.path.exists(ssl_key_path):
+                print(f"🔒 启用HTTPS，访问地址: https://8.148.200.151:{Config.PORT}")
+                app.run(
+                    host='0.0.0.0',
+                    port=Config.PORT,
+                    debug=Config.DEBUG,
+                    threaded=True,
+                    ssl_context=(ssl_cert_path, ssl_key_path)
+                )
+            else:
+                print(f"⚠️ 未找到SSL证书，使用HTTP模式")
+                print(f"📱 注意：手机录音需要HTTPS环境")
+                print(f"访问地址: http://8.148.200.151:{Config.PORT}")
+                app.run(
+                    host='0.0.0.0',
+                    port=Config.PORT,
+                    debug=Config.DEBUG,
+                    threaded=True
+                )
     else:
         print("❌ 系统初始化失败，无法启动Web服务器")
         exit(1)
