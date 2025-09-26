@@ -354,6 +354,9 @@
     <!-- 实时同步组件 -->
     <script src="{{ url_for('static', filename='js/realtime-sync.js') }}"></script>
     
+    <!-- 录音API适配器 -->
+    <script src="{{ url_for('static', filename='js/recording-api.js') }}"></script>
+    
     <!-- 录音指导组件 -->
     <script src="{{ url_for('static', filename='js/recording-guide.js') }}"></script>
     
@@ -363,8 +366,7 @@
     <!-- 页面特定JS -->
     <script>
         // 全局变量
-        let mediaRecorder = null;
-        let audioChunks = [];
+        let recordingAdapter = null;  // 新的录音适配器
         let standardFileId = null;
         let userFileId = null;
         let currentText = '';
@@ -396,6 +398,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 录音页面初始化...');
             
+            // 初始化录音适配器
+            initializeRecordingAdapter();
+            
             // 初始化WebSocket
             initializeWebSocket();
             
@@ -413,6 +418,26 @@
             
             console.log('✓ 录音页面初始化完成');
         });
+        
+        // 初始化录音适配器
+        async function initializeRecordingAdapter() {
+            try {
+                recordingAdapter = new RecordingAPIAdapter();
+                await recordingAdapter.detectRecordingSupport();
+                
+                const mode = recordingAdapter.getMode();
+                console.log(`🎙️ 录音模式: ${mode === 'browser' ? '浏览器录音' : '服务器录音'}`);
+                
+                // 显示录音模式提示
+                if (mode === 'server') {
+                    showAlert('检测到移动端环境，将使用服务器录音模式', 'info');
+                }
+                
+            } catch (error) {
+                console.error('录音适配器初始化失败:', error);
+                showAlert('录音功能初始化失败', 'danger');
+            }
+        }
         
         // 初始化页面数据
         function initializePage(params) {
@@ -533,7 +558,10 @@
         // 开始录音
         async function startRecording() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                if (!recordingAdapter) {
+                    showAlert('录音功能未初始化', 'danger');
+                    return;
+                }
                 
                 // 检查录音模式
                 const guidedMode = document.getElementById('guidedMode').checked;
@@ -547,115 +575,115 @@
                     }
                 }
                 
-                // 优先选择高质量录音格式
-                let options = {};
-                if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-                    options.mimeType = 'audio/webm;codecs=opus';
-                } else if (MediaRecorder.isTypeSupported('audio/webm')) {
-                    options.mimeType = 'audio/webm';
-                } else if (MediaRecorder.isTypeSupported('audio/wav')) {
-                    options.mimeType = 'audio/wav';
-                } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-                    options.mimeType = 'audio/mp4';
-                }
+                // 使用录音适配器开始录音
+                const result = await recordingAdapter.startRecording();
                 
-                // 设置高质量录音参数
-                if (options.mimeType) {
-                    options.audioBitsPerSecond = 128000;  // 128kbps
-                }
-                
-                mediaRecorder = new MediaRecorder(stream, options);
-                audioChunks = [];
-                
-                console.log('使用录音格式:', mediaRecorder.mimeType);
-                
-                mediaRecorder.ondataavailable = function(event) {
-                    audioChunks.push(event.data);
-                };
-                
-                mediaRecorder.onstop = function() {
-                    // 使用实际的MIME类型
-                    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    userAudio.src = audioUrl;
-                    userAudio.style.display = 'block';
+                if (result.success) {
+                    recordBtn.disabled = true;
+                    stopBtn.disabled = false;
                     
-                    // 停止录音指导
-                    if (recordingGuide) {
-                        recordingGuide.stopGuide();
+                    // 显示录音状态栏
+                    recordingStatusBar.style.display = 'flex';
+                    
+                    const mode = recordingAdapter.getMode();
+                    const modeText = mode === 'browser' ? '浏览器录音' : '服务器录音';
+                    
+                    if (guidedMode) {
+                        waveformContainer.innerHTML = `<i class="fas fa-microphone text-danger me-2"></i>正在录音中 (${modeText})... 请跟随上方的实时指导进行朗读`;
+                    } else {
+                        waveformContainer.classList.add('recording');
+                        waveformContainer.innerHTML = `<i class="fas fa-microphone text-danger me-2"></i>录音中 (${modeText})... 可以点击上方的"立即停止"按钮结束录音`;
                     }
                     
-                    // 上传录音
-                    uploadRecording(audioBlob);
-                };
-                
-                mediaRecorder.start();
-                
-                recordBtn.disabled = true;
-                stopBtn.disabled = false;
-                
-                // 显示录音状态栏
-                recordingStatusBar.style.display = 'flex';
-                
-                if (guidedMode) {
-                    waveformContainer.innerHTML = '<i class="fas fa-microphone text-danger me-2"></i>正在录音中... 请跟随上方的实时指导进行朗读';
+                    console.log(`🎙️ ${modeText}开始成功`);
                 } else {
-                    waveformContainer.classList.add('recording');
-                    waveformContainer.innerHTML = '<i class="fas fa-microphone text-danger me-2"></i>录音中... 可以点击上方的"立即停止"按钮结束录音';
+                    throw new Error(result.error || '录音启动失败');
                 }
                 
             } catch (error) {
-                showAlert('无法访问麦克风，请检查权限设置', 'danger');
+                console.error('录音启动失败:', error);
+                showAlert(`录音启动失败: ${error.message}`, 'danger');
             }
         }
         
         // 停止录音
-        function stopRecording() {
+        async function stopRecording() {
             console.log('停止录音被调用');
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
+            
+            try {
+                if (!recordingAdapter) {
+                    showAlert('录音功能未初始化', 'danger');
+                    return;
+                }
                 
-                recordBtn.disabled = false;
-                stopBtn.disabled = true;
-                waveformContainer.classList.remove('recording');
+                // 使用录音适配器停止录音
+                const result = await recordingAdapter.stopRecording();
                 
-                // 隐藏录音状态栏
-                recordingStatusBar.style.display = 'none';
-                
-                // 检查录音模式
-                const guidedMode = document.getElementById('guidedMode').checked;
-                
-                if (guidedMode) {
-                    waveformContainer.innerHTML = '<i class="fas fa-check text-success me-2"></i>录音和指导完成';
+                if (result.success) {
+                    recordBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    waveformContainer.classList.remove('recording');
                     
-                    // 停止录音指导并获取结果
-                    if (recordingGuide) {
-                        const result = recordingGuide.getGuidanceResult();
-                        console.log('录音指导结果:', result);
+                    // 隐藏录音状态栏
+                    recordingStatusBar.style.display = 'none';
+                    
+                    // 检查录音模式
+                    const guidedMode = document.getElementById('guidedMode').checked;
+                    const mode = recordingAdapter.getMode();
+                    const modeText = mode === 'browser' ? '浏览器录音' : '服务器录音';
+                    
+                    if (guidedMode) {
+                        waveformContainer.innerHTML = `<i class="fas fa-check text-success me-2"></i>录音和指导完成 (${modeText})`;
                         
-                        // 显示简要统计
-                        if (result.stats) {
-                            const accuracy = result.stats.accuracy || 0;
-                            showAlert(`录音指导完成！准确率: ${accuracy.toFixed(1)}%`, 
-                                     accuracy >= 80 ? 'success' : accuracy >= 60 ? 'warning' : 'info');
+                        // 停止录音指导并获取结果
+                        if (recordingGuide) {
+                            const guideResult = recordingGuide.getGuidanceResult();
+                            console.log('录音指导结果:', guideResult);
+                            
+                            // 显示简要统计
+                            if (guideResult.stats) {
+                                const accuracy = guideResult.stats.accuracy || 0;
+                                showAlert(`录音指导完成！准确率: ${accuracy.toFixed(1)}%`, 
+                                         accuracy >= 80 ? 'success' : accuracy >= 60 ? 'warning' : 'info');
+                            }
+                            
+                            recordingGuide.stopGuide();
+                            recordingGuide = null;
+                        }
+                    } else {
+                        waveformContainer.innerHTML = `<i class="fas fa-check text-success me-2"></i>录音完成 (${modeText})`;
+                    }
+                    
+                    // 设置用户文件ID和显示音频
+                    if (result.file_id) {
+                        userFileId = result.file_id;
+                        console.log('录音完成，userFileId设置为:', userFileId);
+                        
+                        // 如果是浏览器录音，可能需要显示音频播放器
+                        if (mode === 'browser' && result.audioUrl) {
+                            userAudio.src = result.audioUrl;
+                            userAudio.style.display = 'block';
                         }
                         
-                        recordingGuide.stopGuide();
-                        recordingGuide = null;
+                        compareBtn.style.display = 'inline-block';
+                        
+                        const duration = result.duration || 0;
+                        showAlert(`录音完成！时长: ${duration.toFixed(2)}秒`, 'success');
                     }
+                    
+                    console.log(`🎙️ ${modeText}停止成功`);
                 } else {
-                    waveformContainer.innerHTML = '<i class="fas fa-check text-success me-2"></i>录音完成';
+                    throw new Error(result.error || '录音停止失败');
                 }
                 
-                // 停止所有音频轨道
-                if (mediaRecorder.stream) {
-                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                }
+            } catch (error) {
+                console.error('录音停止失败:', error);
+                showAlert(`录音停止失败: ${error.message}`, 'danger');
             }
         }
         
         // 强制停止录音
-        function forceStopRecording() {
+        async function forceStopRecording() {
             console.log('强制停止录音');
             
             // 停止录音指导
@@ -665,49 +693,11 @@
             }
             
             // 停止录音
-            stopRecording();
+            await stopRecording();
             
             showAlert('录音已强制停止', 'info');
         }
         
-        // 上传录音
-        async function uploadRecording(audioBlob) {
-            const formData = new FormData();
-            // 根据实际录音格式设置正确的文件扩展名
-            let filename = 'recording.wav';  // 默认
-            if (mediaRecorder && mediaRecorder.mimeType) {
-                if (mediaRecorder.mimeType.includes('webm')) {
-                    filename = 'recording.webm';
-                } else if (mediaRecorder.mimeType.includes('mp4')) {
-                    filename = 'recording.mp4';
-                } else if (mediaRecorder.mimeType.includes('ogg')) {
-                    filename = 'recording.ogg';
-                }
-            }
-            console.log('上传录音文件名:', filename, '格式:', mediaRecorder?.mimeType);
-            formData.append('audio', audioBlob, filename);
-            
-            try {
-                const response = await fetch('/api/audio/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    userFileId = data.file_id;
-                    console.log('录音上传成功，userFileId设置为:', userFileId);
-                    compareBtn.style.display = 'inline-block';
-                    showAlert(`录音上传成功！时长: ${data.pitch_info.duration.toFixed(2)}秒`, 'success');
-                } else {
-                    console.error('录音上传失败:', data.error);
-                    showAlert(`上传失败: ${data.error}`, 'danger');
-                }
-            } catch (error) {
-                showAlert(`上传错误: ${error.message}`, 'danger');
-            }
-        }
         
         // 处理文件上传
         async function handleFileUpload(event) {

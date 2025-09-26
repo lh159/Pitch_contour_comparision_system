@@ -24,6 +24,10 @@ from dialogue_emotion_analyzer import DialogueEmotionAnalyzer
 
 # 导入数值处理
 import numpy as np
+import io
+import wave
+import threading
+import queue
 
 # 导入场景对话模块
 from deepseek_integration import get_deepseek_generator
@@ -88,6 +92,53 @@ emotion_analyzer = None
 
 # 场景对话会话存储
 dialogue_sessions = {}
+
+# 录音会话管理
+recording_sessions = {}
+recording_lock = threading.Lock()
+
+class RecordingSession:
+    """录音会话类"""
+    def __init__(self, session_id):
+        self.session_id = session_id
+        self.is_recording = False
+        self.audio_data = queue.Queue()
+        self.start_time = None
+        self.audio_format = {
+            'channels': 1,
+            'sample_width': 2,
+            'frame_rate': 44100
+        }
+        
+    def start_recording(self):
+        """开始录音"""
+        self.is_recording = True
+        self.start_time = time.time()
+        # 清空之前的音频数据
+        while not self.audio_data.empty():
+            try:
+                self.audio_data.get_nowait()
+            except queue.Empty:
+                break
+    
+    def stop_recording(self):
+        """停止录音"""
+        self.is_recording = False
+        
+    def add_audio_chunk(self, chunk_data):
+        """添加音频数据块"""
+        if self.is_recording:
+            self.audio_data.put(chunk_data)
+    
+    def get_audio_data(self):
+        """获取完整的音频数据"""
+        chunks = []
+        while not self.audio_data.empty():
+            try:
+                chunks.append(self.audio_data.get_nowait())
+            except queue.Empty:
+                break
+        return b''.join(chunks) if chunks else b''
 
 def init_system():
     """初始化系统组件"""
@@ -252,6 +303,164 @@ def generate_standard_audio():
         return jsonify({
             'success': False,
             'error': f'服务器错误: {str(e)}'
+        }), 500
+
+@app.route('/api/recording/start', methods=['POST'])
+def start_recording():
+    """开始录音会话"""
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id', str(uuid.uuid4()))
+        
+        with recording_lock:
+            # 如果已存在会话，先清理
+            if session_id in recording_sessions:
+                recording_sessions[session_id].stop_recording()
+            
+            # 创建新的录音会话
+            recording_sessions[session_id] = RecordingSession(session_id)
+            recording_sessions[session_id].start_recording()
+        
+        return jsonify({
+            'success': True,
+            'session_id': session_id,
+            'message': '录音会话已开始'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'启动录音失败: {str(e)}'
+        }), 500
+
+@app.route('/api/recording/stop', methods=['POST'])
+def stop_recording():
+    """停止录音会话并保存音频"""
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id')
+        
+        if not session_id:
+            return jsonify({
+                'success': False,
+                'error': '缺少session_id参数'
+            }), 400
+        
+        with recording_lock:
+            if session_id not in recording_sessions:
+                return jsonify({
+                    'success': False,
+                    'error': '录音会话不存在'
+                }), 404
+            
+            session = recording_sessions[session_id]
+            session.stop_recording()
+            
+            # 获取录音数据
+            audio_data = session.get_audio_data()
+            
+            if not audio_data:
+                return jsonify({
+                    'success': False,
+                    'error': '没有录音数据'
+                }), 400
+            
+            # 保存音频文件
+            file_id = str(uuid.uuid4())
+            wav_filename = f"recording_{file_id}.wav"
+            wav_filepath = os.path.join(Config.UPLOAD_FOLDER, wav_filename)
+            
+            # 将音频数据保存为WAV文件
+            with wave.open(wav_filepath, 'wb') as wav_file:
+                wav_file.setnchannels(session.audio_format['channels'])
+                wav_file.setsampwidth(session.audio_format['sample_width'])
+                wav_file.setframerate(session.audio_format['frame_rate'])
+                wav_file.writeframes(audio_data)
+            
+            # 清理录音会话
+            del recording_sessions[session_id]
+        
+        # 获取音频信息
+        duration = len(audio_data) / (session.audio_format['frame_rate'] * 
+                                     session.audio_format['sample_width'] * 
+                                     session.audio_format['channels'])
+        
+        return jsonify({
+            'success': True,
+            'file_id': file_id,
+            'filename': wav_filename,
+            'duration': duration,
+            'message': '录音已保存'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'停止录音失败: {str(e)}'
+        }), 500
+
+@app.route('/api/recording/data', methods=['POST'])
+def upload_recording_data():
+    """接收录音数据块"""
+    try:
+        session_id = request.form.get('session_id')
+        
+        if not session_id:
+            return jsonify({
+                'success': False,
+                'error': '缺少session_id参数'
+            }), 400
+        
+        if 'audio_chunk' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': '缺少音频数据'
+            }), 400
+        
+        audio_chunk = request.files['audio_chunk']
+        chunk_data = audio_chunk.read()
+        
+        with recording_lock:
+            if session_id in recording_sessions:
+                recording_sessions[session_id].add_audio_chunk(chunk_data)
+                return jsonify({
+                    'success': True,
+                    'message': '音频数据已接收'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': '录音会话不存在'
+                }), 404
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'上传录音数据失败: {str(e)}'
+        }), 500
+
+@app.route('/api/recording/status/<session_id>', methods=['GET'])
+def get_recording_status(session_id):
+    """获取录音会话状态"""
+    try:
+        with recording_lock:
+            if session_id in recording_sessions:
+                session = recording_sessions[session_id]
+                return jsonify({
+                    'success': True,
+                    'is_recording': session.is_recording,
+                    'duration': time.time() - session.start_time if session.start_time else 0
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': '录音会话不存在'
+                }), 404
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'获取录音状态失败: {str(e)}'
         }), 500
 
 @app.route('/api/audio/upload', methods=['POST'])
