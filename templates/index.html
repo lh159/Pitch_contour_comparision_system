@@ -2,16 +2,68 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- H5移动端优化的viewport设置 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- H5移动端必需的meta标签 -->
+    <meta name="format-detection" content="telephone=no, email=no, address=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="音高比对">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#667eea">
+    
+    <!-- PWA相关meta标签 -->
+    <meta name="description" content="AI智能发音练习与评估平台，帮助您改进中文发音准确性">
+    <meta name="keywords" content="发音练习,音高比对,中文学习,AI语音">
+    
+    <!-- 防止页面缩放和滚动弹性 -->
+    <meta name="msapplication-tap-highlight" content="no">
+    
     <title>音高曲线比对系统</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/realtime-sync.css') }}" rel="stylesheet">
     <style>
+        /* H5移动端基础样式 */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        html {
+            /* 防止iOS Safari弹性滚动 */
+            overflow: hidden;
+            height: 100%;
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+        
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            min-height: -webkit-fill-available; /* iOS Safari兼容 */
             font-family: 'Microsoft YaHei', Arial, sans-serif;
+            /* 防止过度滚动 */
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: touch;
+            /* 移动端字体优化 */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            /* 防止长按选择 */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            /* 允许文本输入框选择 */
+        }
+        
+        /* 允许输入框和文本区域选择 */
+        input, textarea, [contenteditable] {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
         }
         
         .main-container {
@@ -19,9 +71,47 @@
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             backdrop-filter: blur(10px);
-            margin: 20px auto;
-            padding: 30px;
+            margin: 10px;
+            padding: 20px;
             max-width: 1200px;
+            /* 移动端优化 */
+            width: calc(100% - 20px);
+        }
+        
+        /* 移动端响应式布局 */
+        @media (max-width: 768px) {
+            html {
+                overflow: auto; /* 移动端允许滚动 */
+            }
+            
+            .main-container {
+                margin: 5px;
+                padding: 15px;
+                border-radius: 15px;
+                width: calc(100% - 10px);
+            }
+            
+            /* 移动端标题优化 */
+            .display-4 {
+                font-size: 2rem !important;
+            }
+            
+            .lead {
+                font-size: 1rem !important;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .main-container {
+                margin: 2px;
+                padding: 12px;
+                border-radius: 12px;
+                width: calc(100% - 4px);
+            }
+            
+            .display-4 {
+                font-size: 1.75rem !important;
+            }
         }
         
         .step-card {
@@ -33,9 +123,35 @@
             margin-bottom: 20px;
         }
         
-        .step-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        /* 桌面端悬停效果 */
+        @media (hover: hover) {
+            .step-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            }
+        }
+        
+        /* 移动端触摸效果 */
+        @media (hover: none) {
+            .step-card:active {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+            }
+        }
+        
+        /* 移动端步骤卡片优化 */
+        @media (max-width: 768px) {
+            .step-card {
+                margin-bottom: 15px;
+                border-radius: 12px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .step-card {
+                margin-bottom: 12px;
+                border-radius: 10px;
+            }
         }
         
         .step-header {
@@ -87,12 +203,27 @@
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+            /* 移动端触摸优化 */
+            min-height: 44px; /* iOS推荐最小触摸目标 */
+            min-width: 44px;
+            touch-action: manipulation; /* 防止双击缩放 */
         }
         
-        .btn-custom:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
-            color: white;
+        /* 桌面端悬停效果 */
+        @media (hover: hover) {
+            .btn-custom:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+                color: white;
+            }
+        }
+        
+        /* 移动端触摸反馈 */
+        @media (hover: none) {
+            .btn-custom:active {
+                transform: scale(0.98);
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            }
         }
         
         .btn-custom:disabled {
@@ -101,11 +232,72 @@
             transform: none;
         }
         
+        /* 移动端按钮尺寸优化 */
+        @media (max-width: 768px) {
+            .btn-custom {
+                padding: 14px 24px;
+                font-size: 16px; /* 防止iOS缩放 */
+                border-radius: 20px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .btn-custom {
+                padding: 16px 20px;
+                font-size: 16px;
+                border-radius: 18px;
+                width: 100%; /* 小屏幕按钮全宽 */
+                margin-bottom: 10px;
+            }
+            
+            /* 按钮组在小屏幕下垂直排列 */
+            .btn-group {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .btn-group .btn {
+                width: 100%;
+                margin-bottom: 8px;
+                border-radius: 18px !important;
+            }
+        }
+        
         .audio-controls {
             display: flex;
             align-items: center;
             gap: 15px;
             margin: 15px 0;
+        }
+        
+        /* 移动端音频控件优化 */
+        @media (max-width: 768px) {
+            .audio-controls {
+                flex-direction: column;
+                gap: 12px;
+                align-items: stretch;
+            }
+            
+            .audio-controls audio {
+                width: 100%;
+                height: 40px; /* 增加触摸目标大小 */
+            }
+            
+            .audio-controls .btn {
+                width: 100%;
+                min-height: 44px;
+                font-size: 16px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .audio-controls {
+                gap: 10px;
+            }
+            
+            .audio-controls audio {
+                height: 44px;
+            }
         }
         
         .waveform-container {
@@ -203,6 +395,25 @@
             min-height: 600px;
         }
         
+        /* 移动端可视化容器优化 */
+        @media (max-width: 768px) {
+            .visualization-container {
+                padding: 20px;
+                margin: 20px 0;
+                border-radius: 12px;
+                min-height: 400px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .visualization-container {
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 10px;
+                min-height: 300px;
+            }
+        }
+        
         .visualization-container::before {
             content: '';
             position: absolute;
@@ -249,6 +460,35 @@
             box-sizing: border-box;
             display: block;
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        
+        /* 移动端图表优化 */
+        @media (max-width: 768px) {
+            .chart-wrapper {
+                padding: 15px;
+                border-radius: 10px;
+            }
+            
+            .comparison-chart {
+                min-height: 400px;
+                max-height: 600px;
+                padding: 12px;
+                border-radius: 6px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .chart-wrapper {
+                padding: 10px;
+                border-radius: 8px;
+            }
+            
+            .comparison-chart {
+                min-height: 300px;
+                max-height: 500px;
+                padding: 8px;
+                border-radius: 4px;
+            }
         }
         
         .chart-loading {
@@ -592,6 +832,194 @@
         .pitch-stat-item .stat-label {
             font-size: 14px;
             opacity: 0.9;
+        }
+        
+        /* 移动端表单优化 */
+        @media (max-width: 768px) {
+            .form-control, .form-select {
+                font-size: 16px !important; /* 防止iOS缩放 */
+                min-height: 44px; /* iOS推荐触摸目标大小 */
+                border-radius: 12px;
+                padding: 12px 16px;
+            }
+            
+            .form-control-lg {
+                font-size: 16px !important;
+                min-height: 48px;
+                padding: 14px 18px;
+            }
+            
+            textarea.form-control {
+                min-height: 100px;
+                resize: vertical;
+            }
+            
+            .form-check-input {
+                width: 20px;
+                height: 20px;
+                margin-top: 2px;
+            }
+            
+            .form-check-label {
+                font-size: 16px;
+                padding-left: 8px;
+            }
+            
+            /* 表单行在移动端垂直排列 */
+            .row .col-md-6,
+            .row .col-md-4,
+            .row .col-md-8 {
+                margin-bottom: 15px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .form-control, .form-select {
+                font-size: 16px !important;
+                min-height: 44px;
+                border-radius: 10px;
+                padding: 14px 16px;
+            }
+            
+            .form-control-lg {
+                min-height: 50px;
+                padding: 16px 18px;
+            }
+            
+            textarea.form-control {
+                min-height: 120px;
+            }
+            
+            .row .col-md-6,
+            .row .col-md-4,
+            .row .col-md-8 {
+                margin-bottom: 12px;
+            }
+        }
+        
+        /* H5移动端性能优化样式 */
+        
+        /* 硬件加速优化 */
+        .step-card,
+        .btn-custom,
+        .visualization-container,
+        .chart-wrapper {
+            transform: translateZ(0); /* 强制硬件加速 */
+            -webkit-transform: translateZ(0);
+            will-change: transform; /* 提示浏览器优化 */
+        }
+        
+        /* 减少重绘和重排 */
+        .comparison-chart,
+        .pitch-chart {
+            contain: layout style paint; /* CSS Containment */
+        }
+        
+        /* 移动端字体渲染优化 */
+        @media (max-width: 768px) {
+            body {
+                text-rendering: optimizeSpeed; /* 优化渲染速度 */
+            }
+            
+            /* 减少阴影复杂度以提升性能 */
+            .step-card,
+            .visualization-container {
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            }
+            
+            /* 简化动画以节省电量 */
+            .step-card,
+            .btn-custom {
+                transition: transform 0.2s ease;
+            }
+        }
+        
+        /* 横屏模式优化 */
+        @media (max-width: 768px) and (orientation: landscape) {
+            .main-container {
+                padding: 10px;
+                margin: 5px;
+            }
+            
+            .step-card {
+                margin-bottom: 10px;
+            }
+            
+            .visualization-container {
+                min-height: 250px;
+                padding: 15px;
+            }
+            
+            .comparison-chart {
+                min-height: 200px;
+                max-height: 350px;
+            }
+        }
+        
+        /* 设备特定优化 */
+        .mobile-device {
+            /* 移动端通用优化 */
+            touch-action: manipulation;
+        }
+        
+        .ios-device {
+            /* iOS特定优化 */
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .android-device {
+            /* Android特定优化 */
+            overscroll-behavior: contain;
+        }
+        
+        /* 屏幕方向样式 */
+        .portrait-mode {
+            /* 竖屏模式样式 */
+            --orientation: portrait;
+        }
+        
+        .landscape-mode {
+            /* 横屏模式样式 */
+            --orientation: landscape;
+        }
+        
+        .landscape-mode .main-container {
+            max-width: none;
+            width: 100%;
+            margin: 5px;
+            padding: 15px;
+        }
+        
+        .landscape-mode .step-card {
+            margin-bottom: 8px;
+        }
+        
+        /* 深色模式支持（如果系统支持） */
+        @media (prefers-color-scheme: dark) {
+            .mobile-device {
+                /* 可以添加深色模式支持 */
+                color-scheme: dark;
+            }
+        }
+        
+        /* 减少动画的用户偏好设置 */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        
+        /* 高对比度模式支持 */
+        @media (prefers-contrast: high) {
+            .btn-custom {
+                border: 2px solid #333;
+            }
+            
+            .step-card {
+                border: 1px solid #ccc;
+            }
         }
     </style>
 </head>
@@ -1021,6 +1449,13 @@
         let socket = null;
         let toneAnalyzer = null;
         
+        // H5移动端特有变量
+        let isMobile = false;
+        let isIOS = false;
+        let isAndroid = false;
+        let deviceOrientation = 'portrait';
+        let vibrationSupported = false;
+        
         // 场景对话相关变量
         let currentSession = null;
         let currentOrder = 0;
@@ -1056,9 +1491,87 @@
         const waveformContainer = document.getElementById('waveformContainer');
         const systemStatus = document.getElementById('systemStatus');
         
+        // H5移动端设备检测和初始化
+        function initMobileDetection() {
+            const userAgent = navigator.userAgent;
+            isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+            isIOS = /iPad|iPhone|iPod/.test(userAgent);
+            isAndroid = /Android/i.test(userAgent);
+            
+            // 检测振动支持
+            vibrationSupported = 'vibrate' in navigator;
+            
+            // 获取初始屏幕方向
+            if (screen.orientation) {
+                deviceOrientation = screen.orientation.angle === 0 || screen.orientation.angle === 180 ? 'portrait' : 'landscape';
+            }
+            
+            console.log('📱 设备信息:', {
+                isMobile,
+                isIOS,
+                isAndroid,
+                vibrationSupported,
+                deviceOrientation,
+                screenSize: `${screen.width}x${screen.height}`,
+                pixelRatio: window.devicePixelRatio || 1
+            });
+            
+            // 移动端特殊处理
+            if (isMobile) {
+                document.body.classList.add('mobile-device');
+                if (isIOS) document.body.classList.add('ios-device');
+                if (isAndroid) document.body.classList.add('android-device');
+                
+                // 防止iOS Safari地址栏影响视口高度
+                if (isIOS) {
+                    const setViewportHeight = () => {
+                        document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+                    };
+                    setViewportHeight();
+                    window.addEventListener('resize', setViewportHeight);
+                    window.addEventListener('orientationchange', () => {
+                        setTimeout(setViewportHeight, 100);
+                    });
+                }
+            }
+        }
+        
+        // 触摸反馈函数
+        function triggerHapticFeedback(type = 'light') {
+            if (!vibrationSupported || !isMobile) return;
+            
+            try {
+                switch(type) {
+                    case 'light':
+                        navigator.vibrate(10);
+                        break;
+                    case 'medium':
+                        navigator.vibrate(25);
+                        break;
+                    case 'heavy':
+                        navigator.vibrate(50);
+                        break;
+                    case 'success':
+                        navigator.vibrate([100, 50, 100]);
+                        break;
+                    case 'error':
+                        navigator.vibrate([200, 100, 200, 100, 200]);
+                        break;
+                    case 'warning':
+                        navigator.vibrate([150, 75, 150]);
+                        break;
+                }
+            } catch (e) {
+                console.warn('振动反馈失败:', e);
+            }
+        }
+        
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 DOM加载完成，开始初始化...');
+            
+            // 初始化移动端检测
+            initMobileDetection();
             
             // 初始化声调分析器
             if (typeof ChineseToneAnalyzer !== 'undefined') {
@@ -1117,10 +1630,26 @@
         
         // 设置事件监听器
         function setupEventListeners() {
-            generateBtn.addEventListener('click', generateStandardAudio);
-            recordBtn.addEventListener('click', startRecording);
-            stopBtn.addEventListener('click', stopRecording);
-            compareBtn.addEventListener('click', compareAudio);
+            // 为按钮添加触摸反馈
+            generateBtn.addEventListener('click', (e) => {
+                triggerHapticFeedback('light');
+                generateStandardAudio();
+            });
+            
+            recordBtn.addEventListener('click', (e) => {
+                triggerHapticFeedback('medium');
+                startRecording();
+            });
+            
+            stopBtn.addEventListener('click', (e) => {
+                triggerHapticFeedback('light');
+                stopRecording();
+            });
+            
+            compareBtn.addEventListener('click', (e) => {
+                triggerHapticFeedback('medium');
+                compareAudio();
+            });
             const retryBtn = document.getElementById('retryBtn');
             if (retryBtn) {
                 retryBtn.addEventListener('click', retry);
@@ -2834,7 +3363,7 @@
             `;
         }
         
-        // 显示警告信息
+        // 显示警告信息（增强移动端体验）
         function showAlert(message, type = 'info') {
             // 移除现有的警告
             const existingAlerts = document.querySelectorAll('.alert-dismissible');
@@ -2851,6 +3380,24 @@
             // 插入到页面顶部
             document.querySelector('.main-container').insertBefore(alertDiv, document.querySelector('.main-container').firstChild);
             
+            // 移动端触摸反馈
+            if (isMobile) {
+                switch(type) {
+                    case 'success':
+                        triggerHapticFeedback('success');
+                        break;
+                    case 'danger':
+                    case 'error':
+                        triggerHapticFeedback('error');
+                        break;
+                    case 'warning':
+                        triggerHapticFeedback('warning');
+                        break;
+                    default:
+                        triggerHapticFeedback('light');
+                }
+            }
+            
             // 自动消失
             setTimeout(() => {
                 if (alertDiv.parentNode) {
@@ -2858,6 +3405,39 @@
                 }
             }, 8000);  // 延长显示时间以便阅读更长的消息
         }
+        
+        // 屏幕方向变化处理
+        if (screen.orientation) {
+            screen.orientation.addEventListener('change', function() {
+                const newOrientation = screen.orientation.angle === 0 || screen.orientation.angle === 180 ? 'portrait' : 'landscape';
+                if (newOrientation !== deviceOrientation) {
+                    deviceOrientation = newOrientation;
+                    console.log('📱 屏幕方向改变:', deviceOrientation);
+                    
+                    // 触摸反馈
+                    triggerHapticFeedback('light');
+                    
+                    // 可以在这里添加方向变化的特殊处理
+                    if (deviceOrientation === 'landscape') {
+                        // 横屏时的处理
+                        document.body.classList.add('landscape-mode');
+                        document.body.classList.remove('portrait-mode');
+                    } else {
+                        // 竖屏时的处理
+                        document.body.classList.add('portrait-mode');
+                        document.body.classList.remove('landscape-mode');
+                    }
+                }
+            });
+        }
+        
+        // 添加移动端特殊CSS类
+        document.addEventListener('DOMContentLoaded', function() {
+            if (isMobile) {
+                // 初始方向类
+                document.body.classList.add(deviceOrientation === 'landscape' ? 'landscape-mode' : 'portrait-mode');
+            }
+        });
     </script>
 </body>
 </html>
