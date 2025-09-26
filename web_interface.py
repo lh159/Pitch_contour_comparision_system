@@ -1684,6 +1684,9 @@ if __name__ == '__main__':
             
             if os.path.exists(ssl_cert_path) and os.path.exists(ssl_key_path):
                 print(f"🔒 启用HTTPS WebSocket，访问地址: https://8.148.200.151:{Config.PORT}")
+                import ssl
+                ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                ssl_context.load_cert_chain(ssl_cert_path, ssl_key_path)
                 socketio.run(
                     app,
                     host='0.0.0.0',
@@ -1691,8 +1694,7 @@ if __name__ == '__main__':
                     debug=Config.DEBUG,
                     use_reloader=False,  # WebSocket模式下禁用重载器
                     allow_unsafe_werkzeug=True,  # 生产环境允许Werkzeug
-                    keyfile=ssl_key_path,
-                    certfile=ssl_cert_path
+                    ssl_context=ssl_context
                 )
             else:
                 print(f"⚠️ 未找到SSL证书，使用HTTP WebSocket模式")
