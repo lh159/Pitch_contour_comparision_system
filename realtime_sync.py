@@ -545,6 +545,6 @@ if __name__ == '__main__':
     socketio = init_socketio(app)
     
     print("WebSocket同步服务器启动")
-    print("测试地址: http://localhost:5000")
+    print("测试地址: http://localhost:9999")
     
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=9999, debug=True)

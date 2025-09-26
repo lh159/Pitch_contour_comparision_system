@@ -1,0 +1,415 @@
+/* H5移动端通用样式 */
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html {
+    /* 防止iOS Safari弹性滚动 */
+    overflow: hidden;
+    height: 100%;
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+}
+
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    min-height: -webkit-fill-available; /* iOS Safari兼容 */
+    font-family: 'Microsoft YaHei', Arial, sans-serif;
+    /* 防止过度滚动 */
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+    /* 移动端字体优化 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* 防止长按选择 */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* 允许输入框和文本区域选择 */
+input, textarea, [contenteditable] {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+}
+
+.main-container {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    backdrop-filter: blur(10px);
+    margin: 10px;
+    padding: 20px;
+    max-width: 1200px;
+    width: calc(100% - 20px);
+    margin: 10px auto;
+}
+
+/* 移动端响应式布局 */
+@media (max-width: 768px) {
+    html {
+        overflow: auto; /* 移动端允许滚动 */
+    }
+    
+    .main-container {
+        margin: 5px;
+        padding: 15px;
+        border-radius: 15px;
+        width: calc(100% - 10px);
+    }
+    
+    /* 移动端标题优化 */
+    .display-4 {
+        font-size: 2rem !important;
+    }
+    
+    .lead {
+        font-size: 1rem !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .main-container {
+        margin: 2px;
+        padding: 12px;
+        border-radius: 12px;
+        width: calc(100% - 4px);
+    }
+    
+    .display-4 {
+        font-size: 1.75rem !important;
+    }
+}
+
+.step-card {
+    background: white;
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 20px;
+}
+
+/* 桌面端悬停效果 */
+@media (hover: hover) {
+    .step-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+    }
+}
+
+/* 移动端触摸效果 */
+@media (hover: none) {
+    .step-card:active {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    }
+}
+
+.step-header {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    color: white;
+    border-radius: 15px 15px 0 0;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.step-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+    transform: rotate(45deg);
+    animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+}
+
+.step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    margin-right: 15px;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.btn-custom {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    border: none;
+    border-radius: 25px;
+    padding: 12px 30px;
+    color: white;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    /* 移动端触摸优化 */
+    min-height: 44px; /* iOS推荐最小触摸目标 */
+    min-width: 44px;
+    touch-action: manipulation; /* 防止双击缩放 */
+}
+
+/* 桌面端悬停效果 */
+@media (hover: hover) {
+    .btn-custom:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+}
+
+/* 移动端触摸反馈 */
+@media (hover: none) {
+    .btn-custom:active {
+        transform: scale(0.98);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+}
+
+.btn-custom:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* 移动端按钮尺寸优化 */
+@media (max-width: 768px) {
+    .btn-custom {
+        padding: 14px 24px;
+        font-size: 16px; /* 防止iOS缩放 */
+        border-radius: 20px;
+    }
+}
+
+@media (max-width: 576px) {
+    .btn-custom {
+        padding: 16px 20px;
+        font-size: 16px;
+        border-radius: 18px;
+        width: 100%; /* 小屏幕按钮全宽 */
+        margin-bottom: 10px;
+    }
+    
+    /* 按钮组在小屏幕下垂直排列 */
+    .btn-group {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        width: 100%;
+        margin-bottom: 8px;
+        border-radius: 18px !important;
+    }
+}
+
+/* 导航按钮样式 */
+.nav-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 20px 0;
+    gap: 15px;
+}
+
+@media (max-width: 576px) {
+    .nav-buttons {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .nav-buttons .btn {
+        width: 100%;
+    }
+}
+
+/* 移动端表单优化 */
+@media (max-width: 768px) {
+    .form-control, .form-select {
+        font-size: 16px !important; /* 防止iOS缩放 */
+        min-height: 44px; /* iOS推荐触摸目标大小 */
+        border-radius: 12px;
+        padding: 12px 16px;
+    }
+    
+    .form-control-lg {
+        font-size: 16px !important;
+        min-height: 48px;
+        padding: 14px 18px;
+    }
+    
+    textarea.form-control {
+        min-height: 100px;
+        resize: vertical;
+    }
+    
+    .form-check-input {
+        width: 20px;
+        height: 20px;
+        margin-top: 2px;
+    }
+    
+    .form-check-label {
+        font-size: 16px;
+        padding-left: 8px;
+    }
+    
+    /* 表单行在移动端垂直排列 */
+    .row .col-md-6,
+    .row .col-md-4,
+    .row .col-md-8 {
+        margin-bottom: 15px;
+    }
+}
+
+/* 加载动画 */
+.loading-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    text-align: center;
+}
+
+.loading-spinner .spinner-border {
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 1rem;
+}
+
+/* 状态指示器 */
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-success { background: #28a745; }
+.status-warning { background: #ffc107; }
+.status-error { background: #dc3545; }
+
+/* H5移动端性能优化样式 */
+
+/* 硬件加速优化 */
+.step-card,
+.btn-custom {
+    transform: translateZ(0); /* 强制硬件加速 */
+    -webkit-transform: translateZ(0);
+    will-change: transform; /* 提示浏览器优化 */
+}
+
+/* 移动端字体渲染优化 */
+@media (max-width: 768px) {
+    body {
+        text-rendering: optimizeSpeed; /* 优化渲染速度 */
+    }
+    
+    /* 减少阴影复杂度以提升性能 */
+    .step-card {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    /* 简化动画以节省电量 */
+    .step-card,
+    .btn-custom {
+        transition: transform 0.2s ease;
+    }
+}
+
+/* 横屏模式优化 */
+@media (max-width: 768px) and (orientation: landscape) {
+    .main-container {
+        padding: 10px;
+        margin: 5px;
+    }
+    
+    .step-card {
+        margin-bottom: 10px;
+    }
+}
+
+/* 设备特定优化 */
+.mobile-device {
+    /* 移动端通用优化 */
+    touch-action: manipulation;
+}
+
+.ios-device {
+    /* iOS特定优化 */
+    -webkit-overflow-scrolling: touch;
+}
+
+.android-device {
+    /* Android特定优化 */
+    overscroll-behavior: contain;
+}
+
+/* 屏幕方向样式 */
+.portrait-mode {
+    /* 竖屏模式样式 */
+    --orientation: portrait;
+}
+
+.landscape-mode {
+    /* 横屏模式样式 */
+    --orientation: landscape;
+}
+
+.landscape-mode .main-container {
+    max-width: none;
+    width: 100%;
+    margin: 5px;
+    padding: 15px;
+}
+
+.landscape-mode .step-card {
+    margin-bottom: 8px;
+}
+
+/* 深色模式支持（如果系统支持） */
+@media (prefers-color-scheme: dark) {
+    .mobile-device {
+        /* 可以添加深色模式支持 */
+        color-scheme: dark;
+    }
+}
+
+/* 减少动画的用户偏好设置 */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+    .btn-custom {
+        border: 2px solid #333;
+    }
+    
+    .step-card {
+        border: 1px solid #ccc;
+    }
+}

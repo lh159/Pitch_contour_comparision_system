@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-音高曲线比对系统配置文件
+音高曲线比对系统配置文件模板
+复制此文件为 config.py 并填入您的API密钥
 """
 import os
 from dotenv import load_dotenv
@@ -14,7 +15,7 @@ class Config:
     # === TTS配置 ===
     # 阿里云情感TTS配置
     ALIBABA_TTS_CONFIG = {
-        'api_key': 'sk-26cd7fe2661444f2804896a590bdbbc0',
+        'api_key': 'YOUR_ALIBABA_TTS_API_KEY_HERE',  # 请填入您的阿里云TTS API密钥
         'default_voice': 'zhimiao_emo',      # 默认使用知妙女声（情感TTS）
         'default_emotion': 'neutral',         # 默认中性情感
         'sample_rate': 22050,                # 音频采样率（SDK推荐）
@@ -31,12 +32,12 @@ class Config:
     }
     
     # === 阿里达摩院语音配置 ===
-    ALIBABA_PARAFORMER_API_KEY = os.getenv('ALIBABA_PARAFORMER_API_KEY', '')
+    ALIBABA_PARAFORMER_API_KEY = os.getenv('ALIBABA_PARAFORMER_API_KEY', 'YOUR_PARAFORMER_API_KEY_HERE')
     ALIBABA_VAD_MODEL = 'iic/speech_fsmn_vad_zh-cn-16k-common-pytorch'  # VAD模型名称
     ALIBABA_ASR_MODEL = 'iic/speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404'  # 带时间戳的ASR模型
     
     # === DashScope API配置（Fun-ASR云端服务）===
-    DASHSCOPE_API_KEY = os.getenv('DASHSCOPE_API_KEY', '')
+    DASHSCOPE_API_KEY = os.getenv('DASHSCOPE_API_KEY', 'YOUR_DASHSCOPE_API_KEY_HERE')
     
     # === 音频配置 ===
     SAMPLE_RATE = 16000  # 采样率
@@ -93,14 +94,12 @@ class Config:
     PORT = int(os.getenv('PORT', 9999))
     
     # === DeepSeek API配置 ===
-    DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
+    DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', 'YOUR_DEEPSEEK_API_KEY_HERE')
     
     # === 场景对话配置 ===
     MAX_SCENARIO_LENGTH = 200  # 场景描述最大长度
     DEFAULT_DIALOGUE_ROUNDS = 6  # 默认对话轮数
     DIALOGUE_SESSION_TIMEOUT = 3600  # 对话会话超时时间（秒）
-    
-    # IndexTTS2配置已移除
     
     # === 情感TTS配置 ===
     AVAILABLE_EMOTIONS = {

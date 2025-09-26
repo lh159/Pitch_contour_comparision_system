@@ -480,8 +480,8 @@ class RecordingGuide extends RealtimeTextSync {
                     </button>
                 </div>
                 
-                <!-- 设置面板 -->
-                <div class="guide-settings collapsed" id="guideSettings">
+                <!-- 设置面板（默认隐藏） -->
+                <div class="guide-settings collapsed" id="guideSettings" style="display: none;">
                     <div class="settings-toggle" id="settingsToggle">
                         <i class="fas fa-cog"></i> 设置
                     </div>
@@ -1135,7 +1135,14 @@ class RecordingGuide extends RealtimeTextSync {
     toggleSettings() {
         const settings = this.container.querySelector('#guideSettings');
         if (settings) {
-            settings.classList.toggle('collapsed');
+            // 切换显示状态
+            if (settings.style.display === 'none') {
+                settings.style.display = 'block';
+                settings.classList.remove('collapsed');
+            } else {
+                settings.style.display = 'none';
+                settings.classList.add('collapsed');
+            }
         }
     }
     

@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- H5移动端优化的viewport设置 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- H5移动端必需的meta标签 -->
+    <meta name="format-detection" content="telephone=no, email=no, address=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="音高比对">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#667eea">
+    
+    <title>标准发音播放 - 音高曲线比对系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/realtime-sync.css') }}" rel="stylesheet">
+    <style>
+        /* 标准发音音高可视化样式 */
+        .standard-pitch-visualization {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+
+        .standard-pitch-visualization:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.12);
+        }
+
+        .visualization-header {
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .visualization-header h5 {
+            color: #667eea;
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .pitch-chart {
+            width: 100%;
+            height: auto;
+            min-height: 400px;
+            max-height: 600px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            background: white;
+        }
+
+        .chart-text-overlay {
+            position: relative;
+            margin-top: 15px;
+            padding: 15px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 10px;
+            border: 1px solid #dee2e6;
+        }
+
+        .text-char {
+            display: inline-block;
+            padding: 5px 8px;
+            margin: 2px;
+            border-radius: 5px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            font-size: 18px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .text-char.tone-1 { border-left: 4px solid #ff6b6b; }  /* 阴平 - 红色 */
+        .text-char.tone-2 { border-left: 4px solid #4ecdc4; }  /* 阳平 - 青色 */
+        .text-char.tone-3 { border-left: 4px solid #45b7d1; }  /* 上声 - 蓝色 */
+        .text-char.tone-4 { border-left: 4px solid #96ceb4; }  /* 去声 - 绿色 */
+        .text-char.tone-0 { border-left: 4px solid #ffeaa7; }  /* 轻声 - 黄色 */
+
+        .text-char:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background: #f8f9fa;
+        }
+
+        .pitch-analysis-info {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 10px;
+        }
+
+        .pitch-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .pitch-stat-item {
+            text-align: center;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .pitch-stat-item .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            display: block;
+        }
+
+        .pitch-stat-item .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        /* 移动端音频控件优化 */
+        @media (max-width: 768px) {
+            .audio-controls {
+                flex-direction: column;
+                gap: 12px;
+                align-items: stretch;
+            }
+            
+            .audio-controls audio {
+                width: 100%;
+                height: 40px; /* 增加触摸目标大小 */
+            }
+            
+            .audio-controls .btn {
+                width: 100%;
+                min-height: 44px;
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .audio-controls {
+                gap: 10px;
+            }
+            
+            .audio-controls audio {
+                height: 44px;
+            }
+        }
+
+        /* 场景对话信息卡片 */
+        .dialogue-info-card {
+            background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+            border: none;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4caf50;
+        }
+
+        .current-dialogue-text {
+            font-size: 1.2em;
+            font-weight: 500;
+            color: #2e7d32;
+            line-height: 1.6;
+            margin: 10px 0;
+        }
+
+        .dialogue-progress {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .progress-indicator {
+            flex: 1;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(45deg, #4caf50, #66bb6a);
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <!-- 导航栏 -->
+            <div class="nav-buttons mb-4">
+                <button class="btn btn-outline-secondary" onclick="navigateTo('/home')">
+                    <i class="fas fa-arrow-left me-2"></i>返回首页
+                </button>
+                <div class="text-center">
+                    <h4 class="mb-0 text-primary">
+                        <i class="fas fa-volume-up me-2"></i>标准发音播放
+                    </h4>
+                </div>
+                <div></div> <!-- 占位符保持布局 -->
+            </div>
+
+            <!-- 场景对话信息（仅在对话模式下显示） -->
+            <div class="dialogue-info-card" id="dialogueInfoCard" style="display: none;">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="text-success mb-2">
+                            <i class="fas fa-theater-masks me-2"></i>
+                            <span id="scenarioTitle">场景对话</span>
+                        </h6>
+                        <div class="mb-2">
+                            <strong id="currentRole">您的角色：</strong>
+                        </div>
+                        <div class="current-dialogue-text" id="currentDialogueText">
+                            <!-- 当前台词文本 -->
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-success" id="dialogueOrder">第1句</span>
+                    </div>
+                </div>
+                <div class="dialogue-progress">
+                    <span class="text-muted">对话进度:</span>
+                    <div class="progress-indicator">
+                        <div class="progress-bar" id="dialogueProgressBar" style="width: 0%"></div>
+                    </div>
+                    <span class="text-muted" id="progressText">0/0</span>
+                </div>
+            </div>
+
+            <!-- 标准发音播放与同步预览 -->
+            <div class="step-card">
+                <div class="step-header">
+                    <h4 class="mb-0">
+                        <span class="step-number">2</span>
+                        标准发音播放与同步预览
+                    </h4>
+                </div>
+                <div class="card-body p-4">
+                    <!-- 练习文本显示 -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">练习文本:</label>
+                        <div class="p-3 bg-light rounded border">
+                            <h5 class="mb-0 text-primary" id="practiceText">加载中...</h5>
+                        </div>
+                    </div>
+
+                    <!-- 音频控件 -->
+                    <div class="audio-controls">
+                        <audio controls class="flex-grow-1" id="standardAudio" preload="metadata">
+                            您的浏览器不支持音频播放
+                        </audio>
+                        <button class="btn btn-outline-primary" id="analyzeStandardBtn">
+                            <i class="fas fa-chart-line me-2"></i>
+                            分析音高
+                        </button>
+                        <button class="btn btn-outline-success" id="toggleSyncBtn" style="display: none;">
+                            <i class="fas fa-sync-alt me-2"></i>
+                            启用同步显示
+                        </button>
+                    </div>
+                    
+                    <!-- 实时同步文本显示区域 -->
+                    <div class="sync-display-container" id="syncDisplayContainer" style="display: none;">
+                        <div class="sync-text-area" id="syncTextArea">
+                            <!-- 同步文本将在这里动态生成 -->
+                        </div>
+                    </div>
+                    
+                    <!-- 标准发音音高可视化区域 -->
+                    <div class="standard-pitch-visualization" id="standardPitchVisualization" style="display: none;">
+                        <div class="visualization-header">
+                            <h5><i class="fas fa-chart-line me-2"></i>标准发音音高曲线分析</h5>
+                        </div>
+                        <div class="chart-wrapper" id="standardChartWrapper">
+                            <div class="chart-loading" id="standardChartLoading">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">分析中...</span>
+                                </div>
+                                <p class="mt-2">正在分析标准发音的音高曲线...</p>
+                            </div>
+                            <div class="chart-content" id="standardChartContent" style="display: none;">
+                                <img id="standardPitchChart" class="pitch-chart" alt="标准发音音高曲线图">
+                                <div class="chart-text-overlay" id="standardTextOverlay">
+                                    <!-- 汉字与音高对应显示 -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pitch-analysis-info" id="standardPitchInfo">
+                            <!-- 音高分析信息 -->
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-success alert-custom">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>提示:</strong> 启用同步显示可以看到每个字的朗读时机，帮助您更好地掌握节奏
+                    </div>
+                </div>
+            </div>
+
+            <!-- 导航按钮 -->
+            <div class="nav-buttons">
+                <button class="btn btn-outline-secondary" onclick="navigateTo('/home')">
+                    <i class="fas fa-arrow-left me-2"></i>重新选择
+                </button>
+                <button class="btn btn-custom" id="nextToRecordingBtn">
+                    <i class="fas fa-microphone me-2"></i>开始录音
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    
+    <!-- 实时同步组件 -->
+    <script src="{{ url_for('static', filename='js/realtime-sync.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chinese-tone-analyzer.js') }}"></script>
+    
+    <!-- 通用JS -->
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+    
+    <!-- 页面特定JS -->
+    <script>
+        // 全局变量
+        let standardFileId = null;
+        let currentText = '';
+        let currentCharTimestamps = [];
+        let realtimeSync = null;
+        let socket = null;
+        let toneAnalyzer = null;
+        let isDialogueMode = false;
+        let dialogueData = null;
+        let currentSession = null;
+        let currentOrder = 0;
+        
+        // DOM元素
+        const practiceText = document.getElementById('practiceText');
+        const standardAudio = document.getElementById('standardAudio');
+        const analyzeStandardBtn = document.getElementById('analyzeStandardBtn');
+        const toggleSyncBtn = document.getElementById('toggleSyncBtn');
+        const nextToRecordingBtn = document.getElementById('nextToRecordingBtn');
+        const dialogueInfoCard = document.getElementById('dialogueInfoCard');
+        
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 标准发音页面初始化...');
+            
+            // 初始化声调分析器
+            if (typeof ChineseToneAnalyzer !== 'undefined') {
+                toneAnalyzer = new ChineseToneAnalyzer();
+                console.log('✓ 中文声调分析器初始化成功');
+            }
+            
+            // 初始化WebSocket
+            initializeWebSocket();
+            
+            // 获取URL参数并初始化页面
+            const params = getUrlParams();
+            initializePage(params);
+            
+            // 设置事件监听器
+            setupEventListeners();
+            
+            console.log('✓ 标准发音页面初始化完成');
+        });
+        
+        // 初始化页面数据
+        function initializePage(params) {
+            console.log('初始化页面数据:', params);
+            
+            // 检查是否是场景对话模式
+            if (params.mode === 'dialogue') {
+                isDialogueMode = true;
+                currentSession = params.session_id;
+                currentOrder = parseInt(params.current_order) || 1;
+                
+                try {
+                    dialogueData = JSON.parse(params.dialogue_data);
+                    initializeDialogueMode();
+                } catch (e) {
+                    console.error('解析对话数据失败:', e);
+                    showAlert('对话数据解析失败', 'danger');
+                    return;
+                }
+            } else {
+                // 基础模式
+                initializeBasicMode(params);
+            }
+        }
+        
+        // 初始化基础模式
+        function initializeBasicMode(params) {
+            if (params.file_id && params.text && params.audio_url) {
+                standardFileId = params.file_id;
+                currentText = params.text;
+                
+                // 设置文本和音频
+                practiceText.textContent = currentText;
+                standardAudio.src = params.audio_url;
+                
+                // 处理时间戳数据
+                try {
+                    currentCharTimestamps = JSON.parse(params.char_timestamps || '[]');
+                } catch (e) {
+                    console.warn('时间戳数据解析失败:', e);
+                    currentCharTimestamps = [];
+                }
+                
+                // 显示成功信息
+                let message = `标准发音加载成功！时长: ${params.duration}秒`;
+                if (currentCharTimestamps.length > 0) {
+                    message += ` | 时间戳: ${currentCharTimestamps.length}个字符 (${params.timestamp_method})`;
+                    toggleSyncBtn.style.display = 'inline-block';
+                }
+                if (params.warning) {
+                    message += ` | 警告: ${params.warning}`;
+                }
+                
+                showAlert(message, 'success');
+            } else {
+                showAlert('缺少必要的音频数据，请返回重新生成', 'warning');
+            }
+        }
+        
+        // 初始化场景对话模式
+        async function initializeDialogueMode() {
+            if (!dialogueData || !currentSession) {
+                showAlert('对话数据不完整', 'danger');
+                return;
+            }
+            
+            // 显示对话信息卡片
+            dialogueInfoCard.style.display = 'block';
+            
+            // 更新对话信息显示
+            updateDialogueInfo();
+            
+            // 获取当前对话并生成音频
+            await processCurrentDialogue();
+        }
+        
+        // 更新对话信息显示
+        function updateDialogueInfo() {
+            const scenarioTitle = document.getElementById('scenarioTitle');
+            const currentRole = document.getElementById('currentRole');
+            const dialogueOrder = document.getElementById('dialogueOrder');
+            const dialogueProgressBar = document.getElementById('dialogueProgressBar');
+            const progressText = document.getElementById('progressText');
+            
+            scenarioTitle.textContent = dialogueData.scenario_title;
+            currentRole.textContent = `您的角色：${dialogueData.user_role}`;
+            dialogueOrder.textContent = `第${currentOrder}句`;
+            
+            // 更新进度
+            const totalDialogues = dialogueData.dialogues.length;
+            const progress = (currentOrder / totalDialogues) * 100;
+            dialogueProgressBar.style.width = `${progress}%`;
+            progressText.textContent = `${currentOrder}/${totalDialogues}`;
+        }
+        
+        // 处理当前对话
+        async function processCurrentDialogue() {
+            const currentDialogue = dialogueData.dialogues.find(d => d.order === currentOrder);
+            
+            if (!currentDialogue) {
+                showAlert('对话数据不完整', 'danger');
+                return;
+            }
+            
+            // 更新当前台词显示
+            const currentDialogueText = document.getElementById('currentDialogueText');
+            currentDialogueText.textContent = currentDialogue.text;
+            
+            if (currentDialogue.speaker === 'user') {
+                // 用户台词 - 生成标准发音
+                currentText = currentDialogue.text;
+                practiceText.textContent = currentText;
+                
+                // 生成标准发音
+                await generateDialogueAudio();
+            } else {
+                // AI台词 - 这里不应该出现，因为AI台词应该在其他地方处理
+                console.warn('在标准发音页面遇到AI台词，这不应该发生');
+                showAlert('对话流程异常，请返回重新开始', 'warning');
+            }
+        }
+        
+        // 为场景对话生成音频
+        async function generateDialogueAudio() {
+            try {
+                const response = await fetch('/api/tts/generate_with_timestamps', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        text: currentText,
+                        method: 'auto',
+                        voice_gender: 'female', // 默认女声
+                        voice_emotion: 'neutral' // 默认中性
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    standardFileId = data.file_id;
+                    standardAudio.src = data.audio_url;
+                    currentCharTimestamps = data.char_timestamps || [];
+                    
+                    if (currentCharTimestamps.length > 0) {
+                        toggleSyncBtn.style.display = 'inline-block';
+                    }
+                    
+                    showAlert('台词音频生成成功！', 'success');
+                } else {
+                    showAlert(`音频生成失败: ${data.error}`, 'danger');
+                }
+            } catch (error) {
+                showAlert(`网络错误: ${error.message}`, 'danger');
+            }
+        }
+        
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 分析音高按钮
+            analyzeStandardBtn.addEventListener('click', analyzeStandardPitch);
+            
+            // 同步显示切换按钮
+            toggleSyncBtn.addEventListener('click', toggleRealtimeSync);
+            
+            // 下一步按钮
+            nextToRecordingBtn.addEventListener('click', goToRecording);
+        }
+        
+        // 跳转到录音页面
+        function goToRecording() {
+            if (!standardFileId || !currentText) {
+                showAlert('请先确保标准发音已准备就绪', 'warning');
+                return;
+            }
+            
+            const params = {
+                standard_file_id: standardFileId,
+                text: currentText,
+                char_timestamps: JSON.stringify(currentCharTimestamps)
+            };
+            
+            // 如果是场景对话模式，传递额外参数
+            if (isDialogueMode) {
+                params.mode = 'dialogue';
+                params.session_id = currentSession;
+                params.dialogue_data = JSON.stringify(dialogueData);
+                params.current_order = currentOrder;
+            }
+            
+            navigateTo('/recording', params);
+        }
+        
+        // 分析标准发音音高
+        async function analyzeStandardPitch() {
+            if (!standardFileId) {
+                showAlert('请先生成标准发音', 'warning');
+                return;
+            }
+            
+            const visualizationContainer = document.getElementById('standardPitchVisualization');
+            const chartLoading = document.getElementById('standardChartLoading');
+            const chartContent = document.getElementById('standardChartContent');
+            
+            // 显示可视化容器
+            visualizationContainer.style.display = 'block';
+            chartLoading.style.display = 'flex';
+            chartContent.style.display = 'none';
+            
+            // 禁用按钮
+            analyzeStandardBtn.disabled = true;
+            analyzeStandardBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>分析中...';
+            
+            try {
+                // 调用音高提取API
+                const response = await fetch('/api/pitch/extract', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        file_id: standardFileId,
+                        type: 'standard',
+                        text: currentText
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 设置声调分析器的音高数据
+                    if (toneAnalyzer) {
+                        toneAnalyzer.setPitchAnalysisData(data.pitch_data);
+                    }
+                    
+                    // 显示音高图表
+                    displayStandardPitchChart(data);
+                    showAlert('标准发音音高分析完成！', 'success');
+                } else {
+                    showAlert(`音高分析失败: ${data.error}`, 'danger');
+                    visualizationContainer.style.display = 'none';
+                }
+                
+            } catch (error) {
+                showAlert(`分析错误: ${error.message}`, 'danger');
+                visualizationContainer.style.display = 'none';
+            } finally {
+                // 恢复按钮
+                analyzeStandardBtn.disabled = false;
+                analyzeStandardBtn.innerHTML = '<i class="fas fa-chart-line me-2"></i>分析音高';
+            }
+        }
+        
+        // 显示标准发音音高图表
+        function displayStandardPitchChart(data) {
+            const chartLoading = document.getElementById('standardChartLoading');
+            const chartContent = document.getElementById('standardChartContent');
+            const chart = document.getElementById('standardPitchChart');
+            const textOverlay = document.getElementById('standardTextOverlay');
+            const pitchInfo = document.getElementById('standardPitchInfo');
+            
+            // 隐藏加载动画
+            chartLoading.style.display = 'none';
+            
+            // 设置图表
+            if (data.chart_url) {
+                chart.src = data.chart_url + '?t=' + new Date().getTime();
+                chart.onload = function() {
+                    chartContent.style.display = 'block';
+                };
+                chart.onerror = function() {
+                    showAlert('音高图表加载失败', 'warning');
+                };
+            }
+            
+            // 生成文本与音高对应显示
+            generateTextPitchOverlay(textOverlay);
+            
+            // 显示音高统计信息
+            displayPitchStats(pitchInfo, data.pitch_data);
+        }
+        
+        // 生成文本与音高对应的可视化
+        function generateTextPitchOverlay(container) {
+            if (!currentText) {
+                container.innerHTML = `
+                    <div class="text-center text-muted">
+                        <i class="fas fa-info-circle me-2"></i>
+                        暂无文本数据
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            // 创建标题
+            const title = document.createElement('div');
+            title.innerHTML = '<h6><i class="fas fa-font me-2"></i>汉字与音高对应（点击字符可查看详细信息）</h6>';
+            title.style.marginBottom = '15px';
+            container.appendChild(title);
+            
+            // 使用声调分析器生成可视化
+            if (toneAnalyzer) {
+                const visualizationHTML = toneAnalyzer.generateToneVisualization(currentText);
+                const contentDiv = document.createElement('div');
+                contentDiv.innerHTML = visualizationHTML;
+                contentDiv.style.lineHeight = '2';
+                contentDiv.style.fontSize = '18px';
+                container.appendChild(contentDiv);
+            } else {
+                // 降级处理
+                for (let i = 0; i < currentText.length; i++) {
+                    const char = currentText[i];
+                    const timestamp = currentCharTimestamps[i];
+                    
+                    const charElement = document.createElement('span');
+                    charElement.className = 'text-char';
+                    charElement.textContent = char;
+                    
+                    // 简单的声调分析
+                    const tone = simpleAnalyzeTone(char);
+                    if (tone > 0) {
+                        charElement.classList.add(`tone-${tone}`);
+                    }
+                    
+                    // 添加悬停提示
+                    if (timestamp) {
+                        const duration = ((timestamp.end_time - timestamp.start_time) * 1000).toFixed(0);
+                        charElement.title = `${char} | ${timestamp.start_time.toFixed(2)}s - ${timestamp.end_time.toFixed(2)}s | 时长: ${duration}ms`;
+                    }
+                    
+                    container.appendChild(charElement);
+                }
+            }
+            
+            // 添加声调图例
+            const legend = document.createElement('div');
+            legend.className = 'tone-legend';
+            legend.style.marginTop = '15px';
+            legend.innerHTML = `
+                <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                    <strong>声调图例：</strong>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                    <span class="text-char tone-1" style="font-size: 14px;">阴平</span>
+                    <span class="text-char tone-2" style="font-size: 14px;">阳平</span>
+                    <span class="text-char tone-3" style="font-size: 14px;">上声</span>
+                    <span class="text-char tone-4" style="font-size: 14px;">去声</span>
+                    <span class="text-char tone-0" style="font-size: 14px;">轻声</span>
+                </div>
+            `;
+            container.appendChild(legend);
+        }
+        
+        // 简单的声调分析（降级方法）
+        function simpleAnalyzeTone(char) {
+            const charCode = char.charCodeAt(0);
+            
+            // 检查是否是中文字符
+            if (charCode >= 0x4e00 && charCode <= 0x9fff) {
+                return ((charCode - 0x4e00) % 4) + 1; // 返回1-4
+            }
+            return 0; // 非中文字符返回轻声
+        }
+        
+        // 显示音高统计信息
+        function displayPitchStats(container, pitchData) {
+            const stats = {
+                '时长': `${pitchData.duration.toFixed(2)}秒`,
+                '平均音高': `${pitchData.mean_pitch.toFixed(1)}Hz`,
+                '音高范围': `${pitchData.pitch_range.toFixed(1)}Hz`,
+                '有效率': `${(pitchData.valid_ratio * 100).toFixed(1)}%`
+            };
+            
+            container.innerHTML = `
+                <h6><i class="fas fa-chart-bar me-2"></i>音高统计信息</h6>
+                <div class="pitch-stats">
+                    ${Object.entries(stats).map(([label, value]) => `
+                        <div class="pitch-stat-item">
+                            <span class="stat-value">${value}</span>
+                            <span class="stat-label">${label}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        // 切换实时同步显示
+        function toggleRealtimeSync() {
+            const syncContainer = document.getElementById('syncDisplayContainer');
+            
+            if (!currentCharTimestamps.length) {
+                showAlert('无时间戳数据，无法启用实时同步', 'warning');
+                return;
+            }
+            
+            if (syncContainer.style.display === 'none' || !syncContainer.style.display) {
+                // 启用同步显示
+                syncContainer.style.display = 'block';
+                syncContainer.classList.add('active');
+                toggleSyncBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>关闭同步显示';
+                toggleSyncBtn.classList.remove('btn-outline-success');
+                toggleSyncBtn.classList.add('btn-success');
+                
+                // 初始化实时同步组件
+                initializeRealtimeSync();
+                
+            } else {
+                // 关闭同步显示
+                syncContainer.style.display = 'none';
+                syncContainer.classList.remove('active');
+                toggleSyncBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>启用同步显示';
+                toggleSyncBtn.classList.remove('btn-success');
+                toggleSyncBtn.classList.add('btn-outline-success');
+                
+                // 销毁同步组件
+                if (realtimeSync) {
+                    realtimeSync.destroy();
+                    realtimeSync = null;
+                }
+            }
+        }
+        
+        // 初始化实时同步组件
+        function initializeRealtimeSync() {
+            const syncTextArea = document.getElementById('syncTextArea');
+            
+            if (!syncTextArea || !currentCharTimestamps.length) {
+                console.warn('无法初始化实时同步组件');
+                return;
+            }
+            
+            try {
+                // 创建实时同步组件
+                realtimeSync = new RealtimeTextSync(syncTextArea, {
+                    highlightClass: 'highlight-current',
+                    upcomingClass: 'upcoming-char',
+                    completedClass: 'completed-char'
+                });
+                
+                // 加载文本和时间戳
+                realtimeSync.loadText(currentText, currentCharTimestamps);
+                
+                // 设置事件回调
+                realtimeSync.setCallback('onCharacterChange', (index, char, timestamp) => {
+                    console.log(`当前字符: ${char} (索引: ${index})`);
+                    
+                    // 发送同步状态到服务器
+                    if (socket && socket.connected) {
+                        socket.emit('sync_position', {
+                            session_id: standardFileId,
+                            current_time: timestamp.start_time,
+                            char_index: index
+                        });
+                    }
+                });
+                
+                // 绑定音频
+                if (standardAudio) {
+                    realtimeSync.startSync(standardAudio);
+                }
+                
+                console.log('实时同步组件初始化成功');
+                
+            } catch (error) {
+                console.error('实时同步组件初始化失败:', error);
+                showAlert('实时同步功能初始化失败', 'danger');
+            }
+        }
+        
+        // 初始化WebSocket连接
+        function initializeWebSocket() {
+            if (typeof io !== 'undefined') {
+                try {
+                    socket = io();
+                    
+                    socket.on('connect', () => {
+                        console.log('WebSocket连接成功');
+                    });
+                    
+                    socket.on('disconnect', () => {
+                        console.log('WebSocket连接断开');
+                    });
+                    
+                    socket.on('error', (error) => {
+                        console.error('WebSocket错误:', error);
+                    });
+                    
+                } catch (error) {
+                    console.warn('WebSocket初始化失败:', error);
+                }
+            } else {
+                console.warn('Socket.IO不可用，实时同步功能将被禁用');
+            }
+        }
+    </script>
+</body>
+</html>

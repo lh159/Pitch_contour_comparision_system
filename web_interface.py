@@ -138,7 +138,32 @@ def init_system():
 
 @app.route('/')
 def index():
-    """主页"""
+    """重定向到首页"""
+    return render_template('home.html')
+
+@app.route('/home')
+def home():
+    """首页 - 选择练习模式"""
+    return render_template('home.html')
+
+@app.route('/standard-audio')
+def standard_audio():
+    """标准发音播放页面"""
+    return render_template('standard_audio.html')
+
+@app.route('/recording')
+def recording():
+    """录音界面页面"""
+    return render_template('recording.html')
+
+@app.route('/results')
+def results():
+    """结果分析页面"""
+    return render_template('results.html')
+
+@app.route('/legacy')
+def legacy():
+    """原有的单页面应用（保留作为备用）"""
     return render_template('index.html')
 
 @app.route('/api/tts/engines', methods=['GET'])

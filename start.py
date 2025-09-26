@@ -173,7 +173,7 @@ def check_port_available(port):
 def start_server(mode='full', port=None):
     """启动服务器"""
     if mode == 'realtime':
-        default_port = 5000
+        default_port = 9999
         print("\n🚀 启动实时字词同步系统...")
     else:
         default_port = 9999

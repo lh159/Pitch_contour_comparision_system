@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- H5移动端优化的viewport设置 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- H5移动端必需的meta标签 -->
+    <meta name="format-detection" content="telephone=no, email=no, address=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="音高比对">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#667eea">
+    
+    <!-- PWA相关meta标签 -->
+    <meta name="description" content="AI智能发音练习与评估平台，帮助您改进中文发音准确性">
+    <meta name="keywords" content="发音练习,音高比对,中文学习,AI语音">
+    
+    <!-- 防止页面缩放和滚动弹性 -->
+    <meta name="msapplication-tap-highlight" content="no">
+    
+    <title>音高曲线比对系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <!-- 标题 -->
+            <div class="text-center mb-4">
+                <h1 class="display-4 text-primary mb-3">
+                    <i class="fas fa-microphone me-3"></i>
+                    音高曲线比对系统
+                </h1>
+                <p class="lead text-muted">
+                    AI智能发音练习与评估平台，帮助您改进中文发音准确性
+                </p>
+            </div>
+
+            <!-- 系统状态 -->
+            <div class="alert alert-info alert-custom" id="systemStatus">
+                <i class="fas fa-info-circle me-2"></i>
+                正在检查系统状态...
+            </div>
+
+            <!-- 选择练习模式 -->
+            <div class="step-card">
+                <div class="step-header">
+                    <h4 class="mb-0">
+                        <span class="step-number">1</span>
+                        选择练习模式
+                    </h4>
+                </div>
+                <div class="card-body p-4">
+                    <!-- 练习模式选择 -->
+                    <div class="mb-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="practiceMode" id="basicMode" value="basic" checked>
+                                    <label class="form-check-label fw-bold" for="basicMode">
+                                        <i class="fas fa-keyboard me-2 text-primary"></i>基础模式
+                                    </label>
+                                    <div class="form-text text-muted ms-4">直接输入词汇进行发音练习</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="practiceMode" id="scenarioMode" value="scenario">
+                                    <label class="form-check-label fw-bold" for="scenarioMode">
+                                        <i class="fas fa-theater-masks me-2 text-success"></i>场景对话模式 <span class="badge bg-success ms-1">NEW</span>
+                                    </label>
+                                    <div class="form-text text-muted ms-4">AI生成情景对话，沉浸式练习</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 基础模式输入区域 -->
+                    <div id="basicModeInput">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <label for="textInput" class="form-label">请输入要练习的中文词汇:</label>
+                                <input type="text" class="form-control form-control-lg" id="textInput" 
+                                       placeholder="例如: 你好、早上好、欢迎光临" maxlength="20">
+                                <div class="form-text">支持词汇、短语和简单句子</div>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button class="btn btn-custom w-100" id="generateBtn">
+                                    <i class="fas fa-volume-up me-2"></i>
+                                    生成标准发音
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- TTS声音选择区域 -->
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label for="voiceGender" class="form-label">
+                                    <i class="fas fa-user me-1"></i>选择声音性别:
+                                </label>
+                                <select class="form-select" id="voiceGender">
+                                    <option value="female">女声 (zhimiao_emo)</option>
+                                    <option value="male">男声 (zhichu_emo)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="voiceEmotion" class="form-label">
+                                    <i class="fas fa-heart me-1"></i>选择情感风格:
+                                </label>
+                                <select class="form-select" id="voiceEmotion">
+                                    <option value="neutral">中性 (自然)</option>
+                                    <option value="happy">开心 (愉悦)</option>
+                                    <option value="sad">难过 (低沉)</option>
+                                    <option value="angry">生气 (严厉)</option>
+                                    <option value="fearful">恐惧 (紧张)</option>
+                                    <option value="surprised">惊讶 (兴奋)</option>
+                                    <option value="disgusted">厌恶 (嫌弃)</option>
+                                    <option value="arousal">兴奋 (激动)</option>
+                                    <option value="valence">愉悦 (满意)</option>
+                                    <option value="cheerful">欢快 (活泼)</option>
+                                    <option value="depressed">沮丧 (失落)</option>
+                                    <option value="irritated">烦躁 (不耐烦)</option>
+                                    <option value="envious">嫉妒 (酸涩)</option>
+                                    <option value="embarrassed">尴尬 (羞涩)</option>
+                                    <option value="serious">严肃 (正式)</option>
+                                    <option value="gentle">温柔 (亲切)</option>
+                                    <option value="newscast">播音 (标准)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-text mt-1 text-center text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            选择不同的声音性别和情感风格，体验更丰富的发音练习
+                        </div>
+                    </div>
+                    
+                    <!-- 场景对话模式输入区域 -->
+                    <div id="scenarioModeInput" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <label for="scenarioInput" class="form-label">请描述您想要练习的场景:</label>
+                                <textarea class="form-control form-control-lg" id="scenarioInput" 
+                                          placeholder="例如：妈妈教导三年级小孩学习数学、朋友之间讨论周末计划、客服接待顾客咨询、医生问诊患者等..."
+                                          rows="3" maxlength="200"></textarea>
+                                <div class="form-text">描述一个具体的对话场景，系统将为您生成个性化的角色扮演对话</div>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button class="btn btn-custom w-100" id="generateScenarioBtn">
+                                    <i class="fas fa-magic me-2"></i>
+                                    生成场景对话
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 场景对话展示区域 -->
+            <div class="step-card" id="dialogueContainer" style="display: none;">
+                <div class="step-header">
+                    <h4 class="mb-0">
+                        <i class="fas fa-theater-masks me-2"></i>
+                        <span id="scenarioTitle">场景对话</span>
+                    </h4>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="alert alert-primary mb-0">
+                                <i class="fas fa-user me-2"></i>
+                                <span class="user-role">您的角色：用户</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="alert alert-success mb-0">
+                                <i class="fas fa-robot me-2"></i>
+                                <span class="ai-role">AI角色：助手</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="dialogue-content" id="dialogueContent">
+                        <!-- 动态生成对话内容 -->
+                    </div>
+                    
+                    <div class="nav-buttons">
+                        <button class="btn btn-success" id="startDialogueBtn">
+                            <i class="fas fa-play me-2"></i>开始对话
+                        </button>
+                        <button class="btn btn-info" id="regenerateBtn">
+                            <i class="fas fa-redo me-2"></i>重新生成
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 通用JS -->
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+    
+    <!-- 页面特定JS -->
+    <script>
+        // 全局变量
+        let currentText = '';
+        let isDialogueMode = false;
+        let dialogueData = null;
+        let currentSession = null;
+        
+        // DOM元素
+        const textInput = document.getElementById('textInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const basicModeRadio = document.getElementById('basicMode');
+        const scenarioModeRadio = document.getElementById('scenarioMode');
+        const basicModeInput = document.getElementById('basicModeInput');
+        const scenarioModeInput = document.getElementById('scenarioModeInput');
+        const scenarioInput = document.getElementById('scenarioInput');
+        const generateScenarioBtn = document.getElementById('generateScenarioBtn');
+        const dialogueContainer = document.getElementById('dialogueContainer');
+        const scenarioTitle = document.getElementById('scenarioTitle');
+        const dialogueContent = document.getElementById('dialogueContent');
+        const startDialogueBtn = document.getElementById('startDialogueBtn');
+        const regenerateBtn = document.getElementById('regenerateBtn');
+        
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 首页初始化...');
+            
+            // 检查系统状态
+            checkSystemStatus();
+            
+            // 设置事件监听器
+            setupEventListeners();
+            
+            console.log('✓ 首页初始化完成');
+        });
+        
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 基础模式生成按钮
+            generateBtn.addEventListener('click', generateBasicMode);
+            
+            // 场景对话生成按钮
+            generateScenarioBtn.addEventListener('click', generateScenario);
+            
+            // 开始对话按钮
+            startDialogueBtn.addEventListener('click', startDialogue);
+            
+            // 重新生成按钮
+            regenerateBtn.addEventListener('click', regenerateScenario);
+            
+            // 模式切换
+            basicModeRadio.addEventListener('change', handleModeChange);
+            scenarioModeRadio.addEventListener('change', handleModeChange);
+            
+            // 回车键触发生成
+            textInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    generateBasicMode();
+                }
+            });
+            
+            // 场景输入回车键触发生成
+            scenarioInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    generateScenario();
+                }
+            });
+        }
+        
+        // 处理练习模式切换
+        function handleModeChange() {
+            isDialogueMode = scenarioModeRadio.checked;
+            
+            if (isDialogueMode) {
+                basicModeInput.style.display = 'none';
+                scenarioModeInput.style.display = 'block';
+                console.log('✅ 切换到场景对话模式');
+            } else {
+                basicModeInput.style.display = 'block';
+                scenarioModeInput.style.display = 'none';
+                dialogueContainer.style.display = 'none';
+                console.log('✅ 切换到基础模式');
+            }
+            
+            // 重置状态
+            resetDialogueState();
+        }
+        
+        // 重置对话状态
+        function resetDialogueState() {
+            currentSession = null;
+            dialogueData = null;
+        }
+        
+        // 基础模式生成标准发音
+        async function generateBasicMode() {
+            const text = textInput.value.trim();
+            if (!text) {
+                showAlert('请输入要练习的文本', 'warning');
+                return;
+            }
+            
+            // 获取用户选择的声音参数
+            const voiceGender = document.getElementById('voiceGender').value;
+            const voiceEmotion = document.getElementById('voiceEmotion').value;
+            
+            currentText = text;
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>生成中...';
+            
+            try {
+                // 调用TTS生成API
+                const response = await fetch('/api/tts/generate_with_timestamps', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        text: text,
+                        method: 'auto',
+                        voice_gender: voiceGender,
+                        voice_emotion: voiceEmotion
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 跳转到标准发音页面
+                    navigateTo('/standard-audio', {
+                        file_id: data.file_id,
+                        text: text,
+                        audio_url: data.audio_url,
+                        char_timestamps: JSON.stringify(data.char_timestamps || []),
+                        timestamp_method: data.timestamp_method || 'unknown',
+                        duration: data.pitch_info?.duration || 0,
+                        warning: data.warning || ''
+                    });
+                } else {
+                    showAlert(`生成失败: ${data.error}`, 'danger');
+                }
+            } catch (error) {
+                showAlert(`网络错误: ${error.message}`, 'danger');
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '<i class="fas fa-volume-up me-2"></i>生成标准发音';
+            }
+        }
+        
+        // 生成场景对话
+        async function generateScenario() {
+            const scenario = scenarioInput.value.trim();
+            
+            if (!scenario) {
+                showAlert('请输入场景描述', 'warning');
+                return;
+            }
+            
+            if (scenario.length > 200) {
+                showAlert('场景描述不能超过200个字符', 'warning');
+                return;
+            }
+            
+            generateScenarioBtn.disabled = true;
+            generateScenarioBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>生成中...';
+            
+            try {
+                console.log('开始生成场景对话:', scenario);
+                
+                const response = await fetch('/api/scenario/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ scenario: scenario })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentSession = data.session_id;
+                    dialogueData = data.dialogue_data;
+                    
+                    displayDialogue();
+                    showAlert('场景对话生成成功！', 'success');
+                    console.log('对话生成成功:', dialogueData);
+                } else {
+                    showAlert(`生成失败: ${data.error}`, 'danger');
+                    console.error('对话生成失败:', data.error);
+                }
+            } catch (error) {
+                showAlert(`网络错误: ${error.message}`, 'danger');
+                console.error('网络错误:', error);
+            } finally {
+                generateScenarioBtn.disabled = false;
+                generateScenarioBtn.innerHTML = '<i class="fas fa-magic me-2"></i>生成场景对话';
+            }
+        }
+        
+        // 显示对话内容
+        function displayDialogue() {
+            if (!dialogueData) return;
+            
+            scenarioTitle.textContent = dialogueData.scenario_title;
+            
+            // 显示角色信息
+            document.querySelector('.user-role').innerHTML = 
+                `<i class="fas fa-user me-2"></i>您的角色：${dialogueData.user_role}`;
+            document.querySelector('.ai-role').innerHTML = 
+                `<i class="fas fa-robot me-2"></i>AI角色：${dialogueData.ai_role}`;
+            
+            // 生成对话列表
+            dialogueContent.innerHTML = '';
+            dialogueData.dialogues.forEach((dialogue, index) => {
+                const dialogueItem = document.createElement('div');
+                dialogueItem.className = `dialogue-item ${dialogue.speaker}-dialogue`;
+                dialogueItem.innerHTML = `
+                    <div class="dialogue-speaker">${dialogue.speaker === 'user' ? dialogueData.user_role : dialogueData.ai_role}</div>
+                    <div class="dialogue-text">${dialogue.text}</div>
+                    <div class="dialogue-status" id="status-${dialogue.order}">
+                        ${dialogue.speaker === 'user' ? '待练习' : '待播放'}
+                    </div>
+                `;
+                dialogueContent.appendChild(dialogueItem);
+            });
+            
+            dialogueContainer.style.display = 'block';
+        }
+        
+        // 开始对话
+        function startDialogue() {
+            if (!dialogueData || !currentSession) {
+                showAlert('请先生成场景对话', 'warning');
+                return;
+            }
+            
+            // 跳转到标准发音页面，携带场景对话数据
+            navigateTo('/standard-audio', {
+                mode: 'dialogue',
+                session_id: currentSession,
+                dialogue_data: JSON.stringify(dialogueData),
+                current_order: 1
+            });
+        }
+        
+        // 重新生成场景
+        function regenerateScenario() {
+            const scenario = scenarioInput.value.trim();
+            if (!scenario) {
+                showAlert('请先输入场景描述', 'warning');
+                return;
+            }
+            
+            resetDialogueState();
+            dialogueContainer.style.display = 'none';
+            generateScenario();
+        }
+        
+        // 场景对话相关样式
+        const dialogueStyles = `
+            <style>
+            .dialogue-content {
+                max-height: 400px;
+                overflow-y: auto;
+                border: 1px solid #e9ecef;
+                border-radius: 10px;
+                padding: 15px;
+                background: #f8f9fa;
+            }
+            
+            .dialogue-item {
+                display: flex;
+                align-items: flex-start;
+                margin-bottom: 15px;
+                padding: 12px;
+                border-radius: 10px;
+                position: relative;
+                transition: all 0.3s ease;
+            }
+            
+            .dialogue-item.user-dialogue {
+                background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+                border-left: 4px solid #2196f3;
+            }
+            
+            .dialogue-item.ai-dialogue {
+                background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+                border-left: 4px solid #4caf50;
+            }
+            
+            .dialogue-speaker {
+                font-weight: bold;
+                font-size: 14px;
+                color: #666;
+                min-width: 80px;
+                margin-right: 15px;
+            }
+            
+            .dialogue-text {
+                flex: 1;
+                font-size: 16px;
+                line-height: 1.5;
+                color: #333;
+            }
+            
+            .dialogue-status {
+                font-size: 12px;
+                padding: 4px 8px;
+                border-radius: 12px;
+                background: #f0f0f0;
+                color: #666;
+                min-width: 60px;
+                text-align: center;
+            }
+            
+            .dialogue-status.active {
+                background: #2196f3;
+                color: white;
+                animation: pulse 1.5s infinite;
+            }
+            
+            .dialogue-status.playing {
+                background: #ff9800;
+                color: white;
+            }
+            
+            .dialogue-status.completed {
+                background: #4caf50;
+                color: white;
+            }
+            
+            @keyframes pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.7; }
+                100% { opacity: 1; }
+            }
+            </style>
+        `;
+        
+        // 添加样式到页面
+        document.head.insertAdjacentHTML('beforeend', dialogueStyles);
+    </script>
+</body>
+</html>

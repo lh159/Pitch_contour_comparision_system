@@ -123,7 +123,7 @@ BAIDU_VOICE_PER=0
 # === 系统配置 ===
 SECRET_KEY=your_secret_key_here_change_in_production
 DEBUG=true
-PORT=5000
+PORT=9999
 
 # === 使用说明 ===
 # 1. 推荐使用百度TTS，性价比高，免费额度大
@@ -207,7 +207,7 @@ PORT=5000
         print("📝 下一步:")
         print("   1. 根据需要修改 .env 文件中的配置")
         print("   2. 运行 python web_interface.py 启动系统")
-        print("   3. 在浏览器中访问 http://localhost:5000")
+        print("   3. 在浏览器中访问 http://localhost:9999")
         
         return True
 
