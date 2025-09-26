@@ -1,35 +1,71 @@
 # 音高曲线比对系统依赖包
+
+# Python基础库
+setuptools>=60.0.0
+wheel>=0.37.0
+pip>=21.0.0
+
 # 音频处理核心库
 parselmouth>=0.4.2
 numpy>=1.21.0
 matplotlib>=3.5.0
 scipy>=1.7.0
 librosa>=0.8.1
+soundfile>=0.10.3.post1  # librosa音频文件读取依赖
 
 # 音频格式处理
 pydub>=0.25.1
+audioread>=2.1.9         # 音频格式支持
+resampy>=0.2.2           # 音频重采样
 
 # 机器学习和数据分析
 scikit-learn>=1.0.0
 dtaidistance>=2.3.4
+pandas>=1.3.0            # 数据处理
+seaborn>=0.11.0          # 数据可视化
 
 # Web框架
 flask>=2.0.0
 flask-cors>=3.0.10
 flask-socketio>=5.3.0
+eventlet>=0.33.0         # SocketIO异步支持
 redis>=4.5.0
+gunicorn>=20.1.0         # 生产环境WSGI服务器
+werkzeug>=2.0.0          # Flask依赖
+
+# HTTP和网络
+requests>=2.25.0
+urllib3>=1.26.0
+certifi>=2021.10.8
+
+# 环境配置
+python-dotenv>=0.19.0
+configparser>=5.2.0
 
 # TTS语音合成
-edge-tts>=6.1.0     # 免费的Edge TTS (备用)
-pyttsx3>=2.90       # 离线TTS (备用)
-
-# 其他工具库
-requests>=2.25.0
-python-dotenv>=0.19.0
+edge-tts>=6.1.0          # 免费的Edge TTS (备用)
+pyttsx3>=2.90            # 离线TTS (备用)
 
 # 阿里达摩院语音处理
 dashscope>=1.0.0
-funasr>=1.0.0
+funasr>=1.0.0            # 可能安装失败，但不影响核心功能
 
 # 文本处理和分词
 jieba>=0.42.1
+pypinyin>=0.44.0         # 中文拼音转换
+
+# 系统工具
+psutil>=5.8.0            # 系统资源监控
+pathlib2>=2.3.6         # 路径处理 (Python<3.4兼容)
+
+# 日志和调试
+colorlog>=6.6.0          # 彩色日志输出
+
+# 可选依赖 (可能在某些系统上安装失败)
+# torch>=1.10.0          # 深度学习框架 (可选)
+# torchaudio>=0.10.0     # 音频深度学习 (可选)
+
+# 开发和测试工具 (可选)
+# pytest>=6.2.0         # 单元测试
+# black>=22.0.0          # 代码格式化
+# flake8>=4.0.0          # 代码检查
