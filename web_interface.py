@@ -1690,6 +1690,7 @@ if __name__ == '__main__':
                     port=Config.PORT,
                     debug=Config.DEBUG,
                     use_reloader=False,  # WebSocket模式下禁用重载器
+                    allow_unsafe_werkzeug=True,  # 生产环境允许Werkzeug
                     keyfile=ssl_key_path,
                     certfile=ssl_cert_path
                 )
@@ -1701,7 +1702,8 @@ if __name__ == '__main__':
                     host='0.0.0.0',
                     port=Config.PORT,
                     debug=Config.DEBUG,
-                    use_reloader=False  # WebSocket模式下禁用重载器
+                    use_reloader=False,  # WebSocket模式下禁用重载器
+                    allow_unsafe_werkzeug=True  # 生产环境允许Werkzeug
                 )
         else:
             print("⚠ 使用标准HTTP模式启动服务器")
