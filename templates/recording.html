@@ -672,7 +672,10 @@
                         // 显示音频播放器
                         if (result.audioUrl) {
                             console.log('设置用户音频播放器URL:', result.audioUrl);
-                            userAudio.src = result.audioUrl;
+                            // 添加时间戳防止缓存
+                            const audioUrlWithTimestamp = result.audioUrl + '?t=' + Date.now();
+                            userAudio.src = audioUrlWithTimestamp;
+                            userAudio.load(); // 强制重新加载音频
                             userAudio.style.display = 'block';
                             
                             // 更新波形容器显示录音完成状态
@@ -740,7 +743,10 @@
                 if (data.success) {
                     userFileId = data.file_id;
                     console.log('文件上传成功，userFileId设置为:', userFileId);
-                    userAudio.src = `/upload/${data.filename}`;
+                    // 添加时间戳防止缓存
+                    const audioUrlWithTimestamp = `/uploads/${data.filename}?t=${Date.now()}`;
+                    userAudio.src = audioUrlWithTimestamp;
+                    userAudio.load(); // 强制重新加载音频
                     userAudio.style.display = 'block';
                     compareBtn.style.display = 'inline-block';
                     showAlert('音频文件上传成功！', 'success');

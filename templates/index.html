@@ -1928,6 +1928,7 @@
                     const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
                     const audioUrl = URL.createObjectURL(audioBlob);
                     userAudio.src = audioUrl;
+                    userAudio.load(); // 强制重新加载音频
                     userAudio.style.display = 'block';
                     
                     // 停止录音指导
@@ -2156,7 +2157,10 @@
                 if (data.success) {
                     userFileId = data.file_id;
                     console.log('文件上传成功，userFileId设置为:', userFileId);
-                    userAudio.src = `/upload/${data.filename}`;
+                    // 添加时间戳防止缓存
+                    const audioUrlWithTimestamp = `/uploads/${data.filename}?t=${Date.now()}`;
+                    userAudio.src = audioUrlWithTimestamp;
+                    userAudio.load(); // 强制重新加载音频
                     userAudio.style.display = 'block';
                     compareBtn.style.display = 'inline-block';
                     showAlert('音频文件上传成功！', 'success');

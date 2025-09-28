@@ -365,10 +365,10 @@ def stop_recording():
                     'error': '没有录音数据'
                 }), 400
             
-            # 保存音频文件
-            file_id = str(uuid.uuid4())
-            wav_filename = f"recording_{file_id}.wav"
-            wav_filepath = os.path.join(Config.UPLOAD_FOLDER, wav_filename)
+        # 保存音频文件
+        file_id = str(uuid.uuid4())
+        wav_filename = f"user_{file_id}.wav"  # 使用与upload_audio一致的命名格式
+        wav_filepath = os.path.join(Config.UPLOAD_FOLDER, wav_filename)
             
             # 将音频数据保存为WAV文件
             with wave.open(wav_filepath, 'wb') as wav_file:
