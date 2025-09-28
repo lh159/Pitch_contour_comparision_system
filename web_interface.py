@@ -580,10 +580,39 @@ def upload_user_audio():
                 if result.returncode != 0:
                     print(f"ffmpeg转换失败: {result.stderr}")
                     print(f"尝试的命令: {' '.join(ffmpeg_cmd)}")
-                    # 如果转换失败，尝试直接使用原文件
-                    import shutil
-                    shutil.move(temp_filepath, wav_filepath)
-                    print("使用原文件作为备选方案")
+                    
+                    # 🔧 对于WebM格式，尝试更宽松的转换参数
+                    if actual_format == 'webm':
+                        print("🔧 尝试WebM宽松转换参数...")
+                        fallback_cmd = [
+                            'ffmpeg', '-i', temp_filepath, 
+                            '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
+                            '-vn',  # 忽略视频流
+                            '-y', wav_filepath
+                        ]
+                        fallback_result = subprocess.run(fallback_cmd, capture_output=True, text=True, timeout=30)
+                        
+                        if fallback_result.returncode == 0:
+                            print("✓ WebM宽松转换成功")
+                            if os.path.exists(temp_filepath):
+                                os.remove(temp_filepath)
+                        else:
+                            print(f"WebM宽松转换也失败: {fallback_result.stderr}")
+                            # 返回错误而不是使用原始WebM文件
+                            if os.path.exists(temp_filepath):
+                                os.remove(temp_filepath)
+                            return jsonify({
+                                'success': False,
+                                'error': f'音频格式转换失败，无法处理该音频文件。检测到格式: {actual_format}'
+                            }), 400
+                    else:
+                        # 对于其他格式，如果转换失败则返回错误
+                        if os.path.exists(temp_filepath):
+                            os.remove(temp_filepath)
+                        return jsonify({
+                            'success': False,
+                            'error': f'音频格式转换失败: {result.stderr}'
+                        }), 400
                 else:
                     print(f"音频格式转换成功: {temp_filename} -> {wav_filename}")
                     print(f"转换后文件大小: {os.path.getsize(wav_filepath)} bytes")
@@ -593,11 +622,20 @@ def upload_user_audio():
                     
         except Exception as e:
             print(f"音频转换过程出错: {e}")
-            # 转换失败时使用原文件
-            import shutil
-            if os.path.exists(temp_filepath):
-                shutil.move(temp_filepath, wav_filepath)
-                print("转换异常，使用原文件")
+            # 🔧 对于WebM等需要转换的格式，转换异常时返回错误
+            if actual_format in ['webm', 'mp4', 'mp3']:
+                if os.path.exists(temp_filepath):
+                    os.remove(temp_filepath)
+                return jsonify({
+                    'success': False,
+                    'error': f'音频转换异常: {str(e)}。检测到格式: {actual_format}'
+                }), 400
+            else:
+                # 对于WAV或其他格式，尝试使用原文件
+                import shutil
+                if os.path.exists(temp_filepath):
+                    shutil.move(temp_filepath, wav_filepath)
+                    print("转换异常，使用原文件")
         
         # 使用转换后的WAV文件路径
         filepath = wav_filepath
