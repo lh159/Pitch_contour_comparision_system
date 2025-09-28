@@ -234,22 +234,23 @@ class PitchExtractor:
                 temp_wav_path = audio_path.replace('.wav', '_temp_converted.wav')
                 
                 try:
-                    # 使用ffmpeg转换
+                    # 使用ffmpeg转换（使用绝对路径）
+                    ffmpeg_path = '/usr/bin/ffmpeg'
                     if actual_format == 'webm':
                         ffmpeg_cmd = [
-                            'ffmpeg', '-f', 'webm', '-i', audio_path,
+                            ffmpeg_path, '-f', 'webm', '-i', audio_path,
                             '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
                             '-y', temp_wav_path
                         ]
                     elif actual_format == 'mp4':
                         ffmpeg_cmd = [
-                            'ffmpeg', '-f', 'mp4', '-i', audio_path,
+                            ffmpeg_path, '-f', 'mp4', '-i', audio_path,
                             '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
                             '-y', temp_wav_path
                         ]
                     elif actual_format == 'mp3':
                         ffmpeg_cmd = [
-                            'ffmpeg', '-f', 'mp3', '-i', audio_path,
+                            ffmpeg_path, '-f', 'mp3', '-i', audio_path,
                             '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
                             '-y', temp_wav_path
                         ]

@@ -26,7 +26,7 @@ def test_compare_api():
     # 测试数据
     test_data = {
         "standard_file_id": "3b73bfaa-b06a-4910-b16e-ca55a0388626",  # 从temp目录中选择一个存在的文件
-        "user_file_id": "71c15bef-8cd2-47d1-b4e2-c35154eff71e",     # 从uploads目录中选择一个存在的文件
+        "user_file_id": "0bb4fbc4-289c-47ac-981b-f2f900ef40c7",     # 尝试不同的用户音频文件
         "text": "今天天气很好"
     }
     
