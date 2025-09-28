@@ -449,6 +449,9 @@
                 recordingAdapter = new RecordingAPIAdapter();
                 await recordingAdapter.detectRecordingSupport();
                 
+                // 设置全局引用，供录音指导组件使用
+                window.recordingAdapter = recordingAdapter;
+                
                 const mode = recordingAdapter.getMode();
                 console.log(`🎙️ 录音模式: ${mode === 'browser' ? '浏览器录音' : '服务器录音'}`);
                 
@@ -585,10 +588,21 @@
                 const guideStarted = startRecordingGuide();
                 if (!guideStarted) {
                     showAlert('缺少时间戳数据，将以基础录音方式进行，录音完成后可进行音高比对', 'info');
+                    // 没有指导时，立即开始录音
+                    var result = await recordingAdapter.startRecording();
+                } else {
+                    // 有指导时，标记延迟录音启动，等待准备阶段结束
+                    console.log('🕐 检测到录音指导，将延迟录音启动至准备阶段结束');
+                    if (recordingGuide) {
+                        recordingGuide.delayedRecordingStart = true;
+                    }
+                    // 暂时返回成功状态，实际录音将在准备阶段结束后启动
+                    var result = {
+                        success: true,
+                        mode: recordingAdapter.getMode(),
+                        message: '录音指导已开始，录音将在准备阶段结束后自动启动'
+                    };
                 }
-                
-                // 使用录音适配器开始录音
-                const result = await recordingAdapter.startRecording();
                 
                 if (result.success) {
                     recordBtn.disabled = true;

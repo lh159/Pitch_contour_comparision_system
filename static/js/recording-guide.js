@@ -612,6 +612,17 @@ class RecordingGuide extends RealtimeTextSync {
         
         this.isRecording = true;
         this.recordingStartTime = Date.now();
+        
+        // 🔧 通知外部系统现在开始真正的录音（解决时序问题）
+        if (window.recordingAdapter && this.delayedRecordingStart) {
+            console.log('🎙️ 准备阶段结束，现在开始真正的录音');
+            window.recordingAdapter.startRecording().then(() => {
+                console.log('✅ 延迟录音启动成功');
+            }).catch(error => {
+                console.error('❌ 延迟录音启动失败:', error);
+            });
+            this.delayedRecordingStart = false;
+        }
         this.currentCharIndex = -1; // 重置字符索引
         
         // 初始显示第一个字符为即将朗读状态
