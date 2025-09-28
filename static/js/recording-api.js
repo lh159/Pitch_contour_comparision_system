@@ -92,7 +92,14 @@ class RecordingAPIAdapter {
             }
             
             if (options.mimeType) {
-                options.audioBitsPerSecond = 128000;
+                // 🔧 针对手机录音优化音质参数
+                if (options.mimeType.includes('opus')) {
+                    options.audioBitsPerSecond = 256000;  // Opus格式使用更高比特率
+                } else if (options.mimeType.includes('webm')) {
+                    options.audioBitsPerSecond = 192000;  // WebM格式
+                } else {
+                    options.audioBitsPerSecond = 128000;  // 其他格式
+                }
             }
             
             this.mediaRecorder = new MediaRecorder(stream, options);

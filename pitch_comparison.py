@@ -607,12 +607,18 @@ class PitchComparator:
         print("提取用户发音音高...")
         user_pitch = self.extractor.extract_pitch(actual_user_audio)
         
-        # 检查提取结果
-        if standard_pitch['valid_ratio'] < 0.1:
+        # 检查提取结果 - 放宽手机录音的音高检测要求
+        if standard_pitch['valid_ratio'] < 0.05:
             return {'error': '标准发音音高提取失败，可能是音频质量问题'}
         
-        if user_pitch['valid_ratio'] < 0.1:
-            return {'error': '用户发音音高提取失败，请检查录音质量'}
+        # 🔧 手机录音音高检测更宽松的阈值
+        user_valid_ratio = user_pitch['valid_ratio']
+        if user_valid_ratio < 0.02:  # 从0.1降低到0.02
+            return {'error': f'用户发音音高提取失败，请检查录音质量（有效音高比例：{user_valid_ratio:.1%}）'}
+        
+        # 如果音高提取质量较低，给出友好提示但继续处理
+        if user_valid_ratio < 0.05:
+            print(f"⚠️ 用户录音音高质量较低（{user_valid_ratio:.1%}），但继续处理")
         
         # 3. 对齐音高曲线 - 使用增强对齐或标准对齐
         if enhanced_alignment_result and enhanced_alignment_result['success']:

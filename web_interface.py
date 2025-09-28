@@ -493,15 +493,17 @@ def upload_user_audio():
         wav_filename = f"user_{file_id}.wav"
         wav_filepath = os.path.join(Config.UPLOAD_FOLDER, wav_filename)
         
-        # 使用ffmpeg转换为WAV格式
+        # 使用ffmpeg转换为WAV格式，优化手机录音处理
         try:
             import subprocess
+            # 🔧 优化的ffmpeg参数，适合手机录音转换
             result = subprocess.run([
                 'ffmpeg', '-i', temp_filepath, 
-                '-acodec', 'pcm_s16le', 
-                '-ar', '16000', 
-                '-ac', '1',  # 单声道
-                '-y',  # 覆盖输出文件
+                '-acodec', 'pcm_s16le',     # 16位PCM编码
+                '-ar', '22050',             # 提高采样率到22kHz，保留更多音频细节
+                '-ac', '1',                 # 单声道
+                '-af', 'highpass=f=80,lowpass=f=8000,volume=2.0',  # 音频滤波和增益
+                '-y',                       # 覆盖输出文件
                 wav_filepath
             ], capture_output=True, text=True, timeout=30)
             
@@ -534,6 +536,18 @@ def upload_user_audio():
         pitch_values = pitch_data.get('pitch_values', [])
         valid_pitches = [p for p in pitch_values if p > 0]
         mean_pitch = np.mean(valid_pitches) if valid_pitches else 0.0
+        
+        # 🔧 添加录音质量诊断信息
+        audio_diagnostics = {
+            'file_size': os.path.getsize(filepath) if os.path.exists(filepath) else 0,
+            'duration': pitch_data.get('duration', 0),
+            'valid_ratio': pitch_data.get('valid_ratio', 0),
+            'total_pitch_points': len(pitch_values),
+            'valid_pitch_points': len(valid_pitches),
+            'conversion_success': result.returncode == 0 if 'result' in locals() else True
+        }
+        
+        print(f"📊 录音质量诊断: {audio_diagnostics}")
         
         return safe_json_serialize({
             'success': True,
