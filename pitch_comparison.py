@@ -121,6 +121,89 @@ class PitchExtractor:
             print(f"音频质量增强失败: {e}")
             return sound
     
+    def _load_audio_with_format_detection(self, audio_path: str) -> 'parselmouth.Sound':
+        """
+        带格式检测的音频加载，处理WebM等格式问题
+        :param audio_path: 音频文件路径
+        :return: parselmouth Sound对象
+        """
+        import os
+        import subprocess
+        
+        try:
+            # 首先尝试直接加载
+            return parselmouth.Sound(audio_path)
+        except Exception as e:
+            print(f"直接加载失败: {e}，尝试格式检测和转换...")
+            
+            # 检查文件头确定实际格式
+            actual_format = None
+            try:
+                with open(audio_path, 'rb') as f:
+                    header = f.read(16)
+                    if header[:4] == b'\x1a\x45\xdf\xa3':  # WebM/Matroska文件头
+                        actual_format = 'webm'
+                        print("⚠️ 检测到WebM格式文件，但扩展名可能不正确")
+                    elif header[:4] == b'ftyp':  # MP4文件头
+                        actual_format = 'mp4'
+                    elif header[:2] == b'\xff\xfb' or header[:2] == b'\xff\xf3':  # MP3文件头
+                        actual_format = 'mp3'
+            except Exception as header_e:
+                print(f"文件头检测失败: {header_e}")
+            
+            if actual_format:
+                # 生成临时转换文件
+                temp_wav_path = audio_path.replace('.wav', '_temp_converted.wav')
+                
+                try:
+                    # 使用ffmpeg转换
+                    if actual_format == 'webm':
+                        ffmpeg_cmd = [
+                            'ffmpeg', '-f', 'webm', '-i', audio_path,
+                            '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
+                            '-y', temp_wav_path
+                        ]
+                    elif actual_format == 'mp4':
+                        ffmpeg_cmd = [
+                            'ffmpeg', '-f', 'mp4', '-i', audio_path,
+                            '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
+                            '-y', temp_wav_path
+                        ]
+                    elif actual_format == 'mp3':
+                        ffmpeg_cmd = [
+                            'ffmpeg', '-f', 'mp3', '-i', audio_path,
+                            '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
+                            '-y', temp_wav_path
+                        ]
+                    
+                    result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=30)
+                    
+                    if result.returncode == 0 and os.path.exists(temp_wav_path):
+                        print(f"✅ 格式转换成功: {actual_format} -> WAV")
+                        try:
+                            # 加载转换后的文件
+                            sound = parselmouth.Sound(temp_wav_path)
+                            
+                            # 清理临时文件
+                            if os.path.exists(temp_wav_path):
+                                os.remove(temp_wav_path)
+                            
+                            return sound
+                        except Exception as load_e:
+                            print(f"转换后文件加载失败: {load_e}")
+                            if os.path.exists(temp_wav_path):
+                                os.remove(temp_wav_path)
+                    else:
+                        print(f"ffmpeg转换失败: {result.stderr}")
+                        
+                except subprocess.TimeoutExpired:
+                    print("ffmpeg转换超时")
+                except Exception as conv_e:
+                    print(f"转换过程出错: {conv_e}")
+            
+            # 如果所有转换尝试都失败，重新抛出原始异常
+            raise e
+    
     def extract_pitch(self, audio_path: str) -> dict:
         """
         从音频文件中提取音高曲线
@@ -130,7 +213,8 @@ class PitchExtractor:
         try:
             # 加载音频
             if isinstance(audio_path, str):
-                snd = parselmouth.Sound(audio_path)
+                # 🔧 检查文件格式，处理WebM伪装成WAV的问题
+                snd = self._load_audio_with_format_detection(audio_path)
             else:
                 # 如果是Sound对象直接使用
                 snd = audio_path

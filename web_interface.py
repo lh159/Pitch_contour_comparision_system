@@ -495,7 +495,25 @@ def upload_user_audio():
         
         # 获取实际MIME类型
         mime_type = request.form.get('mime_type', 'audio/wav')
-        print(f"收到音频文件: {temp_filename}, MIME类型: {mime_type}, 大小: {os.path.getsize(temp_filepath)} bytes")
+        
+        # 🔧 通过文件头检测实际格式，解决WebM伪装成WAV的问题
+        actual_format = None
+        try:
+            with open(temp_filepath, 'rb') as f:
+                header = f.read(16)
+                if header[:4] == b'\x1a\x45\xdf\xa3':  # WebM/Matroska文件头
+                    actual_format = 'webm'
+                    print("⚠️ 检测到WebM格式文件，但扩展名为.wav")
+                elif header[:4] == b'RIFF' and header[8:12] == b'WAVE':  # WAV文件头
+                    actual_format = 'wav'
+                elif header[:4] == b'ftyp':  # MP4文件头
+                    actual_format = 'mp4'
+                elif header[:2] == b'\xff\xfb' or header[:2] == b'\xff\xf3':  # MP3文件头
+                    actual_format = 'mp3'
+        except Exception as e:
+            print(f"文件头检测失败: {e}")
+        
+        print(f"收到音频文件: {temp_filename}, 声明MIME: {mime_type}, 实际格式: {actual_format}, 大小: {os.path.getsize(temp_filepath)} bytes")
         
         # 使用ffmpeg转换为WAV格式，优化手机录音处理
         try:
@@ -508,21 +526,9 @@ def upload_user_audio():
                 import shutil
                 shutil.move(temp_filepath, wav_filepath)
             else:
-                # 🔧 针对不同格式优化转换参数
-                ffmpeg_cmd = [
-                    'ffmpeg', '-i', temp_filepath, 
-                    '-acodec', 'pcm_s16le',     # 16位PCM编码
-                    '-ar', '16000',             # 16kHz采样率，适合语音识别
-                    '-ac', '1',                 # 单声道
-                    '-af', 'highpass=f=80,lowpass=f=8000,volume=1.5',  # 音频滤波和适度增益
-                    '-y',                       # 覆盖输出文件
-                    wav_filepath
-                ]
-                
-                # 对WebM格式添加特殊处理
-                if 'webm' in mime_type.lower():
-                    print("检测到WebM格式，使用优化参数")
-                    # 在输入文件参数前添加格式指定
+                # 🔧 根据实际检测的格式优化转换参数
+                if actual_format == 'webm' or 'webm' in mime_type.lower():
+                    print("🔧 使用WebM格式转换参数")
                     ffmpeg_cmd = [
                         'ffmpeg', '-f', 'webm', '-i', temp_filepath, 
                         '-acodec', 'pcm_s16le',     # 16位PCM编码
@@ -531,6 +537,38 @@ def upload_user_audio():
                         '-af', 'highpass=f=80,lowpass=f=8000,volume=1.5',  # 音频滤波和适度增益
                         '-y',                       # 覆盖输出文件
                         wav_filepath
+                    ]
+                elif actual_format == 'mp4':
+                    print("🔧 使用MP4格式转换参数")
+                    ffmpeg_cmd = [
+                        'ffmpeg', '-f', 'mp4', '-i', temp_filepath, 
+                        '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
+                        '-af', 'highpass=f=80,lowpass=f=8000,volume=1.5',
+                        '-y', wav_filepath
+                    ]
+                elif actual_format == 'mp3':
+                    print("🔧 使用MP3格式转换参数")
+                    ffmpeg_cmd = [
+                        'ffmpeg', '-f', 'mp3', '-i', temp_filepath, 
+                        '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
+                        '-af', 'highpass=f=80,lowpass=f=8000,volume=1.5',
+                        '-y', wav_filepath
+                    ]
+                elif actual_format == 'wav':
+                    print("🔧 使用WAV格式转换参数")
+                    ffmpeg_cmd = [
+                        'ffmpeg', '-i', temp_filepath, 
+                        '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
+                        '-af', 'highpass=f=80,lowpass=f=8000,volume=1.5',
+                        '-y', wav_filepath
+                    ]
+                else:
+                    print("🔧 使用通用格式转换参数")
+                    ffmpeg_cmd = [
+                        'ffmpeg', '-i', temp_filepath, 
+                        '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1',
+                        '-af', 'highpass=f=80,lowpass=f=8000,volume=1.5',
+                        '-y', wav_filepath
                     ]
                 
                 result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=30)
