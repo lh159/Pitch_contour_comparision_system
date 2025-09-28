@@ -61,14 +61,31 @@ class RecordingAPIAdapter {
      * 停止录音
      */
     async stopRecording() {
+        console.log(`🎙️ 尝试停止录音，当前状态: ${this.isRecording}, 模式: ${this.mode}`);
+        
+        // 🔧 更宽松的状态检查，允许在某些异常情况下强制停止
         if (!this.isRecording) {
-            throw new Error('没有正在进行的录音');
+            console.warn('⚠️ 没有正在进行的录音，但继续尝试清理状态');
+            // 不直接抛出错误，而是尝试清理状态
+            this.cleanup();
+            return {
+                success: false,
+                message: '没有正在进行的录音，已清理状态',
+                mode: this.mode
+            };
         }
         
-        if (this.mode === 'browser') {
-            return await this.stopBrowserRecording();
-        } else {
-            return await this.stopServerRecording();
+        try {
+            if (this.mode === 'browser') {
+                return await this.stopBrowserRecording();
+            } else {
+                return await this.stopServerRecording();
+            }
+        } catch (error) {
+            console.error('停止录音时出错:', error);
+            // 确保状态被清理
+            this.cleanup();
+            throw error;
         }
     }
     
@@ -144,6 +161,7 @@ class RecordingAPIAdapter {
             }
             
             this.mediaRecorder.onstop = async () => {
+                console.log('🎙️ MediaRecorder停止事件触发');
                 this.isRecording = false;
                 
                 // 停止所有音频轨道
@@ -156,12 +174,17 @@ class RecordingAPIAdapter {
                     type: this.mediaRecorder.mimeType 
                 });
                 
+                console.log(`📦 创建音频Blob: ${audioBlob.size} bytes, 类型: ${audioBlob.type}`);
+                
                 try {
                     // 上传录音
                     const result = await this.uploadRecording(audioBlob);
                     console.log('🎙️ 浏览器录音完成并上传');
                     resolve(result);
                 } catch (error) {
+                    console.error('📤 上传录音失败:', error);
+                    // 确保状态被重置
+                    this.isRecording = false;
                     reject(error);
                 }
             };
@@ -349,14 +372,40 @@ class RecordingAPIAdapter {
      * 清理资源
      */
     cleanup() {
-        if (this.mediaRecorder && this.mediaRecorder.stream) {
-            this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        console.log('🧹 清理录音状态和资源');
+        
+        // 重置录音状态
+        this.isRecording = false;
+        
+        // 清理浏览器录音资源
+        if (this.mediaRecorder) {
+            if (this.mediaRecorder.state === 'recording') {
+                try {
+                    this.mediaRecorder.stop();
+                } catch (e) {
+                    console.warn('停止MediaRecorder时出错:', e);
+                }
+            }
+            
+            // 停止所有音频轨道
+            if (this.mediaRecorder.stream) {
+                this.mediaRecorder.stream.getTracks().forEach(track => {
+                    try {
+                        track.stop();
+                    } catch (e) {
+                        console.warn('停止音频轨道时出错:', e);
+                    }
+                });
+            }
+            
+            this.mediaRecorder = null;
         }
         
-        this.mediaRecorder = null;
+        // 清理音频数据
         this.audioChunks = [];
-        this.isRecording = false;
         this.session_id = null;
+        
+        console.log('✅ 录音状态和资源已清理');
     }
 }
 

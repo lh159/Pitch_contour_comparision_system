@@ -524,9 +524,14 @@ def upload_user_audio():
             import subprocess
             
             # 检查ffmpeg是否可用
-            ffmpeg_check = subprocess.run(['which', 'ffmpeg'], capture_output=True)
-            if ffmpeg_check.returncode != 0:
-                print("警告: ffmpeg未安装，尝试直接处理音频文件")
+            try:
+                ffmpeg_check = subprocess.run(['ffmpeg', '-version'], capture_output=True, timeout=5)
+                ffmpeg_available = ffmpeg_check.returncode == 0
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                ffmpeg_available = False
+            
+            if not ffmpeg_available:
+                print("警告: ffmpeg未安装或不可用，尝试直接处理音频文件")
                 import shutil
                 shutil.move(temp_filepath, wav_filepath)
             else:
