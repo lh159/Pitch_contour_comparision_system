@@ -648,17 +648,33 @@ def compare_audio():
         # 详细分析
         detailed_analysis = analyzer.analyze_pitch_details(comparison_result)
         
-        # 生成可视化图表
-        chart_filename = f"comparison_{user_file_id}_{int(time.time())}.png"
-        chart_path = os.path.join(Config.OUTPUT_FOLDER, chart_filename)
+        # 🎯 生成两个可视化图表
+        timestamp = int(time.time())
+        
+        # 1. 音高曲线对比图
+        pitch_chart_filename = f"pitch_comparison_{user_file_id}_{timestamp}.png"
+        pitch_chart_path = os.path.join(Config.OUTPUT_FOLDER, pitch_chart_filename)
         
         # 强制使用桌面端完整布局尺寸，传递TTS音频路径
         standard_audio_path = comparison_result.get('processed_audio_paths', {}).get('standard')
-        chart_success = visualizer.plot_pitch_comparison(
-            comparison_result, score_result, chart_path, 
+        pitch_chart_success = visualizer.plot_pitch_comparison(
+            comparison_result, score_result, pitch_chart_path, 
             fig_size=(18, 12), dpi=150, input_text=text,
             standard_audio_path=standard_audio_path  # 🎯 传递TTS音频路径
         )
+        
+        # 2. 波形与音高分析图
+        waveform_chart_filename = f"waveform_analysis_{user_file_id}_{timestamp}.png"
+        waveform_chart_path = os.path.join(Config.OUTPUT_FOLDER, waveform_chart_filename)
+        waveform_chart_success = False
+        
+        try:
+            from audio_plot import plot_waveform_and_pitch
+            plot_waveform_and_pitch(user_path, waveform_chart_path, fig_size=(16, 8), dpi=150)
+            waveform_chart_success = True
+            print(f"✓ 波形分析图生成成功: {waveform_chart_path}")
+        except Exception as e:
+            print(f"⚠️ 波形分析图生成失败: {e}")
         
         # 准备返回数据，使用安全序列化
         result = {
@@ -667,7 +683,8 @@ def compare_audio():
             'analysis': safe_json_serialize(detailed_analysis),
             'text': text,
             'timestamp': datetime.now().isoformat(),
-            'chart_url': url_for('serve_output_file', filename=chart_filename) if chart_success else None
+            'chart_url': url_for('serve_output_file', filename=pitch_chart_filename) if pitch_chart_success else None,
+            'waveform_chart_url': url_for('serve_output_file', filename=waveform_chart_filename) if waveform_chart_success else None
         }
         
         return jsonify(result)

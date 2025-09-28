@@ -568,19 +568,19 @@ class PitchVisualization:
         self._set_text_with_font(ax, 'ylabel', '基频 (Hz)', fontsize=14, fontweight='bold')  
         self._set_text_with_font(ax, 'title', '📊 音高曲线对比 - 实时差异分析', fontsize=16, fontweight='bold', pad=20)
         
-        # 美化图例
-        legend = ax.legend(fontsize=12, loc='upper right', 
+        # 美化图例（🔧 增大字体适配移动端）
+        legend = ax.legend(fontsize=16, loc='upper right',  # 🎯 12->16
                           frameon=True, fancybox=True, shadow=True,
-                          prop=self._get_font_properties(12))
+                          prop=self._get_font_properties(16))  # 🎯 12->16
         legend.get_frame().set_facecolor('white')
         legend.get_frame().set_alpha(0.9)
         
         ax.grid(True, alpha=0.3, linestyle='--')
         ax.set_facecolor('#fafafa')
         
-        # 设置坐标轴刻度字体
+        # 设置坐标轴刻度字体（🔧 增大字体适配移动端）
         for label in ax.get_xticklabels() + ax.get_yticklabels():
-            label.set_fontproperties(self._get_font_properties(10))
+            label.set_fontproperties(self._get_font_properties(14))  # 🎯 10->14
         
         # 设置y轴范围
         all_pitch = np.concatenate([standard_pitch[~np.isnan(standard_pitch)], 
@@ -1221,16 +1221,16 @@ class PitchVisualization:
                         segment_pitch = pitch_values[start_idx:end_idx]
                         
                         ax.plot(segment_times, segment_pitch, 'o-', color=color, 
-                               markersize=3, linewidth=2, alpha=0.8)
+                               markersize=5, linewidth=3, alpha=0.8)  # 🎯 增大标记点和线条
             else:
                 # 使用默认颜色绘制整条曲线
                 ax.plot(times, pitch_values, 'o-', color=self.colors['standard'], 
-                       markersize=3, linewidth=2, alpha=0.8)
+                       markersize=5, linewidth=3, alpha=0.8)  # 🎯 增大标记点和线条
             
-            # 设置图表属性 - 使用正确的中文字体
-            self._set_text_with_font(ax, 'xlabel', '时间 (秒)', fontsize=12)
-            self._set_text_with_font(ax, 'ylabel', '基频 (Hz)', fontsize=12)
-            self._set_text_with_font(ax, 'title', title, fontsize=16, fontweight='bold')
+            # 设置图表属性 - 使用正确的中文字体（🔧 增大字体适配移动端）
+            self._set_text_with_font(ax, 'xlabel', '时间 (秒)', fontsize=16)  # 🎯 12->16
+            self._set_text_with_font(ax, 'ylabel', '基频 (Hz)', fontsize=16)  # 🎯 12->16
+            self._set_text_with_font(ax, 'title', title, fontsize=20, fontweight='bold')  # 🎯 16->20
             ax.grid(True, alpha=0.3)
             
             # 设置y轴范围
@@ -1704,14 +1704,14 @@ class PitchVisualization:
         # 设置背景
         ax.set_facecolor(self.colors['background'])
         
-        # 🎯 绘制标准发音曲线 - 使用更粗的线条和优雅的样式
+        # 🎯 绘制标准发音曲线 - 使用更粗的线条和优雅的样式（🔧 增大线条适配移动端）
         line_std = ax.plot(times, standard_pitch, color=self.colors['standard'], 
-                          linewidth=4, label='● 标准发音 (TTS)', alpha=0.9, 
+                          linewidth=6, label='● 标准发音 (TTS)', alpha=0.9,  # 🎯 4->6
                           linestyle='-', marker='none', zorder=3)
         
         # 🎤 绘制用户发音曲线
         line_user = ax.plot(times, user_pitch, color=self.colors['user'], 
-                           linewidth=4, label='◆ 您的发音', alpha=0.9,
+                           linewidth=6, label='◆ 您的发音', alpha=0.9,  # 🎯 4->6
                            linestyle='-', marker='none', zorder=3)
         
         # 🌟 添加柔和的差异填充区域
@@ -1719,12 +1719,12 @@ class PitchVisualization:
                        color=self.colors['difference'], alpha=0.2, 
                        interpolate=True, zorder=1, label='差异区域')
         
-        # ✨ 设置优雅的图表属性
-        self._set_text_with_font(ax, 'xlabel', '时间 (秒)', fontsize=14, fontweight='600', 
+        # ✨ 设置优雅的图表属性（🔧 增大字体适配移动端）
+        self._set_text_with_font(ax, 'xlabel', '时间 (秒)', fontsize=18, fontweight='600',  # 🎯 14->18
                                color=self.colors['text'])
-        self._set_text_with_font(ax, 'ylabel', '基频 (Hz)', fontsize=14, fontweight='600',
+        self._set_text_with_font(ax, 'ylabel', '基频 (Hz)', fontsize=18, fontweight='600',  # 🎯 14->18
                                color=self.colors['text'])
-        self._set_text_with_font(ax, 'title', '■ 音高曲线对比分析', fontsize=16, fontweight='bold', 
+        self._set_text_with_font(ax, 'title', '■ 音高曲线对比分析', fontsize=22, fontweight='bold',  # 🎯 16->22
                                color=self.colors['text'], pad=20)
         
         # 🎨 美化网格

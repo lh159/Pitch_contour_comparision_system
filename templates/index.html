@@ -462,32 +462,40 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
         
-        /* 移动端图表优化 */
+        /* 移动端图表优化 - 🔧 改进移动端显示 */
         @media (max-width: 768px) {
             .chart-wrapper {
-                padding: 15px;
+                padding: 12px;
                 border-radius: 10px;
+                margin: 10px;
             }
             
             .comparison-chart {
-                min-height: 400px;
-                max-height: 600px;
-                padding: 12px;
+                min-height: 500px;  /* 🎯 400->500 增大最小高度 */
+                max-height: 700px;  /* 🎯 600->700 增大最大高度 */
+                padding: 8px;
                 border-radius: 6px;
+                width: 100% !important;
+                height: auto !important;
+                object-fit: contain;
             }
         }
         
         @media (max-width: 576px) {
             .chart-wrapper {
-                padding: 10px;
+                padding: 8px;
                 border-radius: 8px;
+                margin: 8px;
             }
             
             .comparison-chart {
-                min-height: 300px;
-                max-height: 500px;
-                padding: 8px;
+                min-height: 450px;  /* 🎯 300->450 显著增大最小高度 */
+                max-height: 650px;  /* 🎯 500->650 增大最大高度 */
+                padding: 6px;
                 border-radius: 4px;
+                width: 100% !important;
+                height: auto !important;
+                object-fit: contain;
             }
         }
         
@@ -2202,11 +2210,21 @@
                         chartWrapper.style.maxWidth = '1200px';
                         chartWrapper.style.margin = '0 auto';
                         
-                        // 🔧 确保图表本身也有正确的样式
+                        // 🔧 确保图表本身也有正确的样式（🎯 移动端适配）
                         chart.style.width = '100%';
                         chart.style.height = 'auto';
-                        chart.style.minHeight = '600px';
-                        chart.style.maxHeight = '800px';
+                        
+                        // 根据屏幕尺寸设置不同的最小高度
+                        if (window.innerWidth <= 576) {
+                            chart.style.minHeight = '450px';  // 小屏幕
+                            chart.style.maxHeight = '650px';
+                        } else if (window.innerWidth <= 768) {
+                            chart.style.minHeight = '500px';  // 中等屏幕
+                            chart.style.maxHeight = '700px';
+                        } else {
+                            chart.style.minHeight = '600px';  // 大屏幕
+                            chart.style.maxHeight = '800px';
+                        }
                     }
                     console.log('音高曲线图加载完成');
                 };
@@ -3005,6 +3023,105 @@
         
         // === 标准发音音高分析功能 ===
         
+        // 创建音高分析弹窗
+        function createPitchAnalysisModal(title) {
+            const modalHTML = `
+                <div class="modal fade" id="pitchAnalysisModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-chart-line me-2"></i>${title}
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <!-- 加载状态 -->
+                                <div class="chart-loading text-center" style="display: flex; flex-direction: column; align-items: center; padding: 40px;">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">加载中...</span>
+                                    </div>
+                                    <p class="mt-2 text-muted">正在分析音高曲线，请稍候...</p>
+                                </div>
+                                
+                                <!-- 图表内容 -->
+                                <div class="chart-content" style="display: none;">
+                                    <img class="pitch-chart w-100" alt="音高曲线图" style="border-radius: 8px;">
+                                    <div class="chart-text-overlay mt-3">
+                                        <!-- 汉字与音高对应显示 -->
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                                <button type="button" class="btn btn-primary" onclick="downloadPitchChart()">
+                                    <i class="fas fa-download me-2"></i>下载图表
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = modalHTML;
+            const modal = tempDiv.firstElementChild;
+            
+            // 监听模态框关闭事件，自动删除DOM元素
+            modal.addEventListener('hidden.bs.modal', function() {
+                this.remove();
+            });
+            
+            return modal;
+        }
+        
+        // 在弹窗中显示音高图表
+        function displayPitchChartInModal(modal, data) {
+            const chartLoading = modal.querySelector('.chart-loading');
+            const chartContent = modal.querySelector('.chart-content');
+            const chartImage = modal.querySelector('.pitch-chart');
+            const textOverlay = modal.querySelector('.chart-text-overlay');
+            
+            // 隐藏加载状态，显示图表
+            chartLoading.style.display = 'none';
+            chartContent.style.display = 'block';
+            
+            // 设置图表图片
+            if (data.chart_url) {
+                chartImage.src = data.chart_url + '?t=' + Date.now();
+            }
+            
+            // 显示汉字与音高对应信息
+            if (data.char_analysis && data.char_analysis.length > 0) {
+                let overlayHTML = '<h6><i class="fas fa-font me-2"></i>汉字与音高对应</h6>';
+                overlayHTML += '<div class="d-flex flex-wrap gap-2 mt-2">';
+                
+                data.char_analysis.forEach((item, index) => {
+                    const toneClass = `tone-${item.tone}`;
+                    overlayHTML += `
+                        <span class="badge ${toneClass} fs-6 p-2" style="cursor: pointer;" 
+                              onclick="highlightCharacter(${index})">
+                            ${item.char} (${item.tone_name})
+                        </span>
+                    `;
+                });
+                
+                overlayHTML += '</div>';
+                textOverlay.innerHTML = overlayHTML;
+            }
+        }
+        
+        // 下载音高图表
+        function downloadPitchChart() {
+            const chartImage = document.querySelector('#pitchAnalysisModal .pitch-chart');
+            if (chartImage && chartImage.src) {
+                const link = document.createElement('a');
+                link.href = chartImage.src;
+                link.download = '标准发音音高曲线.png';
+                link.click();
+            }
+        }
+        
         // 分析标准发音音高
         async function analyzeStandardPitch() {
             if (!standardFileId) {
@@ -3013,12 +3130,17 @@
             }
             
             const analyzeBtn = document.getElementById('analyzeStandardBtn');
-            const visualizationContainer = document.getElementById('standardPitchVisualization');
-            const chartLoading = document.getElementById('standardChartLoading');
-            const chartContent = document.getElementById('standardChartContent');
             
-            // 显示可视化容器
-            visualizationContainer.style.display = 'block';
+            // 创建并显示弹窗
+            const modal = createPitchAnalysisModal('标准发音音高曲线分析');
+            document.body.appendChild(modal);
+            const modalInstance = new bootstrap.Modal(modal);
+            modalInstance.show();
+            
+            const chartLoading = modal.querySelector('.chart-loading');
+            const chartContent = modal.querySelector('.chart-content');
+            
+            // 显示加载状态
             chartLoading.style.display = 'flex';
             chartContent.style.display = 'none';
             
@@ -3048,17 +3170,17 @@
                         toneAnalyzer.setPitchAnalysisData(data.pitch_data);
                     }
                     
-                    // 显示音高图表
-                    displayStandardPitchChart(data);
+                    // 在弹窗中显示音高图表
+                    displayPitchChartInModal(modal, data);
                     showAlert('标准发音音高分析完成！', 'success');
                 } else {
                     showAlert(`音高分析失败: ${data.error}`, 'danger');
-                    visualizationContainer.style.display = 'none';
+                    modalInstance.hide();
                 }
                 
             } catch (error) {
                 showAlert(`分析错误: ${error.message}`, 'danger');
-                visualizationContainer.style.display = 'none';
+                modalInstance.hide();
             } finally {
                 // 恢复按钮
                 analyzeBtn.disabled = false;

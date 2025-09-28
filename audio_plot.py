@@ -40,16 +40,31 @@ def load_audio_data(audio_input):
 def is_chinese_font_available():
     """检测系统是否有可用的中文字体"""
     font_name = None
-    # 优先使用免费商用中文字体列表
-    preferred_fonts = ['SimHei', 'Source Han Sans CN', 'Noto Sans CJK SC', ]
+    # 尝试常见的中文字体，优先使用macOS系统字体
+    preferred_fonts = [
+        'Arial Unicode MS',    # macOS通用Unicode字体
+        'Heiti TC',           # macOS繁体黑体
+        'Hannotate SC',       # macOS简体手写字体
+        'HanziPen SC',        # macOS简体钢笔字体
+        'STHeiti',            # macOS系统黑体
+        'PingFang SC',        # macOS苹方字体
+        'Source Han Sans CN', # 思源黑体
+        'Noto Sans CJK SC',   # Noto字体
+        'SimHei'              # Windows黑体
+    ]
+    
     for font in preferred_fonts:
         try:
-            if fm.findfont(font, fallback_to_default=False):
+            if fm.findfont(font, fallback_to_default=False) != fm.findfont('DejaVu Sans'):
                 font_name = font
+                print(f"✓ 使用中文字体: {font}")
                 break
         except Exception:
             continue
-
+    
+    if not font_name:
+        print("⚠️  未找到合适的中文字体，将使用英文标签")
+    
     return font_name
 
 def plot_pitch_curve(audio_input, output_path, fig_size=(12, 6), dpi=300):
@@ -96,12 +111,12 @@ def plot_pitch_curve(audio_input, output_path, fig_size=(12, 6), dpi=300):
         # 如果没有找到，可以使用任何系统默认的无衬线字体
         plt.rcParams['font.sans-serif'] = ['sans-serif']
 
-    ax.plot(times, pitch_values, 'o', markersize=3.5, linestyle='-', color='tab:red', label=ylabel_text)
+    ax.plot(times, pitch_values, 'o', markersize=5, linestyle='-', color='tab:red', label=ylabel_text)  # 🎯 增大标记点
     ax.set_ylim(bottom=0)  # 音高不会是负数
 
-    ax.set_title(title_text, fontsize=16, weight='bold')
-    ax.set_xlabel(xlabel_text, fontsize=12)
-    ax.set_ylabel(ylabel_text, fontsize=12)
+    ax.set_title(title_text, fontsize=20, weight='bold')  # 🎯 16->20 移动端适配
+    ax.set_xlabel(xlabel_text, fontsize=16)  # 🎯 12->16 移动端适配
+    ax.set_ylabel(ylabel_text, fontsize=16)  # 🎯 12->16 移动端适配
     ax.grid(True, which='both', linestyle='--', linewidth=0.5)
 
     plt.tight_layout()
@@ -120,11 +135,14 @@ def plot_waveform_and_pitch(audio_input, output_path, fig_size=(15, 6), dpi=300)
     - output_path (str): 输出图片的文件路径。
     """
     # --- 1. 字体检测与设置 ---
-    font_name = 'SimHei'
-    preferred_fonts = ['Source Han Sans CN', 'Noto Sans CJK SC', 'SimHei']
+    font_name = None
+    preferred_fonts = [
+        'Arial Unicode MS', 'Heiti TC', 'Hannotate SC', 'HanziPen SC',
+        'STHeiti', 'PingFang SC', 'Source Han Sans CN', 'Noto Sans CJK SC', 'SimHei'
+    ]
     for font in preferred_fonts:
         try:
-            if fm.findfont(font, fallback_to_default=False):
+            if fm.findfont(font, fallback_to_default=False) != fm.findfont('DejaVu Sans'):
                 font_name = font
                 break
         except Exception:
@@ -170,8 +188,8 @@ def plot_waveform_and_pitch(audio_input, output_path, fig_size=(15, 6), dpi=300)
 
     # 绘制波形 (左Y轴)
     ax1.plot(time_axis, waveform, color='tab:blue', alpha=0.8, label=legend_waveform)
-    ax1.set_xlabel(xlabel_text, fontsize=12)
-    ax1.set_ylabel(ylabel_waveform, color='tab:blue', fontsize=12)
+    ax1.set_xlabel(xlabel_text, fontsize=16)  # 🎯 12->16 移动端适配
+    ax1.set_ylabel(ylabel_waveform, color='tab:blue', fontsize=16)  # 🎯 12->16 移动端适配
     ax1.tick_params(axis='y', labelcolor='tab:blue')
     ax1.set_ylim(waveform.min() * 1.1, waveform.max() * 1.1)
     ax1.grid(False)  # 波形图通常不显示网格
@@ -180,13 +198,13 @@ def plot_waveform_and_pitch(audio_input, output_path, fig_size=(15, 6), dpi=300)
     ax2 = ax1.twinx()
 
     # 绘制音高 (右Y轴)
-    ax2.plot(pitch_times, pitch_values, 'o-', markersize=4, color='tab:red', label=legend_pitch)
-    ax2.set_ylabel(ylabel_pitch, color='tab:red', fontsize=12)
+    ax2.plot(pitch_times, pitch_values, 'o-', markersize=6, color='tab:red', label=legend_pitch)  # 🎯 增大标记点
+    ax2.set_ylabel(ylabel_pitch, color='tab:red', fontsize=16)  # 🎯 12->16 移动端适配
     ax2.tick_params(axis='y', labelcolor='tab:red')
     ax2.set_ylim(bottom=0, top=np.nanmax(pitch_values) * 1.1 if not np.all(np.isnan(pitch_values)) else 500)
 
     # 设置标题和图例
-    fig.suptitle(title_text, fontsize=16, weight='bold')
+    fig.suptitle(title_text, fontsize=20, weight='bold')  # 🎯 16->20 移动端适配
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax2.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
@@ -206,11 +224,14 @@ def plot_wideband_spectrogram(audio_input, output_path, fig_size=(12, 6), dpi=30
     - output_path (str): 输出图片的文件路径。
     """
     # --- 1. 字体检测与设置 ---
-    font_name = 'SimHei'
-    preferred_fonts = ['Source Han Sans CN', 'Noto Sans CJK SC', 'SimHei']
+    font_name = None
+    preferred_fonts = [
+        'Arial Unicode MS', 'Heiti TC', 'Hannotate SC', 'HanziPen SC',
+        'STHeiti', 'PingFang SC', 'Source Han Sans CN', 'Noto Sans CJK SC', 'SimHei'
+    ]
     for font in preferred_fonts:
         try:
-            if fm.findfont(font, fallback_to_default=False):
+            if fm.findfont(font, fallback_to_default=False) != fm.findfont('DejaVu Sans'):
                 font_name = font
                 break
         except Exception:
@@ -277,11 +298,14 @@ def plot_narrowband_spectrogram(audio_input, output_path, fig_size=(12, 6), dpi=
     - output_path (str): 输出图片的文件路径。
     """
     # --- 1. 字体检测与设置 ---
-    font_name = 'SimHei'
-    preferred_fonts = ['Source Han Sans CN', 'Noto Sans CJK SC', 'SimHei']
+    font_name = None
+    preferred_fonts = [
+        'Arial Unicode MS', 'Heiti TC', 'Hannotate SC', 'HanziPen SC',
+        'STHeiti', 'PingFang SC', 'Source Han Sans CN', 'Noto Sans CJK SC', 'SimHei'
+    ]
     for font in preferred_fonts:
         try:
-            if fm.findfont(font, fallback_to_default=False):
+            if fm.findfont(font, fallback_to_default=False) != fm.findfont('DejaVu Sans'):
                 font_name = font
                 break
         except Exception:

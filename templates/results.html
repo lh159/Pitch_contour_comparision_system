@@ -169,32 +169,40 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
 
-        /* 移动端图表优化 */
+        /* 移动端图表优化 - 🔧 改进移动端显示 */
         @media (max-width: 768px) {
             .chart-wrapper {
-                padding: 15px;
+                padding: 12px;
                 border-radius: 10px;
+                margin: 10px;
             }
             
             .comparison-chart {
-                min-height: 400px;
-                max-height: 600px;
-                padding: 12px;
+                min-height: 500px;  /* 🎯 400->500 增大最小高度 */
+                max-height: 700px;  /* 🎯 600->700 增大最大高度 */
+                padding: 8px;
                 border-radius: 6px;
+                width: 100% !important;
+                height: auto !important;
+                object-fit: contain;
             }
         }
 
         @media (max-width: 576px) {
             .chart-wrapper {
-                padding: 10px;
+                padding: 8px;
                 border-radius: 8px;
+                margin: 8px;
             }
             
             .comparison-chart {
-                min-height: 300px;
-                max-height: 500px;
-                padding: 8px;
+                min-height: 450px;  /* 🎯 300->450 显著增大最小高度 */
+                max-height: 650px;  /* 🎯 500->650 增大最大高度 */
+                padding: 6px;
                 border-radius: 4px;
+                width: 100% !important;
+                height: auto !important;
+                object-fit: contain;
             }
         }
 
@@ -313,6 +321,120 @@
             color: #664d03;
             margin-bottom: 20px;
         }
+
+        /* 🎯 图表查看按钮样式 */
+        .chart-view-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 30px 0;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+
+        .chart-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        @media (min-width: 576px) {
+            .chart-buttons {
+                flex-direction: row;
+                justify-content: center;
+                gap: 20px;
+            }
+        }
+
+        .chart-view-btn {
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .chart-view-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+
+        /* 🎯 图片模态框样式 */
+        .chart-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            backdrop-filter: blur(5px);
+        }
+
+        .chart-modal-content {
+            position: relative;
+            margin: 2% auto;
+            padding: 20px;
+            width: 95%;
+            max-width: 1200px;
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-modal img {
+            max-width: 100%;
+            max-height: 85%;
+            object-fit: contain;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(255,255,255,0.1);
+        }
+
+        .chart-modal-header {
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .chart-modal-close {
+            position: absolute;
+            top: 15px;
+            right: 25px;
+            color: white;
+            font-size: 35px;
+            font-weight: bold;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .chart-modal-close:hover {
+            background-color: rgba(255,255,255,0.2);
+            transform: scale(1.1);
+        }
+
+        .chart-modal-loading {
+            color: white;
+            text-align: center;
+            font-size: 1.2rem;
+        }
+
+        .chart-modal-loading .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -415,16 +537,18 @@
                         </div>
                     </div>
                     
-                    <!-- 高级可视化容器 -->
-                    <div class="visualization-container" id="visualizationContainer">
-                        <div class="chart-loading" id="chartLoading">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">加载中...</span>
-                            </div>
-                            <p class="mt-2">正在生成音高曲线对比图...</p>
-                        </div>
-                        <div class="chart-wrapper" id="chartWrapper" style="display: none;">
-                            <img id="comparisonChart" class="comparison-chart" alt="音高曲线对比图">
+                    <!-- 🎯 图表查看按钮区域 -->
+                    <div class="chart-view-section" id="chartViewSection" style="display: none;">
+                        <h5 class="mb-3">
+                            <i class="fas fa-chart-line me-2"></i>分析图表
+                        </h5>
+                        <div class="chart-buttons">
+                            <button class="btn btn-primary chart-view-btn" id="viewPitchChart">
+                                <i class="fas fa-chart-line me-2"></i>查看音高曲线对比图
+                            </button>
+                            <button class="btn btn-info chart-view-btn" id="viewWaveformChart">
+                                <i class="fas fa-wave-square me-2"></i>查看波形与音高分析图
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -462,6 +586,23 @@
         </div>
     </div>
 
+    <!-- 🎯 图片查看模态框 -->
+    <div class="chart-modal" id="chartModal">
+        <div class="chart-modal-content">
+            <button class="chart-modal-close" id="closeModal">&times;</button>
+            <div class="chart-modal-header" id="modalTitle">
+                音高曲线分析图
+            </div>
+            <div class="chart-modal-loading" id="modalLoading">
+                <div class="spinner-border text-light" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                </div>
+                <p>正在加载图表...</p>
+            </div>
+            <img id="modalChart" style="display: none;" alt="分析图表">
+        </div>
+    </div>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     
@@ -490,9 +631,6 @@
         const trendScore = document.getElementById('trendScore');
         const stabilityScore = document.getElementById('stabilityScore');
         const rangeScore = document.getElementById('rangeScore');
-        const chartLoading = document.getElementById('chartLoading');
-        const chartWrapper = document.getElementById('chartWrapper');
-        const comparisonChart = document.getElementById('comparisonChart');
         const continueBtn = document.getElementById('continueBtn');
         const retryBtn = document.getElementById('retryBtn');
         const backToRecordingBtn = document.getElementById('backToRecordingBtn');
@@ -501,6 +639,20 @@
         const dialogueCompleteCard = document.getElementById('dialogueCompleteCard');
         const mainNavButtons = document.getElementById('mainNavButtons');
         const practiceAgainBtn = document.getElementById('practiceAgainBtn');
+        
+        // 🎯 图表查看相关DOM元素
+        const chartViewSection = document.getElementById('chartViewSection');
+        const viewPitchChart = document.getElementById('viewPitchChart');
+        const viewWaveformChart = document.getElementById('viewWaveformChart');
+        const chartModal = document.getElementById('chartModal');
+        const closeModal = document.getElementById('closeModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalLoading = document.getElementById('modalLoading');
+        const modalChart = document.getElementById('modalChart');
+        
+        // 🎯 存储图表URL
+        let pitchChartUrl = '';
+        let waveformChartUrl = '';
         
         // 页面初始化
         document.addEventListener('DOMContentLoaded', function() {
@@ -657,49 +809,20 @@
             updateScoreDisplay(stabilityScore, score.component_scores.stability);
             updateScoreDisplay(rangeScore, score.component_scores.range);
             
-            // 显示图表
+            // 🎯 存储图表URL并显示查看按钮
             if (data.chart_url) {
-                // 隐藏加载动画
-                chartLoading.style.display = 'none';
+                pitchChartUrl = data.chart_url + '?t=' + new Date().getTime();
+                waveformChartUrl = data.waveform_chart_url ? data.waveform_chart_url + '?t=' + new Date().getTime() : '';
                 
-                // 设置图表源并显示（添加时间戳破坏缓存）
-                comparisonChart.src = data.chart_url + '?t=' + new Date().getTime();
+                // 显示图表查看按钮区域
+                chartViewSection.style.display = 'block';
                 
-                // 图表加载完成后显示容器
-                comparisonChart.onload = function() {
-                    chartWrapper.style.display = 'block';
-                    // 强制重置并应用正确的样式
-                    chartWrapper.style.width = '100%';
-                    chartWrapper.style.maxWidth = '1200px';
-                    chartWrapper.style.margin = '0 auto';
-                    
-                    // 确保图表本身也有正确的样式
-                    comparisonChart.style.width = '100%';
-                    comparisonChart.style.height = 'auto';
-                    comparisonChart.style.minHeight = '600px';
-                    comparisonChart.style.maxHeight = '800px';
-                    
-                    console.log('音高曲线图加载完成');
-                };
+                // 如果没有波形图，隐藏波形图按钮
+                if (!waveformChartUrl) {
+                    viewWaveformChart.style.display = 'none';
+                }
                 
-                // 图表加载失败处理
-                comparisonChart.onerror = function() {
-                    console.error('音高曲线图加载失败');
-                    chartLoading.innerHTML = `
-                        <div class="text-danger">
-                            <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
-                            <p>图表加载失败，请重试</p>
-                        </div>
-                    `;
-                };
-            } else {
-                // 没有图表URL时显示提示
-                chartLoading.innerHTML = `
-                    <div class="text-muted">
-                        <i class="fas fa-info-circle fa-2x mb-2"></i>
-                        <p>暂无可视化图表</p>
-                    </div>
-                `;
+                console.log('图表URL已准备就绪');
             }
             
             // 显示结果容器
@@ -739,6 +862,77 @@
             
             // 再次练习按钮（对话完成后）
             practiceAgainBtn.addEventListener('click', () => navigateTo('/home'));
+            
+            // 🎯 图表查看按钮事件
+            viewPitchChart.addEventListener('click', () => showChartModal('pitch'));
+            viewWaveformChart.addEventListener('click', () => showChartModal('waveform'));
+            
+            // 🎯 模态框关闭事件
+            closeModal.addEventListener('click', hideChartModal);
+            chartModal.addEventListener('click', (e) => {
+                if (e.target === chartModal) {
+                    hideChartModal();
+                }
+            });
+            
+            // 🎯 ESC键关闭模态框
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && chartModal.style.display === 'block') {
+                    hideChartModal();
+                }
+            });
+        }
+        
+        // 🎯 显示图表模态框
+        function showChartModal(chartType) {
+            const chartUrl = chartType === 'pitch' ? pitchChartUrl : waveformChartUrl;
+            const title = chartType === 'pitch' ? '音高曲线对比图' : '波形与音高分析图';
+            
+            if (!chartUrl) {
+                showAlert('图表暂不可用', 'warning');
+                return;
+            }
+            
+            // 设置标题
+            modalTitle.textContent = title;
+            
+            // 显示模态框和加载动画
+            chartModal.style.display = 'block';
+            modalLoading.style.display = 'block';
+            modalChart.style.display = 'none';
+            
+            // 禁用页面滚动
+            document.body.style.overflow = 'hidden';
+            
+            // 加载图片
+            modalChart.onload = function() {
+                modalLoading.style.display = 'none';
+                modalChart.style.display = 'block';
+                console.log(`${title}加载完成`);
+            };
+            
+            modalChart.onerror = function() {
+                modalLoading.innerHTML = `
+                    <div class="text-danger">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                        <p>图表加载失败，请重试</p>
+                    </div>
+                `;
+                console.error(`${title}加载失败`);
+            };
+            
+            modalChart.src = chartUrl;
+        }
+        
+        // 🎯 隐藏图表模态框
+        function hideChartModal() {
+            chartModal.style.display = 'none';
+            modalChart.src = '';
+            modalLoading.style.display = 'block';
+            modalChart.style.display = 'none';
+            
+            // 恢复页面滚动
+            document.body.style.overflow = 'auto';
         }
         
         // 返回录音页面
