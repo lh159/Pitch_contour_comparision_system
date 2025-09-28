@@ -493,30 +493,53 @@ def upload_user_audio():
         wav_filename = f"user_{file_id}.wav"
         wav_filepath = os.path.join(Config.UPLOAD_FOLDER, wav_filename)
         
+        # 获取实际MIME类型
+        mime_type = request.form.get('mime_type', 'audio/wav')
+        print(f"收到音频文件: {temp_filename}, MIME类型: {mime_type}, 大小: {os.path.getsize(temp_filepath)} bytes")
+        
         # 使用ffmpeg转换为WAV格式，优化手机录音处理
         try:
             import subprocess
-            # 🔧 优化的ffmpeg参数，适合手机录音转换
-            result = subprocess.run([
-                'ffmpeg', '-i', temp_filepath, 
-                '-acodec', 'pcm_s16le',     # 16位PCM编码
-                '-ar', '22050',             # 提高采样率到22kHz，保留更多音频细节
-                '-ac', '1',                 # 单声道
-                '-af', 'highpass=f=80,lowpass=f=8000,volume=2.0',  # 音频滤波和增益
-                '-y',                       # 覆盖输出文件
-                wav_filepath
-            ], capture_output=True, text=True, timeout=30)
             
-            if result.returncode != 0:
-                print(f"ffmpeg转换失败: {result.stderr}")
-                # 如果转换失败，尝试直接使用原文件
+            # 检查ffmpeg是否可用
+            ffmpeg_check = subprocess.run(['which', 'ffmpeg'], capture_output=True)
+            if ffmpeg_check.returncode != 0:
+                print("警告: ffmpeg未安装，尝试直接处理音频文件")
                 import shutil
                 shutil.move(temp_filepath, wav_filepath)
             else:
-                print(f"音频格式转换成功: {temp_filename} -> {wav_filename}")
-                # 删除临时文件
-                if os.path.exists(temp_filepath):
-                    os.remove(temp_filepath)
+                # 🔧 针对不同格式优化转换参数
+                ffmpeg_cmd = [
+                    'ffmpeg', '-i', temp_filepath, 
+                    '-acodec', 'pcm_s16le',     # 16位PCM编码
+                    '-ar', '16000',             # 16kHz采样率，适合语音识别
+                    '-ac', '1',                 # 单声道
+                    '-af', 'highpass=f=80,lowpass=f=8000,volume=1.5',  # 音频滤波和适度增益
+                    '-y',                       # 覆盖输出文件
+                    wav_filepath
+                ]
+                
+                # 对WebM格式添加特殊处理
+                if 'webm' in mime_type.lower():
+                    print("检测到WebM格式，使用优化参数")
+                    ffmpeg_cmd.insert(2, '-f')  # 强制指定输入格式
+                    ffmpeg_cmd.insert(3, 'webm')
+                
+                result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=30)
+                
+                if result.returncode != 0:
+                    print(f"ffmpeg转换失败: {result.stderr}")
+                    print(f"尝试的命令: {' '.join(ffmpeg_cmd)}")
+                    # 如果转换失败，尝试直接使用原文件
+                    import shutil
+                    shutil.move(temp_filepath, wav_filepath)
+                    print("使用原文件作为备选方案")
+                else:
+                    print(f"音频格式转换成功: {temp_filename} -> {wav_filename}")
+                    print(f"转换后文件大小: {os.path.getsize(wav_filepath)} bytes")
+                    # 删除临时文件
+                    if os.path.exists(temp_filepath):
+                        os.remove(temp_filepath)
                     
         except Exception as e:
             print(f"音频转换过程出错: {e}")
@@ -524,6 +547,7 @@ def upload_user_audio():
             import shutil
             if os.path.exists(temp_filepath):
                 shutil.move(temp_filepath, wav_filepath)
+                print("转换异常，使用原文件")
         
         # 使用转换后的WAV文件路径
         filepath = wav_filepath

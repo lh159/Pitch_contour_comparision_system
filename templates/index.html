@@ -2030,19 +2030,26 @@
         // 上传录音
         async function uploadRecording(audioBlob) {
             const formData = new FormData();
-            // 根据实际录音格式设置正确的文件扩展名
+            // 根据实际录音格式设置正确的文件扩展名和MIME类型
             let filename = 'recording.wav';  // 默认
+            let actualMimeType = 'audio/wav';
+            
             if (mediaRecorder && mediaRecorder.mimeType) {
+                actualMimeType = mediaRecorder.mimeType;
                 if (mediaRecorder.mimeType.includes('webm')) {
                     filename = 'recording.webm';
                 } else if (mediaRecorder.mimeType.includes('mp4')) {
                     filename = 'recording.mp4';
                 } else if (mediaRecorder.mimeType.includes('ogg')) {
                     filename = 'recording.ogg';
+                } else if (mediaRecorder.mimeType.includes('wav')) {
+                    filename = 'recording.wav';
                 }
             }
-            console.log('上传录音文件名:', filename, '格式:', mediaRecorder?.mimeType);
+            
+            console.log('上传录音 - 文件名:', filename, 'MIME类型:', actualMimeType, '文件大小:', audioBlob.size);
             formData.append('audio', audioBlob, filename);
+            formData.append('mime_type', actualMimeType);  // 传递实际MIME类型
             
             try {
                 const response = await fetch('/api/audio/upload', {
