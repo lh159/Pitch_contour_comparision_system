@@ -121,6 +121,84 @@ class PitchExtractor:
             print(f"音频质量增强失败: {e}")
             return sound
     
+    def _aggressive_audio_enhancement(self, sound: 'parselmouth.Sound') -> 'parselmouth.Sound':
+        """
+        激进的音频增强，用于处理极低质量的手机录音
+        :param sound: 输入音频
+        :return: 激进增强后的音频
+        """
+        try:
+            enhanced = sound.copy()
+            values = enhanced.values[0]
+            
+            # 1. 更强的预加重
+            preemph_coeff = 0.95  # 更强的预加重
+            for i in range(1, len(values)):
+                values[i] = values[i] - preemph_coeff * values[i-1]
+            
+            # 2. 动态范围压缩 (压缩器)
+            # 计算短时能量
+            frame_size = int(enhanced.sampling_frequency * 0.025)  # 25ms窗口
+            hop_size = frame_size // 2
+            
+            for i in range(0, len(values) - frame_size, hop_size):
+                frame = values[i:i+frame_size]
+                rms = np.sqrt(np.mean(frame**2))
+                
+                if rms > 0:
+                    # 压缩器：强信号压缩，弱信号放大
+                    threshold = 0.1
+                    ratio = 4.0  # 4:1压缩比
+                    
+                    if rms > threshold:
+                        # 压缩强信号
+                        compressed_rms = threshold + (rms - threshold) / ratio
+                    else:
+                        # 放大弱信号
+                        compressed_rms = rms * 2.0
+                    
+                    gain = compressed_rms / rms
+                    values[i:i+frame_size] *= gain
+            
+            # 3. 高通滤波去除低频噪音
+            # 简单的高通滤波器（去除50Hz以下）
+            sampling_rate = enhanced.sampling_frequency
+            cutoff = 50.0  # Hz
+            
+            # 一阶高通滤波器系数
+            rc = 1.0 / (2 * np.pi * cutoff)
+            dt = 1.0 / sampling_rate
+            alpha = rc / (rc + dt)
+            
+            # 应用高通滤波
+            filtered_values = np.zeros_like(values)
+            filtered_values[0] = values[0]
+            for i in range(1, len(values)):
+                filtered_values[i] = alpha * (filtered_values[i-1] + values[i] - values[i-1])
+            
+            # 4. 自动增益控制
+            target_rms = 0.15
+            current_rms = np.sqrt(np.mean(filtered_values**2))
+            if current_rms > 0:
+                auto_gain = min(target_rms / current_rms, 8.0)  # 最大放大8倍
+                filtered_values *= auto_gain
+            
+            # 5. 软限幅防止削波
+            max_val = np.max(np.abs(filtered_values))
+            if max_val > 0.9:
+                # 软限幅
+                filtered_values = np.tanh(filtered_values * 0.9 / max_val) * 0.9
+            
+            enhanced_sound = parselmouth.Sound(
+                filtered_values,
+                sampling_frequency=enhanced.sampling_frequency
+            )
+            return enhanced_sound
+            
+        except Exception as e:
+            print(f"激进音频增强失败: {e}")
+            return sound
+    
     def _load_audio_with_format_detection(self, audio_path: str) -> 'parselmouth.Sound':
         """
         带格式检测的音频加载，处理WebM等格式问题
@@ -223,11 +301,19 @@ class PitchExtractor:
             snd = self._normalize_audio_amplitude(snd)
             snd = self._enhance_audio_quality(snd)
             
-            # 提取音高
+            # 🎯 优化手机录音的音高提取参数
+            # 使用更宽容的参数设置，适应手机录音特点
             pitch = snd.to_pitch(
                 pitch_floor=self.min_freq,
                 pitch_ceiling=self.max_freq,
-                time_step=self.time_step
+                time_step=self.time_step,
+                very_accurate=False,  # 禁用极高精度模式，提高容错性
+                max_number_of_candidates=15,  # 增加候选音高数量
+                silence_threshold=0.03,  # 降低静音阈值
+                voicing_threshold=0.45,  # 降低有声检测阈值（默认0.5）
+                octave_cost=0.01,  # 降低八度跳跃惩罚
+                octave_jump_cost=0.35,  # 降低八度跳跃成本
+                voiced_unvoiced_cost=0.14  # 降低有声/无声切换成本
             )
             
             # 获取音高值和时间轴
@@ -237,6 +323,41 @@ class PitchExtractor:
             # 处理无声段（0Hz -> NaN）
             pitch_values[pitch_values == 0] = np.nan
             
+            # 计算初始有效比例
+            initial_valid_ratio = np.sum(~np.isnan(pitch_values)) / len(pitch_values) if len(pitch_values) > 0 else 0
+            
+            # 🎯 如果音高检测效果很差，尝试更激进的音频增强
+            if initial_valid_ratio < 0.05:
+                print(f"⚠️ 初始音高检测效果差({initial_valid_ratio:.1%})，尝试增强音频...")
+                
+                # 更激进的音频增强
+                enhanced_snd = self._aggressive_audio_enhancement(snd)
+                
+                # 重新提取音高，使用更宽松的参数
+                retry_pitch = enhanced_snd.to_pitch(
+                    pitch_floor=max(50, self.min_freq - 30),  # 进一步降低音高下限
+                    pitch_ceiling=min(800, self.max_freq + 100),  # 提高音高上限
+                    time_step=self.time_step * 0.8,  # 增加时间分辨率
+                    very_accurate=False,
+                    max_number_of_candidates=20,
+                    silence_threshold=0.02,  # 更低的静音阈值
+                    voicing_threshold=0.35,  # 更低的有声检测阈值
+                    octave_cost=0.005,
+                    octave_jump_cost=0.25,
+                    voiced_unvoiced_cost=0.1
+                )
+                
+                retry_pitch_values = retry_pitch.selected_array['frequency']
+                retry_pitch_values[retry_pitch_values == 0] = np.nan
+                retry_valid_ratio = np.sum(~np.isnan(retry_pitch_values)) / len(retry_pitch_values) if len(retry_pitch_values) > 0 else 0
+                
+                # 如果重试效果更好，使用重试结果
+                if retry_valid_ratio > initial_valid_ratio:
+                    print(f"✓ 音频增强成功，有效比例从{initial_valid_ratio:.1%}提升到{retry_valid_ratio:.1%}")
+                    pitch_values = retry_pitch_values
+                    times = retry_pitch.xs()
+                    initial_valid_ratio = retry_valid_ratio
+            
             # 🎯 保留原始音高曲线，不进行平滑处理
             # 让曲线反映归一化后的真实语音特征
             
@@ -245,7 +366,7 @@ class PitchExtractor:
                 'pitch_values': pitch_values,
                 'smooth_pitch': pitch_values,  # 使用原始值，保持接口兼容性
                 'duration': times[-1] if len(times) > 0 else 0,
-                'valid_ratio': np.sum(~np.isnan(pitch_values)) / len(pitch_values) if len(pitch_values) > 0 else 0
+                'valid_ratio': initial_valid_ratio
             }
             
         except Exception as e:
@@ -697,7 +818,7 @@ class PitchComparator:
         
         # 🔧 手机录音音高检测更宽松的阈值
         user_valid_ratio = user_pitch['valid_ratio']
-        if user_valid_ratio < 0.02:  # 从0.1降低到0.02
+        if user_valid_ratio < 0.01:  # 进一步降低到0.01
             return {'error': f'用户发音音高提取失败，请检查录音质量（有效音高比例：{user_valid_ratio:.1%}）'}
         
         # 如果音高提取质量较低，给出友好提示但继续处理
