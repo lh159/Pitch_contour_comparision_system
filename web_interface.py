@@ -522,8 +522,16 @@ def upload_user_audio():
                 # 对WebM格式添加特殊处理
                 if 'webm' in mime_type.lower():
                     print("检测到WebM格式，使用优化参数")
-                    ffmpeg_cmd.insert(2, '-f')  # 强制指定输入格式
-                    ffmpeg_cmd.insert(3, 'webm')
+                    # 在输入文件参数前添加格式指定
+                    ffmpeg_cmd = [
+                        'ffmpeg', '-f', 'webm', '-i', temp_filepath, 
+                        '-acodec', 'pcm_s16le',     # 16位PCM编码
+                        '-ar', '16000',             # 16kHz采样率，适合语音识别
+                        '-ac', '1',                 # 单声道
+                        '-af', 'highpass=f=80,lowpass=f=8000,volume=1.5',  # 音频滤波和适度增益
+                        '-y',                       # 覆盖输出文件
+                        wav_filepath
+                    ]
                 
                 result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=30)
                 
