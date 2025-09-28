@@ -64,7 +64,7 @@ class RecordingGuide extends RealtimeTextSync {
         
         // 初始化状态
         this.currentCharIndex = 0;
-        this.userProgress = new Array(this.charTimestamps.length).fill(null);
+        this.userProgress = Array.from({ length: this.charTimestamps.length }, () => null);
         this.preparationStartTime = null;
         this.isInPreparation = false;
         
@@ -310,6 +310,201 @@ class RecordingGuide extends RealtimeTextSync {
                 box-shadow: 0 2px 10px rgba(0,0,0,0.05);
                 border-left: 4px solid #3498db;
             }
+
+            /* ===== 录音指导界面样式 ===== */
+            .recording-guide-container {
+                padding: 20px;
+                background: #f8f9fa;
+                border-radius: 10px;
+                margin: 10px 0;
+            }
+
+            .recording-status {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: #dc3545;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                box-shadow: 0 2px 10px rgba(220, 53, 69, 0.3);
+            }
+
+            .recording-indicator {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .recording-icon {
+                animation: pulse 1.5s infinite;
+            }
+
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+            }
+
+            .recording-timer {
+                font-family: 'Courier New', monospace;
+                font-size: 18px;
+                font-weight: bold;
+            }
+
+            .recording-progress {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            /* 大字显示区域 */
+            .guide-text-large {
+                background: white;
+                border: 2px solid #e9ecef;
+                border-radius: 10px;
+                padding: 30px;
+                margin: 20px 0;
+                font-size: 32px;
+                line-height: 1.8;
+                text-align: center;
+                min-height: 200px;
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                align-items: center;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            }
+
+            .guide-char {
+                display: inline-block;
+                margin: 2px 4px;
+                padding: 8px 12px;
+                border-radius: 8px;
+                transition: all 0.3s ease;
+                cursor: pointer;
+                position: relative;
+            }
+
+            /* 字符状态样式 */
+            .guide-char.current-char {
+                background: #007bff;
+                color: white;
+                transform: scale(1.2);
+                box-shadow: 0 4px 15px rgba(0, 123, 255, 0.4);
+                z-index: 10;
+            }
+
+            .guide-char.pulse-highlight {
+                animation: char-pulse 1s infinite;
+            }
+
+            @keyframes char-pulse {
+                0%, 100% { 
+                    transform: scale(1.2); 
+                    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.4);
+                }
+                50% { 
+                    transform: scale(1.3); 
+                    box-shadow: 0 6px 20px rgba(0, 123, 255, 0.6);
+                }
+            }
+
+            .guide-char.next-char {
+                background: #17a2b8;
+                color: white;
+                transform: scale(1.1);
+            }
+
+            .guide-char.upcoming-char {
+                background: #ffc107;
+                color: #212529;
+            }
+
+            .guide-char.warning-char {
+                background: #fd7e14;
+                color: white;
+                animation: warning-flash 0.5s infinite alternate;
+            }
+
+            @keyframes warning-flash {
+                0% { background: #fd7e14; }
+                100% { background: #ff6b6b; }
+            }
+
+            .guide-char.correct-char {
+                background: #28a745;
+                color: white;
+            }
+
+            .guide-char.missed-char {
+                background: #dc3545;
+                color: white;
+            }
+
+            .guide-char.early-char {
+                background: #6f42c1;
+                color: white;
+            }
+
+            .guide-char.late-char {
+                background: #e83e8c;
+                color: white;
+            }
+
+            .guide-char.completed-char {
+                background: #6c757d;
+                color: white;
+                opacity: 0.7;
+            }
+
+            /* 实时提示区域 */
+            .recording-hints {
+                background: white;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 15px 0;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+
+            .current-hint {
+                font-size: 18px;
+                font-weight: bold;
+                color: #007bff;
+                margin-bottom: 10px;
+            }
+
+            .timing-hint {
+                font-size: 14px;
+                color: #6c757d;
+                margin-bottom: 10px;
+            }
+
+            .upcoming-hint {
+                font-size: 16px;
+                color: #28a745;
+                font-weight: 500;
+            }
+
+            /* 控制按钮 */
+            .recording-controls {
+                display: flex;
+                gap: 10px;
+                justify-content: center;
+                margin: 20px 0;
+            }
+
+            .guide-control-btn {
+                padding: 10px 20px;
+                border-radius: 25px;
+                font-weight: 500;
+                transition: all 0.3s ease;
+            }
+
+            .guide-control-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            }
         `;
         
         document.head.appendChild(style);
@@ -321,8 +516,8 @@ class RecordingGuide extends RealtimeTextSync {
     updatePreparationDisplay(remaining) {
         console.log('更新倒计时显示:', remaining); // 调试信息
         
-        const countdownNumber = document.getElementById('countdownNumber');
-        const countdownDisplay = document.getElementById('countdownDisplay');
+        const countdownNumber = this.container.querySelector('#countdownNumber');
+        const countdownDisplay = this.container.querySelector('#countdownDisplay');
         const countdownText = countdownDisplay?.querySelector('.countdown-text');
         
         if (!countdownNumber || !countdownDisplay) {
@@ -417,6 +612,12 @@ class RecordingGuide extends RealtimeTextSync {
         
         this.isRecording = true;
         this.recordingStartTime = Date.now();
+        this.currentCharIndex = -1; // 重置字符索引
+        
+        // 初始显示第一个字符为即将朗读状态
+        setTimeout(() => {
+            this.updateCharacterStatus(-1, 0, 0);
+        }, 100);
         
         // 开始录音循环
         this.startRecordingLoop();

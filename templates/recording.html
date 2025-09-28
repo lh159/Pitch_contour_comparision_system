@@ -74,6 +74,52 @@
             background: #f8fff8;
             min-height: 200px;
         }
+        
+        /* 确保录音指导区域内的倒计时样式正确显示 */
+        .recording-guide-area .preparation-hint {
+            position: relative;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            border-radius: 15px;
+            padding: 25px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(79, 172, 254, 0.3);
+            animation: fadeInScale 0.5s ease-out;
+            margin-bottom: 20px;
+        }
+        
+        .recording-guide-area .countdown-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 30px 0;
+            min-height: 200px;
+            position: relative;
+        }
+        
+        .recording-guide-area .countdown-circle {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+        }
+        
+        .recording-guide-area .countdown-number {
+            font-size: 48px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            transform: scale(1);
+            transition: transform 0.3s ease;
+        }
 
         .guide-container-placeholder {
             text-align: center;
@@ -175,34 +221,15 @@
             transition: width 0.3s ease;
         }
 
-        /* 录音模式选择器样式 */
-        .recording-mode-selector {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 15px;
+        /* 录音模式信息样式 */
+        .recording-mode-info {
             margin-bottom: 20px;
-            border: 1px solid #e9ecef;
         }
 
-        .recording-mode-selector .btn-group {
-            width: 100%;
-        }
-
-        .recording-mode-selector .btn-check:checked + .btn {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            border-color: #667eea;
-        }
-
-        /* 移动端优化 */
-        @media (max-width: 576px) {
-            .recording-mode-selector .btn-group {
-                flex-direction: column;
-            }
-            
-            .recording-mode-selector .btn {
-                border-radius: 8px !important;
-                margin-bottom: 5px;
-            }
+        .recording-mode-info .alert {
+            border-left: 4px solid #17a2b8;
+            background: linear-gradient(135deg, #e8f7fa, #b2ebf2);
+            border-color: transparent;
         }
     </style>
 </head>
@@ -267,15 +294,12 @@
                         </div>
                     </div>
 
-                    <!-- 录音模式选择 -->
-                    <div class="recording-mode-selector">
-                        <label class="form-label">录音模式:</label>
-                        <div class="btn-group" role="group">
-                            <input type="radio" class="btn-check" name="recordingMode" id="freeMode" value="free">
-                            <label class="btn btn-outline-primary" for="freeMode">自由录音</label>
-                            
-                            <input type="radio" class="btn-check" name="recordingMode" id="guidedMode" value="guided" checked>
-                            <label class="btn btn-outline-success" for="guidedMode">实时指导录音</label>
+                    <!-- 录音模式说明 -->
+                    <div class="recording-mode-info">
+                        <div class="alert alert-info mb-3">
+                            <i class="fas fa-magic me-2"></i>
+                            <strong>实时指导录音模式</strong><br>
+                            <small>系统将为您提供实时朗读提示，包括倒计时准备和逐字指导</small>
                         </div>
                     </div>
                     
@@ -305,19 +329,19 @@
                     </div>
                     
                     <!-- 实时指导区域 -->
-                    <div class="recording-guide-area" id="recordingGuideArea" style="display: none;">
+                    <div class="recording-guide-area" id="recordingGuideArea" style="display: block;">
                         <div class="guide-container-placeholder">
                             <i class="fas fa-magic me-2"></i>
                             实时录音指导区域<br>
-                            <small>选择"实时指导录音"模式并开始录音后，这里将显示实时朗读提示</small>
+                            <small>点击"开始录音"后，这里将显示倒计时准备和实时朗读提示</small>
                         </div>
                     </div>
                     
                     <!-- 波形容器和音频播放器 -->
                     <div class="waveform-container" id="waveformContainer">
                         <span class="text-muted">
-                            <i class="fas fa-microphone me-2"></i>
-                            选择录音模式并点击"开始录音"
+                            <i class="fas fa-magic me-2"></i>
+                            点击"开始录音"启动实时指导录音
                         </span>
                     </div>
                     
@@ -411,9 +435,9 @@
             // 设置事件监听器
             setupEventListeners();
             
-            // 验证录音模式切换功能
+            // 初始化实时指导录音界面
             setTimeout(() => {
-                validateRecordingModeSwitch();
+                initializeGuidedRecordingInterface();
             }, 1000);
             
             console.log('✓ 录音页面初始化完成');
@@ -527,12 +551,6 @@
             // 返回按钮
             backToStandardBtn.addEventListener('click', goBackToStandard);
             backToStandardBtn2.addEventListener('click', goBackToStandard);
-            
-            // 录音模式切换事件
-            const recordingModeInputs = document.querySelectorAll('input[name="recordingMode"]');
-            recordingModeInputs.forEach(input => {
-                input.addEventListener('change', handleRecordingModeChange);
-            });
         }
         
         // 返回标准发音页面
@@ -563,16 +581,10 @@
                     return;
                 }
                 
-                // 检查录音模式
-                const guidedMode = document.getElementById('guidedMode').checked;
-                
-                // 如果是指导模式，尝试启动录音指导
-                if (guidedMode) {
-                    const guideStarted = startRecordingGuide();
-                    if (!guideStarted) {
-                        // 指导启动失败，显示提示但不切换模式
-                        showAlert('缺少时间戳数据，将以自由录音方式进行，录音完成后可进行音高比对', 'info');
-                    }
+                // 启动录音指导（实时指导录音模式）
+                const guideStarted = startRecordingGuide();
+                if (!guideStarted) {
+                    showAlert('缺少时间戳数据，将以基础录音方式进行，录音完成后可进行音高比对', 'info');
                 }
                 
                 // 使用录音适配器开始录音
@@ -588,7 +600,8 @@
                     const mode = recordingAdapter.getMode();
                     const modeText = mode === 'browser' ? '浏览器录音' : '服务器录音';
                     
-                    if (guidedMode) {
+                    // 如果指导启动成功，显示指导相关信息
+                    if (guideStarted) {
                         waveformContainer.innerHTML = `<i class="fas fa-microphone text-danger me-2"></i>正在录音中 (${modeText})... 请跟随上方的实时指导进行朗读`;
                     } else {
                         waveformContainer.classList.add('recording');
@@ -627,29 +640,26 @@
                     // 隐藏录音状态栏
                     recordingStatusBar.style.display = 'none';
                     
-                    // 检查录音模式
-                    const guidedMode = document.getElementById('guidedMode').checked;
                     const mode = recordingAdapter.getMode();
                     const modeText = mode === 'browser' ? '浏览器录音' : '服务器录音';
                     
-                    if (guidedMode) {
+                    // 检查是否有录音指导
+                    if (recordingGuide) {
                         waveformContainer.innerHTML = `<i class="fas fa-check text-success me-2"></i>录音和指导完成 (${modeText})`;
                         
                         // 停止录音指导并获取结果
-                        if (recordingGuide) {
-                            const guideResult = recordingGuide.getGuidanceResult();
-                            console.log('录音指导结果:', guideResult);
-                            
-                            // 显示简要统计
-                            if (guideResult.stats) {
-                                const accuracy = guideResult.stats.accuracy || 0;
-                                showAlert(`录音指导完成！准确率: ${accuracy.toFixed(1)}%`, 
-                                         accuracy >= 80 ? 'success' : accuracy >= 60 ? 'warning' : 'info');
-                            }
-                            
-                            recordingGuide.stopGuide();
-                            recordingGuide = null;
+                        const guideResult = recordingGuide.getGuidanceResult();
+                        console.log('录音指导结果:', guideResult);
+                        
+                        // 显示简要统计
+                        if (guideResult.stats) {
+                            const accuracy = guideResult.stats.accuracy || 0;
+                            showAlert(`录音指导完成！准确率: ${accuracy.toFixed(1)}%`, 
+                                     accuracy >= 80 ? 'success' : accuracy >= 60 ? 'warning' : 'info');
                         }
+                        
+                        recordingGuide.stopGuide();
+                        recordingGuide = null;
                     } else {
                         waveformContainer.innerHTML = `<i class="fas fa-check text-success me-2"></i>录音完成 (${modeText})`;
                     }
@@ -768,74 +778,6 @@
             navigateTo('/results', params);
         }
         
-        // 处理录音模式切换
-        function handleRecordingModeChange(event) {
-            console.log('🔄 录音模式切换:', event.target.value);
-            const mode = event.target.value;
-            
-            // 如果正在录音，先停止
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                showAlert('正在录音中，请先停止录音再切换模式', 'warning');
-                return;
-            }
-            
-            if (mode === 'guided') {
-                console.log('切换到实时指导模式');
-                
-                // 清理并重置指导区域为占位符状态
-                recordingGuideArea.innerHTML = `
-                    <div class="guide-container-placeholder">
-                        <i class="fas fa-magic me-2"></i>
-                        实时录音指导区域<br>
-                        <small>选择"实时指导录音"模式并开始录音后，这里将显示实时朗读提示</small>
-                    </div>
-                `;
-                
-                // 显示指导区域
-                recordingGuideArea.style.display = 'block';
-                
-                // 检查是否有时间戳数据
-                if (!currentCharTimestamps.length) {
-                    console.warn('缺少时间戳数据，显示提示信息');
-                    waveformContainer.innerHTML = `
-                        <span class="text-muted">
-                            <i class="fas fa-magic me-2"></i>
-                            实时指导模式：请先确保有时间戳数据，然后开始录音获得实时朗读提示
-                        </span>
-                    `;
-                } else {
-                    waveformContainer.innerHTML = `
-                        <span class="text-muted">
-                            <i class="fas fa-magic me-2"></i>
-                            实时指导模式：点击"开始录音"后将根据标准发音的时间戳为您提供实时朗读提示
-                        </span>
-                    `;
-                    showAlert('已切换到实时指导录音模式，开始录音后将显示实时提示', 'success');
-                }
-                
-            } else {
-                console.log('切换到自由录音模式');
-                
-                // 清理录音指导组件
-                if (recordingGuide) {
-                    recordingGuide.stopGuide();
-                    recordingGuide = null;
-                }
-                
-                // 清理并隐藏指导区域
-                recordingGuideArea.innerHTML = '';
-                recordingGuideArea.style.display = 'none';
-                
-                waveformContainer.innerHTML = `
-                    <span class="text-muted">
-                        <i class="fas fa-microphone me-2"></i>
-                        自由录音模式：点击"开始录音"进行录制
-                    </span>
-                `;
-                
-                showAlert('已切换到自由录音模式', 'info');
-            }
-        }
         
         // 启动录音指导
         function startRecordingGuide() {
@@ -899,27 +841,38 @@
             }
         }
         
-        // 验证录音模式切换功能并设置默认模式
-        function validateRecordingModeSwitch() {
-            console.log('🔍 验证录音模式切换功能并设置默认模式...');
+        // 初始化实时指导录音界面
+        function initializeGuidedRecordingInterface() {
+            console.log('🔍 初始化实时指导录音界面...');
             
-            const guidedMode = document.getElementById('guidedMode');
-            const freeMode = document.getElementById('freeMode');
+            // 清理并重置指导区域为占位符状态
+            recordingGuideArea.innerHTML = `
+                <div class="guide-container-placeholder">
+                    <i class="fas fa-magic me-2"></i>
+                    实时录音指导区域<br>
+                    <small>点击"开始录音"后，这里将显示倒计时准备和实时朗读提示</small>
+                </div>
+            `;
             
-            // 检查当前选中的模式并设置相应的界面
-            if (guidedMode && guidedMode.checked) {
-                console.log('当前已选中实时指导模式，设置相应界面...');
-                handleRecordingModeChange({ target: { value: 'guided' } });
-            } else if (freeMode && freeMode.checked) {
-                console.log('当前已选中自由录音模式，设置相应界面...');
-                handleRecordingModeChange({ target: { value: 'free' } });
+            // 显示指导区域
+            recordingGuideArea.style.display = 'block';
+            
+            // 检查是否有时间戳数据
+            if (!currentCharTimestamps.length) {
+                console.warn('缺少时间戳数据，显示提示信息');
+                waveformContainer.innerHTML = `
+                    <span class="text-muted">
+                        <i class="fas fa-magic me-2"></i>
+                        实时指导录音：请先确保有时间戳数据，然后开始录音获得实时朗读提示
+                    </span>
+                `;
             } else {
-                // 如果没有选中任何模式，强制选中实时指导模式
-                console.log('没有选中任何模式，强制选中实时指导模式...');
-                if (guidedMode) {
-                    guidedMode.checked = true;
-                    handleRecordingModeChange({ target: { value: 'guided' } });
-                }
+                waveformContainer.innerHTML = `
+                    <span class="text-muted">
+                        <i class="fas fa-magic me-2"></i>
+                        实时指导录音：点击"开始录音"后将显示倒计时准备和实时朗读指导
+                    </span>
+                `;
             }
         }
         
