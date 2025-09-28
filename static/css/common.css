@@ -413,3 +413,30 @@ input, textarea, [contenteditable] {
         border: 1px solid #ccc;
     }
 }
+
+/* 录音完成指示器 */
+.recording-complete-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    font-size: 1.1em;
+    font-weight: 500;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    border-radius: 10px;
+    color: white;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    animation: fadeInScale 0.5s ease-out;
+    margin: 10px 0;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

@@ -659,15 +659,27 @@
                         userFileId = result.file_id;
                         console.log('录音完成，userFileId设置为:', userFileId);
                         
-                        // 如果是浏览器录音，可能需要显示音频播放器
-                        if (mode === 'browser' && result.audioUrl) {
+                        // 显示音频播放器
+                        if (result.audioUrl) {
+                            console.log('设置用户音频播放器URL:', result.audioUrl);
                             userAudio.src = result.audioUrl;
                             userAudio.style.display = 'block';
+                            
+                            // 更新波形容器显示录音完成状态
+                            waveformContainer.innerHTML = `
+                                <div class="recording-complete-indicator">
+                                    <i class="fas fa-check-circle text-success me-2"></i>
+                                    <span class="text-success">录音和指导完成</span>
+                                    ${mode === 'browser' ? '（浏览器录音）' : '（服务器录音）'}
+                                </div>
+                            `;
+                        } else {
+                            console.warn('录音完成但未收到audioUrl');
                         }
                         
                         compareBtn.style.display = 'inline-block';
                         
-                        const duration = result.duration || 0;
+                        const duration = result.duration || result.pitch_info?.duration || 0;
                         showAlert(`录音完成！时长: ${duration.toFixed(2)}秒`, 'success');
                     }
                     

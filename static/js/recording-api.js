@@ -238,6 +238,7 @@ class RecordingAPIAdapter {
                     mode: 'server',
                     file_id: data.file_id,
                     filename: data.filename,
+                    audioUrl: data.audioUrl,  // 添加音频URL
                     duration: data.duration,
                     message: data.message
                 };
@@ -282,6 +283,7 @@ class RecordingAPIAdapter {
                 success: true,
                 file_id: data.file_id,
                 filename: data.filename,
+                audioUrl: data.audioUrl,  // 添加音频URL
                 duration: data.pitch_info?.duration || 0,
                 message: '录音上传成功'
             };

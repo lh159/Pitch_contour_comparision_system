@@ -385,10 +385,14 @@ def stop_recording():
                                      session.audio_format['sample_width'] * 
                                      session.audio_format['channels'])
         
+        # 生成可访问的音频URL
+        audio_url = f"/uploads/{wav_filename}"
+        
         return jsonify({
             'success': True,
             'file_id': file_id,
             'filename': wav_filename,
+            'audioUrl': audio_url,  # 添加音频URL供前端播放
             'duration': duration,
             'message': '录音已保存'
         })
@@ -619,10 +623,14 @@ def upload_user_audio():
         
         print(f"📊 录音质量诊断: {audio_diagnostics}")
         
+        # 生成可访问的音频URL
+        audio_url = f"/uploads/{filename}"
+        
         return safe_json_serialize({
             'success': True,
             'file_id': file_id,
             'filename': filename,
+            'audioUrl': audio_url,  # 添加音频URL供前端播放
             'pitch_info': {
                 'duration': pitch_data.get('duration', 0),
                 'valid_ratio': pitch_data.get('valid_ratio', 0),
@@ -836,6 +844,19 @@ def serve_temp_file(filename):
     except Exception:
         return "File not found", 404
 
+@app.route('/uploads/<filename>')
+def serve_upload_file(filename):
+    """提供上传文件访问"""
+    try:
+        response = send_file(os.path.join(Config.UPLOAD_FOLDER, filename))
+        # 添加缓存控制头，防止浏览器缓存音频
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+    except Exception:
+        return "File not found", 404
+
 @app.route('/output/<filename>')
 def serve_output_file(filename):
     """提供输出文件访问"""
@@ -849,13 +870,6 @@ def serve_output_file(filename):
     except Exception:
         return "File not found", 404
 
-@app.route('/upload/<filename>')
-def serve_upload_file(filename):
-    """提供上传文件访问"""
-    try:
-        return send_file(os.path.join(Config.UPLOAD_FOLDER, filename))
-    except Exception:
-        return "File not found", 404
 
 @app.route('/api/tts/generate_with_timestamps', methods=['POST'])
 def generate_standard_audio_with_timestamps():
