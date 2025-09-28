@@ -5,7 +5,18 @@
 import requests
 import json
 import urllib3
+import ssl
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# 创建自定义的SSL上下文
+class CustomHTTPSAdapter(requests.adapters.HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        context.set_ciphers('ALL:!DH')  # 禁用Diffie-Hellman密码套件
+        kwargs['ssl_context'] = context
+        return super().init_poolmanager(*args, **kwargs)
 
 def test_compare_api():
     """测试比对API"""
@@ -23,7 +34,11 @@ def test_compare_api():
     print(f"请求数据: {json.dumps(test_data, ensure_ascii=False, indent=2)}")
     
     try:
-        response = requests.post(
+        # 创建会话并添加自定义HTTPS适配器
+        session = requests.Session()
+        session.mount('https://', CustomHTTPSAdapter())
+        
+        response = session.post(
             url, 
             json=test_data,
             headers={'Content-Type': 'application/json'},

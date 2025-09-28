@@ -302,19 +302,18 @@ class PitchExtractor:
             snd = self._enhance_audio_quality(snd)
             
             # 🎯 优化手机录音的音高提取参数
-            # 使用更宽容的参数设置，适应手机录音特点
-            pitch = snd.to_pitch(
-                pitch_floor=self.min_freq,
-                pitch_ceiling=self.max_freq,
-                time_step=self.time_step,
-                very_accurate=False,  # 禁用极高精度模式，提高容错性
-                max_number_of_candidates=15,  # 增加候选音高数量
-                silence_threshold=0.03,  # 降低静音阈值
-                voicing_threshold=0.45,  # 降低有声检测阈值（默认0.5）
-                octave_cost=0.01,  # 降低八度跳跃惩罚
-                octave_jump_cost=0.35,  # 降低八度跳跃成本
-                voiced_unvoiced_cost=0.14  # 降低有声/无声切换成本
-            )
+            # 使用兼容parselmouth 0.4.6的基本参数设置
+            try:
+                # 尝试使用基本参数（兼容旧版本）
+                pitch = snd.to_pitch(
+                    time_step=self.time_step,
+                    pitch_floor=self.min_freq,
+                    pitch_ceiling=self.max_freq
+                )
+            except Exception as e:
+                print(f"⚠️ 音高提取失败，尝试默认参数: {e}")
+                # 如果失败，使用默认参数
+                pitch = snd.to_pitch()
             
             # 获取音高值和时间轴
             pitch_values = pitch.selected_array['frequency']
@@ -333,19 +332,16 @@ class PitchExtractor:
                 # 更激进的音频增强
                 enhanced_snd = self._aggressive_audio_enhancement(snd)
                 
-                # 重新提取音高，使用更宽松的参数
-                retry_pitch = enhanced_snd.to_pitch(
-                    pitch_floor=max(50, self.min_freq - 30),  # 进一步降低音高下限
-                    pitch_ceiling=min(800, self.max_freq + 100),  # 提高音高上限
-                    time_step=self.time_step * 0.8,  # 增加时间分辨率
-                    very_accurate=False,
-                    max_number_of_candidates=20,
-                    silence_threshold=0.02,  # 更低的静音阈值
-                    voicing_threshold=0.35,  # 更低的有声检测阈值
-                    octave_cost=0.005,
-                    octave_jump_cost=0.25,
-                    voiced_unvoiced_cost=0.1
-                )
+                # 重新提取音高，使用更宽松的参数（兼容版本）
+                try:
+                    retry_pitch = enhanced_snd.to_pitch(
+                        time_step=self.time_step * 0.8,  # 增加时间分辨率
+                        pitch_floor=max(50, self.min_freq - 30),  # 进一步降低音高下限
+                        pitch_ceiling=min(800, self.max_freq + 100)  # 提高音高上限
+                    )
+                except Exception as e:
+                    print(f"⚠️ 增强音频音高提取失败，使用默认参数: {e}")
+                    retry_pitch = enhanced_snd.to_pitch()
                 
                 retry_pitch_values = retry_pitch.selected_array['frequency']
                 retry_pitch_values[retry_pitch_values == 0] = np.nan
