@@ -4,6 +4,8 @@
 """
 import requests
 import json
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def test_compare_api():
     """测试比对API"""
@@ -25,7 +27,8 @@ def test_compare_api():
             url, 
             json=test_data,
             headers={'Content-Type': 'application/json'},
-            verify=False  # 忽略SSL证书验证
+            verify=False,  # 忽略SSL证书验证
+            timeout=120    # 增加超时时间到120秒
         )
         
         print(f"\n响应状态码: {response.status_code}")
