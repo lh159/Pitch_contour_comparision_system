@@ -138,34 +138,59 @@
             gap: 15px;
             margin: 15px 0;
         }
+        
+        .audio-function-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .audio-function-buttons .btn {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .audio-function-buttons .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
 
         /* 移动端音频控件优化 */
         @media (max-width: 768px) {
             .audio-controls {
-                flex-direction: column;
+                flex-direction: row;
                 gap: 12px;
-                align-items: stretch;
+                align-items: center;
             }
             
             .audio-controls audio {
-                width: 100%;
+                flex: 1;
                 height: 40px; /* 增加触摸目标大小 */
             }
             
-            .audio-controls .btn {
-                width: 100%;
-                min-height: 44px;
+            .audio-function-buttons .btn {
+                width: 44px;
+                height: 44px;
                 font-size: 16px;
             }
         }
 
         @media (max-width: 576px) {
             .audio-controls {
-                gap: 10px;
+                gap: 8px;
             }
             
             .audio-controls audio {
                 height: 44px;
+            }
+            
+            .audio-function-buttons {
+                gap: 6px;
             }
         }
 
@@ -207,22 +232,65 @@
             background: linear-gradient(45deg, #4caf50, #66bb6a);
             transition: width 0.3s ease;
         }
+
+
+        /* 美化的返回首页按钮 */
+        .home-button {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .home-button:hover {
+            transform: translateX(-50%) translateY(-3px);
+            box-shadow: 0 12px 35px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+
+        .home-button:active {
+            transform: translateX(-50%) translateY(-1px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .home-button {
+                bottom: 20px;
+                padding: 12px 24px;
+                font-size: 14px;
+            }
+            
+            .audio-actions-dropdown {
+                right: auto;
+                left: 0;
+                min-width: 180px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container-fluid">
         <div class="main-container">
-            <!-- 导航栏 -->
-            <div class="nav-buttons mb-4">
-                <button class="btn btn-outline-secondary" onclick="navigateTo('/home')">
-                    <i class="fas fa-arrow-left me-2"></i>返回首页
-                </button>
-                <div class="text-center">
-                    <h4 class="mb-0 text-primary">
-                        <i class="fas fa-volume-up me-2"></i>标准发音播放
-                    </h4>
-                </div>
-                <div></div> <!-- 占位符保持布局 -->
+            <!-- 页面标题 -->
+            <div class="text-center mb-4">
+                <h4 class="mb-0 text-primary">
+                    <i class="fas fa-volume-up me-2"></i>标准发音播放
+                </h4>
             </div>
 
             <!-- 场景对话信息（仅在对话模式下显示） -->
@@ -275,14 +343,16 @@
                         <audio controls class="flex-grow-1" id="standardAudio" preload="metadata">
                             您的浏览器不支持音频播放
                         </audio>
-                        <button class="btn btn-outline-primary" id="analyzeStandardBtn">
-                            <i class="fas fa-chart-line me-2"></i>
-                            分析音高
-                        </button>
-                        <button class="btn btn-outline-success" id="toggleSyncBtn" style="display: none;">
-                            <i class="fas fa-sync-alt me-2"></i>
-                            启用同步显示
-                        </button>
+                        
+                        <!-- 音频功能按钮 -->
+                        <div class="audio-function-buttons">
+                            <button class="btn btn-outline-primary btn-sm" id="analyzeStandardBtn">
+                                <i class="fas fa-chart-line"></i>
+                            </button>
+                            <button class="btn btn-outline-success btn-sm" id="toggleSyncBtn" style="display: none;">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
                     </div>
                     
                     <!-- 实时同步文本显示区域 -->
@@ -315,25 +385,23 @@
                             <!-- 音高分析信息 -->
                         </div>
                     </div>
-                    
-                    <div class="alert alert-success alert-custom">
-                        <i class="fas fa-lightbulb me-2"></i>
-                        <strong>提示:</strong> 启用同步显示可以看到每个字的朗读时机，帮助您更好地掌握节奏
-                    </div>
                 </div>
             </div>
 
-            <!-- 导航按钮 -->
-            <div class="nav-buttons">
-                <button class="btn btn-outline-secondary" onclick="navigateTo('/home')">
-                    <i class="fas fa-arrow-left me-2"></i>重新选择
-                </button>
+            <!-- 继续按钮 -->
+            <div class="text-center mb-5">
                 <button class="btn btn-custom" id="nextToRecordingBtn">
                     <i class="fas fa-microphone me-2"></i>开始录音
                 </button>
             </div>
         </div>
     </div>
+
+    <!-- 美化的返回首页按钮 -->
+    <a href="javascript:void(0)" class="home-button" onclick="navigateTo('/home')">
+        <i class="fas fa-home"></i>
+        返回首页
+    </a>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -530,15 +598,10 @@
             nextToRecordingBtn.style.display = 'inline-block';
             nextToRecordingBtn.innerHTML = '<i class="fas fa-microphone me-2"></i>开始录音';
             
-            // 更新页面标题和提示
+            // 更新页面标题
             document.querySelector('.step-header h4').innerHTML = `
                 <span class="step-number">2</span>
                 标准发音播放与同步预览
-            `;
-            
-            document.querySelector('.alert-success').innerHTML = `
-                <i class="fas fa-lightbulb me-2"></i>
-                <strong>提示:</strong> 启用同步显示可以看到每个字的朗读时机，帮助您更好地掌握节奏
             `;
         }
         
@@ -551,15 +614,10 @@
             // 修改按钮文本
             nextToRecordingBtn.innerHTML = '<i class="fas fa-arrow-right me-2"></i>继续对话';
             
-            // 更新页面标题和提示
+            // 更新页面标题
             document.querySelector('.step-header h4').innerHTML = `
                 <span class="step-number">🎭</span>
                 AI角色台词播放
-            `;
-            
-            document.querySelector('.alert-success').innerHTML = `
-                <i class="fas fa-theater-masks me-2"></i>
-                <strong>对话场景:</strong> 正在播放AI角色的台词，请仔细聆听对话内容和语调
             `;
         }
         
@@ -728,6 +786,7 @@
         
         // 设置事件监听器
         function setupEventListeners() {
+            
             // 分析音高按钮
             analyzeStandardBtn.addEventListener('click', analyzeStandardPitch);
             
@@ -894,6 +953,7 @@
                 link.click();
             }
         }
+        
         
         // 分析标准发音音高
         async function analyzeStandardPitch() {
@@ -1103,9 +1163,7 @@
                 // 启用同步显示
                 syncContainer.style.display = 'block';
                 syncContainer.classList.add('active');
-                toggleSyncBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>关闭同步显示';
-                toggleSyncBtn.classList.remove('btn-outline-success');
-                toggleSyncBtn.classList.add('btn-success');
+                toggleSyncBtn.innerHTML = '<i class="fas fa-sync-alt"></i>关闭同步显示';
                 
                 // 初始化实时同步组件
                 initializeRealtimeSync();
@@ -1114,9 +1172,7 @@
                 // 关闭同步显示
                 syncContainer.style.display = 'none';
                 syncContainer.classList.remove('active');
-                toggleSyncBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>启用同步显示';
-                toggleSyncBtn.classList.remove('btn-success');
-                toggleSyncBtn.classList.add('btn-outline-success');
+                toggleSyncBtn.innerHTML = '<i class="fas fa-sync-alt"></i>启用同步显示';
                 
                 // 销毁同步组件
                 if (realtimeSync) {
