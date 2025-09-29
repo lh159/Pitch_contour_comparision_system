@@ -272,7 +272,7 @@ class TTSManager:
             try:
                 # 根据性别选择声音
                 if voice_gender == 'male':
-                    voice = 'zhishuo'  # 男声
+                    voice = 'zhifeng_emo'  # 男声多情感
                 else:
                     voice = 'zhimiao_emo'  # 女声（默认）
                 

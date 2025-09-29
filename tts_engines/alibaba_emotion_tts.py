@@ -38,7 +38,16 @@ class AlibabaEmotionTTS(TTSEngineBase, DialogueTTSEngine):
             'emotions': ['neutral'],
             'description': '清晰女声，标准发音'
         },
-        # 标准TTS - 知硕男声（可用）
+        # 情感TTS - 知锋多情感男声（可用）
+        'zhifeng_emo': {
+            'model': 'sambert-zhifeng-emo-v1',
+            'voice': 'zhifeng_emo',
+            'name': '知锋(男声-多情感)',
+            'gender': 'male',
+            'emotions': ['angry', 'fear', 'happy', 'neutral', 'sad', 'surprise'],
+            'description': '多情感男声，支持愤怒、恐惧、快乐、中性、悲伤、惊讶等情感'
+        },
+        # 标准TTS - 知硕男声（保留作为备用）
         'zhishuo': {
             'model': 'sambert-zhishuo-v1',
             'voice': 'zhishuo',
@@ -208,7 +217,7 @@ class AlibabaEmotionTTS(TTSEngineBase, DialogueTTSEngine):
         """
         # 根据角色选择合适的发音人
         voice_mapping = {
-            'male': 'zhishuo',      # 男声
+            'male': 'zhifeng_emo',   # 男声多情感
             'female': 'zhimiao_emo', # 女声情感
             'default': 'zhimiao_emo' # 默认女声情感
         }
