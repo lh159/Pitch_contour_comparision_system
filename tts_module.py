@@ -371,6 +371,114 @@ class TTSManager:
         
         return self.generate_standard_audio(text, output_path, **synthesis_params)
     
+    def generate_ai_character_audio(self, text: str, output_path: str, 
+                                   character_type: str = 'default', emotion: str = 'neutral', 
+                                   scenario_context: str = '', **kwargs) -> bool:
+        """
+        专门为AI角色生成带情感的对话音频
+        
+        Args:
+            text: AI角色台词文本
+            output_path: 输出文件路径
+            character_type: AI角色类型 ('adult_male', 'adult_female', 'child', 'elder', etc.)
+            emotion: 情感类型 ('neutral', 'happy', 'sad', 'angry', 'gentle', 'serious')
+            scenario_context: 场景上下文信息
+            **kwargs: 其他参数
+        
+        Returns:
+            bool: 生成是否成功
+        """
+        print(f"🎭 生成AI角色音频: 角色={character_type}, 情感={emotion}, 文本='{text[:50]}...'")
+        
+        # 确保输出目录存在
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        
+        # 优先使用阿里云情感TTS
+        if self.emotion_engine:
+            try:
+                # 根据角色类型映射到具体的发音人
+                voice_mapping = {
+                    'adult_male': 'zhibing_emo',    # 多情感男声
+                    'adult_female': 'zhimiao_emo',  # 多情感女声
+                    'young_male': 'zhibing_emo',    # 年轻男性
+                    'young_female': 'zhimiao_emo',  # 年轻女性
+                    'child': 'zhimiao_emo',         # 儿童（用女声模拟）
+                    'elder_male': 'zhishuo',        # 年长男性（标准男声）
+                    'elder_female': 'zhichu',       # 年长女性（标准女声）
+                    'default': 'zhimiao_emo'        # 默认多情感女声
+                }
+                
+                voice = voice_mapping.get(character_type, 'zhimiao_emo')
+                
+                # 根据场景上下文调整情感强度
+                adjusted_emotion = self._adjust_emotion_for_context(emotion, scenario_context)
+                
+                print(f"🎵 使用阿里云情感TTS: voice={voice}, emotion={adjusted_emotion}")
+                
+                success = self.emotion_engine.synthesize(
+                    text=text,
+                    output_path=output_path,
+                    voice=voice,
+                    emotion=adjusted_emotion,
+                    **kwargs
+                )
+                
+                if success and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                    print(f"✓ AI角色音频生成成功: {output_path}")
+                    return True
+                else:
+                    print(f"✗ 阿里云情感TTS生成失败，尝试备用方案")
+                    
+            except Exception as e:
+                print(f"✗ 阿里云情感TTS生成AI角色音频失败: {e}")
+        
+        # 回退到标准TTS
+        print("🔄 使用标准TTS作为备用方案")
+        return self.generate_standard_audio(
+            text=text,
+            output_path=output_path,
+            voice_gender='female' if 'female' in character_type else 'male',
+            voice_emotion=emotion,
+            **kwargs
+        )
+    
+    def _adjust_emotion_for_context(self, emotion: str, context: str) -> str:
+        """
+        根据场景上下文调整情感表达
+        
+        Args:
+            emotion: 原始情感
+            context: 场景上下文
+        
+        Returns:
+            str: 调整后的情感
+        """
+        # 简单的上下文情感调整逻辑
+        context_lower = context.lower()
+        
+        # 商务场景 - 更加正式
+        if any(word in context_lower for word in ['商务', '工作', '会议', '面试', '办公']):
+            if emotion == 'happy':
+                return 'gentle'  # 商务场景的开心更温和
+            elif emotion in ['angry', 'sad']:
+                return 'serious'  # 商务场景不适合强烈情感
+        
+        # 家庭场景 - 更加亲切
+        elif any(word in context_lower for word in ['家庭', '亲子', '家人', '孩子']):
+            if emotion == 'neutral':
+                return 'gentle'  # 家庭场景更温柔
+        
+        # 学习场景 - 更加耐心
+        elif any(word in context_lower for word in ['学习', '教学', '课堂', '老师', '学生']):
+            if emotion == 'neutral':
+                return 'gentle'
+            elif emotion == 'happy':
+                return 'gentle'  # 教学场景的开心应该是鼓励性的
+        
+        return emotion  # 默认返回原情感
+    
     def get_available_emotions(self) -> List[str]:
         """获取可用的情感类型"""
         if self.emotion_engine:

@@ -32,6 +32,104 @@ import queue
 # 导入场景对话模块
 from deepseek_integration import get_deepseek_generator
 
+def detect_dialogue_emotion(text: str) -> str:
+    """
+    改进的对话情感检测
+    
+    Args:
+        text: 对话文本
+    
+    Returns:
+        str: 检测到的情感类型
+    """
+    text_lower = text.lower()
+    
+    # 情感权重系统，避免单一关键词误判
+    emotion_scores = {
+        'happy': 0,
+        'angry': 0,
+        'sad': 0,
+        'gentle': 0,
+        'serious': 0,
+        'neutral': 0
+    }
+    
+    # 开心/兴奋的关键词（权重不同）
+    happy_keywords = {
+        '哈哈': 3, '太好了': 3, '真棒': 2, '很棒': 2, '开心': 3, '高兴': 3, 
+        '兴奋': 3, '不错': 1, '很好': 1, '太棒了': 3, '棒': 1
+    }
+    for keyword, weight in happy_keywords.items():
+        if keyword in text_lower:
+            emotion_scores['happy'] += weight
+    
+    # 感叹号增加开心权重
+    if '!' in text or '！' in text:
+        emotion_scores['happy'] += 1
+    
+    # 生气/愤怒的关键词
+    angry_keywords = {
+        '生气': 3, '愤怒': 3, '气死了': 3, '讨厌': 2, '烦人': 2, 
+        '可恶': 3, '混蛋': 3, '该死': 3, '恼火': 2
+    }
+    for keyword, weight in angry_keywords.items():
+        if keyword in text_lower:
+            emotion_scores['angry'] += weight
+    
+    # 悲伤的关键词
+    sad_keywords = {
+        '难过': 3, '伤心': 3, '哭': 3, '痛苦': 3, '失望': 2, 
+        '沮丧': 2, '郁闷': 2, '悲伤': 3, '心痛': 3
+    }
+    for keyword, weight in sad_keywords.items():
+        if keyword in text_lower:
+            emotion_scores['sad'] += weight
+    
+    # 温柔的关键词
+    gentle_keywords = {
+        '谢谢': 2, '请': 1, '麻烦': 1, '不好意思': 2, '对不起': 2, 
+        '抱歉': 2, '温柔': 3, '轻声': 2, '劳烦': 1, '辛苦': 1
+    }
+    for keyword, weight in gentle_keywords.items():
+        if keyword in text_lower:
+            emotion_scores['gentle'] += weight
+    
+    # 严肃的关键词
+    serious_keywords = {
+        '重要': 2, '注意': 2, '必须': 2, '严肃': 3, '认真': 2, 
+        '警告': 3, '小心': 2, '紧急': 3, '关键': 2, '务必': 2
+    }
+    for keyword, weight in serious_keywords.items():
+        if keyword in text_lower:
+            emotion_scores['serious'] += weight
+    
+    # 疑问增加中性权重
+    if '?' in text or '？' in text:
+        emotion_scores['neutral'] += 2
+    
+    # 疑问词
+    question_words = ['什么', '为什么', '怎么', '哪里', '谁', '哪个', '多少']
+    for word in question_words:
+        if word in text_lower:
+            emotion_scores['neutral'] += 1
+    
+    # 特殊情况处理
+    # "我很生气" 这种直接表达情感的句子
+    if any(phrase in text_lower for phrase in ['我生气', '我愤怒', '我很生气']):
+        emotion_scores['angry'] += 3
+    
+    if any(phrase in text_lower for phrase in ['我难过', '我伤心', '我很难过']):
+        emotion_scores['sad'] += 3
+    
+    # 找到得分最高的情感
+    max_emotion = max(emotion_scores.items(), key=lambda x: x[1])
+    
+    # 如果最高分数为0或太低，返回neutral
+    if max_emotion[1] == 0 or max_emotion[1] < 2:
+        return 'neutral'
+    
+    return max_emotion[0]
+
 # 创建Flask应用
 app = Flask(__name__)
 app.config['SECRET_KEY'] = Config.SECRET_KEY
@@ -1697,20 +1795,30 @@ def get_next_dialogue():
                     output_path = os.path.join(Config.TEMP_FOLDER, filename)
                     print(f"📁 音频输出路径: {output_path}")
                     
-                    # 使用TTS管理器生成角色语音
+                    # 使用增强的TTS管理器生成AI角色情感语音
                     if tts_manager:
-                        print(f"🔊 开始生成角色语音...")
-                        success = tts_manager.generate_dialogue_audio(
-                            next_dialogue['text'], output_path, voice_type
+                        print(f"🔊 开始生成AI角色情感语音...")
+                        
+                        # 分析台词情感（简单的情感识别）
+                        dialogue_text = next_dialogue['text']
+                        detected_emotion = detect_dialogue_emotion(dialogue_text)
+                        
+                        success = tts_manager.generate_ai_character_audio(
+                            text=dialogue_text,
+                            output_path=output_path,
+                            character_type=voice_type,
+                            emotion=detected_emotion,
+                            scenario_context=scenario_description
                         )
-                        print(f"🔊 语音生成结果: {success}")
+                        print(f"🔊 AI角色情感语音生成结果: {success}")
                         
                         if success and os.path.exists(output_path):
                             # 添加音频信息到对话数据
                             next_dialogue['audio_url'] = url_for('serve_temp_file', filename=filename)
                             next_dialogue['voice_type'] = voice_type
-                            next_dialogue['voice_description'] = voice_mapper.get_voice_description(voice_type)
-                            print(f"✅ 为AI角色 '{ai_role}' 生成语音成功: {voice_type}")
+                            next_dialogue['emotion'] = detected_emotion
+                            next_dialogue['voice_description'] = f"{voice_mapper.get_voice_description(voice_type)} ({detected_emotion})"
+                            print(f"✅ 为AI角色 '{ai_role}' 生成情感语音成功: {voice_type} ({detected_emotion})")
                             print(f"✅ 音频URL: {next_dialogue['audio_url']}")
                         else:
                             print(f"❌ AI角色语音生成失败: TTS生成返回{success}, 文件存在: {os.path.exists(output_path)}")
@@ -1775,6 +1883,106 @@ def get_dialogue_session(session_id):
         return jsonify({
             'success': False,
             'error': str(e)
+        }), 500
+
+@app.route('/api/scenario/ai-tts', methods=['POST'])
+def generate_ai_character_tts():
+    """为AI角色台词生成情感TTS音频"""
+    try:
+        data = request.get_json()
+        
+        # 获取参数
+        text = data.get('text', '').strip()
+        character_type = data.get('character_type', 'default')
+        emotion = data.get('emotion', 'neutral')
+        scenario_context = data.get('scenario_context', '')
+        ai_role = data.get('ai_role', '')
+        
+        # 参数验证
+        if not text:
+            return jsonify({
+                'success': False,
+                'error': '文本内容不能为空'
+            }), 400
+        
+        print(f"🎭 收到AI角色TTS请求:")
+        print(f"   文本: {text}")
+        print(f"   角色类型: {character_type}")
+        print(f"   情感: {emotion}")
+        print(f"   场景: {scenario_context}")
+        print(f"   AI角色: {ai_role}")
+        
+        # 生成唯一文件名
+        import uuid
+        file_id = str(uuid.uuid4())
+        filename = f"ai_character_{file_id}.wav"
+        output_path = os.path.join(Config.TEMP_FOLDER, filename)
+        
+        # 确保临时文件夹存在
+        os.makedirs(Config.TEMP_FOLDER, exist_ok=True)
+        
+        # 使用增强的TTS管理器生成AI角色音频
+        if tts_manager:
+            print(f"🔊 开始生成AI角色情感语音...")
+            
+            success = tts_manager.generate_ai_character_audio(
+                text=text,
+                output_path=output_path,
+                character_type=character_type,
+                emotion=emotion,
+                scenario_context=scenario_context
+            )
+            
+            if success and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                # 生成音频URL
+                audio_url = url_for('serve_temp_file', filename=filename)
+                
+                # 获取语音描述信息
+                voice_description = f"{character_type}({emotion})"
+                if scenario_context:
+                    voice_description += f" - {scenario_context[:30]}..."
+                
+                print(f"✅ AI角色TTS生成成功:")
+                print(f"   文件路径: {output_path}")
+                print(f"   音频URL: {audio_url}")
+                print(f"   文件大小: {os.path.getsize(output_path)} bytes")
+                
+                return jsonify({
+                    'success': True,
+                    'audio_url': audio_url,
+                    'file_id': file_id,
+                    'voice_description': voice_description,
+                    'character_type': character_type,
+                    'emotion': emotion,
+                    'file_size': os.path.getsize(output_path),
+                    'duration_estimate': len(text) * 0.15  # 粗略估算时长（秒）
+                })
+            else:
+                print(f"❌ AI角色TTS生成失败:")
+                print(f"   成功标志: {success}")
+                print(f"   文件存在: {os.path.exists(output_path)}")
+                if os.path.exists(output_path):
+                    print(f"   文件大小: {os.path.getsize(output_path)} bytes")
+                
+                return jsonify({
+                    'success': False,
+                    'error': 'AI角色语音生成失败，请检查TTS服务状态'
+                }), 500
+        else:
+            print(f"❌ TTS管理器未初始化")
+            return jsonify({
+                'success': False,
+                'error': 'TTS服务未初始化，请检查配置'
+            }), 500
+            
+    except Exception as e:
+        print(f"❌ 生成AI角色TTS时出错: {e}")
+        import traceback
+        print(f"详细错误信息: {traceback.format_exc()}")
+        
+        return jsonify({
+            'success': False,
+            'error': f'服务器错误: {str(e)}'
         }), 500
 
 @app.route('/api/scenario/test', methods=['GET'])
