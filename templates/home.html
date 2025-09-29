@@ -107,8 +107,6 @@
                                     <option value="happy">开心</option>
                                     <option value="sad">悲伤</option>
                                     <option value="angry">生气</option>
-                                    <option value="gentle">温柔</option>
-                                    <option value="serious">严肃</option>
                                 </select>
                             </div>
                         </div>
@@ -251,6 +249,17 @@
                     generateScenario();
                 }
             });
+            
+            // 性别选择监听器 - 男声只支持自然情感
+            const voiceGenderSelect = document.getElementById('voiceGender');
+            const voiceEmotionSelect = document.getElementById('voiceEmotion');
+            
+            voiceGenderSelect.addEventListener('change', function() {
+                updateEmotionOptions();
+            });
+            
+            // 初始化情感选项
+            updateEmotionOptions();
         }
         
         // 处理练习模式切换
@@ -270,6 +279,35 @@
             
             // 重置状态
             resetDialogueState();
+        }
+        
+        // 更新情感选项 - 男声只支持自然情感
+        function updateEmotionOptions() {
+            const voiceGenderSelect = document.getElementById('voiceGender');
+            const voiceEmotionSelect = document.getElementById('voiceEmotion');
+            const currentGender = voiceGenderSelect.value;
+            const currentEmotion = voiceEmotionSelect.value;
+            
+            // 清空现有选项
+            voiceEmotionSelect.innerHTML = '';
+            
+            if (currentGender === 'male') {
+                // 男声只支持自然情感
+                voiceEmotionSelect.innerHTML = '<option value="neutral">自然</option>';
+            } else {
+                // 女声支持所有情感
+                voiceEmotionSelect.innerHTML = `
+                    <option value="neutral">自然</option>
+                    <option value="happy">开心</option>
+                    <option value="sad">悲伤</option>
+                    <option value="angry">生气</option>
+                `;
+                
+                // 尝试保持之前选择的情感（如果可用）
+                if (['neutral', 'happy', 'sad', 'angry'].includes(currentEmotion)) {
+                    voiceEmotionSelect.value = currentEmotion;
+                }
+            }
         }
         
         // 重置对话状态

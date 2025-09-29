@@ -270,16 +270,20 @@ class TTSManager:
         # 优先使用情感TTS
         if self.emotion_engine:
             try:
-                # 根据性别选择声音
-                if voice_gender == 'male':
-                    voice = 'zhifeng_emo'  # 男声多情感
-                else:
-                    voice = 'zhimiao_emo'  # 女声（默认）
-                
-                # 使用用户选择的情感，如果没有则使用kwargs中的emotion，最后默认为neutral
+                # 根据性别和情感选择声音
                 emotion = voice_emotion or kwargs.get('emotion', 'neutral')
                 
-                print(f"🎵 使用阿里云情感TTS: voice={voice}, emotion={emotion}")
+                if voice_gender == 'male':
+                    if emotion == 'neutral':
+                        voice = 'zhishuo'  # 男声标准（知硕）- 仅支持中性
+                        print(f"🎵 使用阿里云男声TTS: voice={voice}, emotion={emotion}")
+                    else:
+                        # 男声不支持情感，回退到女声情感模型
+                        voice = 'zhimiao_emo'
+                        print(f"⚠️ 男声暂不支持 {emotion} 情感，使用女声情感模型: voice={voice}, emotion={emotion}")
+                else:
+                    voice = 'zhimiao_emo'  # 女声（默认，支持情感）
+                    print(f"🎵 使用阿里云女声情感TTS: voice={voice}, emotion={emotion}")
                 
                 success = self.emotion_engine.synthesize(
                     text=text,

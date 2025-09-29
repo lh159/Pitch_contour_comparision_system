@@ -38,14 +38,14 @@ class AlibabaEmotionTTS(TTSEngineBase, DialogueTTSEngine):
             'emotions': ['neutral'],
             'description': '清晰女声，标准发音'
         },
-        # 情感TTS - 知锋多情感男声（可用）
-        'zhifeng_emo': {
-            'model': 'sambert-zhifeng-emo-v1',
-            'voice': 'zhifeng_emo',
-            'name': '知锋(男声-多情感)',
+        # 情感TTS - 知冰多情感男声（尝试另一个男声模型）
+        'zhibing_emo': {
+            'model': 'sambert-zhibing-emo-v1',
+            'voice': 'zhibing_emo',
+            'name': '知冰(男声-多情感)',
             'gender': 'male',
-            'emotions': ['angry', 'fear', 'happy', 'neutral', 'sad', 'surprise'],
-            'description': '多情感男声，支持愤怒、恐惧、快乐、中性、悲伤、惊讶等情感'
+            'emotions': ['neutral', 'happy', 'sad', 'angry'],
+            'description': '多情感男声，支持多种情感表达'
         },
         # 标准TTS - 知硕男声（保留作为备用）
         'zhishuo': {
