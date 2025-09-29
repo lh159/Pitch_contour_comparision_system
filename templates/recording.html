@@ -66,121 +66,6 @@
             font-weight: 500;
         }
 
-        .recording-guide-area {
-            margin: 15px 0;
-            border: 2px dashed #28a745;
-            border-radius: 10px;
-            padding: 20px;
-            background: #f8fff8;
-            min-height: 200px;
-        }
-        
-        /* 确保录音指导区域内的倒计时样式正确显示 */
-        .recording-guide-area .preparation-hint {
-            position: relative;
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            border-radius: 15px;
-            padding: 25px;
-            color: white;
-            text-align: center;
-            box-shadow: 0 8px 32px rgba(79, 172, 254, 0.3);
-            animation: fadeInScale 0.5s ease-out;
-            margin-bottom: 20px;
-        }
-        
-        .recording-guide-area .countdown-display {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin: 30px 0;
-            min-height: 200px;
-            position: relative;
-        }
-        
-        .recording-guide-area .countdown-circle {
-            width: 150px;
-            height: 150px;
-            border-radius: 50%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-            transition: all 0.3s ease;
-        }
-        
-        .recording-guide-area .countdown-number {
-            font-size: 48px;
-            font-weight: bold;
-            color: white;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            transform: scale(1);
-            transition: transform 0.3s ease;
-        }
-
-        .guide-container-placeholder {
-            text-align: center;
-            color: #6c757d;
-            font-style: italic;
-        }
-
-        /* 准备阶段样式 */
-        .preparation-hint {
-            position: relative;
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            border-radius: 15px;
-            padding: 25px;
-            color: white;
-            text-align: center;
-            box-shadow: 0 8px 32px rgba(79, 172, 254, 0.3);
-            animation: fadeInScale 0.5s ease-out;
-            margin-bottom: 20px;
-        }
-
-        .preparation-content h4 {
-            margin: 0 0 15px 0;
-            font-size: 1.4em;
-            font-weight: 600;
-        }
-
-        .preparation-content p {
-            margin: 0 0 20px 0;
-            font-size: 1.1em;
-            line-height: 1.5;
-        }
-
-        .preparation-text {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 10px;
-            padding: 15px;
-            font-size: 1.2em;
-            font-weight: 500;
-            letter-spacing: 0.5px;
-            line-height: 1.6;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        #countdown {
-            font-weight: bold;
-            font-size: 1.3em;
-            color: #ffeb3b;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        @keyframes fadeInScale {
-            from {
-                opacity: 0;
-                transform: scale(0.9) translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
-        }
 
         /* 场景对话信息卡片 */
         .dialogue-info-card {
@@ -221,15 +106,131 @@
             transition: width 0.3s ease;
         }
 
-        /* 录音模式信息样式 */
-        .recording-mode-info {
-            margin-bottom: 20px;
+        /* 录音控件样式 */
+        .recording-controls-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            margin: 30px 0;
         }
 
-        .recording-mode-info .alert {
-            border-left: 4px solid #17a2b8;
-            background: linear-gradient(135deg, #e8f7fa, #b2ebf2);
-            border-color: transparent;
+        .btn-record-primary {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #dc3545, #e74c3c);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(220, 53, 69, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-record-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 40px rgba(220, 53, 69, 0.4);
+            background: linear-gradient(135deg, #c82333, #dc3545);
+        }
+
+        .btn-record-primary:active {
+            transform: scale(0.95);
+        }
+
+        .btn-record-primary:disabled {
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        .btn-record-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 10px;
+        }
+
+        .btn-record-content i {
+            font-size: 48px;
+            animation: pulse-icon 2s infinite;
+        }
+
+        .btn-record-content span {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        @keyframes pulse-icon {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* 录音中状态样式 */
+        .btn-record-primary.recording {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            animation: pulse-recording 1.5s infinite;
+        }
+
+        @keyframes pulse-recording {
+            0% { 
+                box-shadow: 0 10px 30px rgba(40, 167, 69, 0.3);
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 15px 40px rgba(40, 167, 69, 0.5);
+                transform: scale(1.02);
+            }
+            100% { 
+                box-shadow: 0 10px 30px rgba(40, 167, 69, 0.3);
+                transform: scale(1);
+            }
+        }
+
+        /* 重新录制按钮样式 */
+        .btn-rerecord {
+            width: 160px;
+            height: 60px;
+            border-radius: 30px;
+            border: 2px solid #e74c3c;
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+            margin-top: 15px;
+        }
+        
+        .btn-rerecord:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
+            background: linear-gradient(135deg, #d62c1a 0%, #a93226 100%);
+            color: white;
+        }
+        
+        .btn-rerecord:active {
+            transform: translateY(0);
+        }
+        
+        /* 重新录制按钮内容样式 */
+        .btn-rerecord .btn-record-content {
+            flex-direction: row;
+            gap: 8px;
+        }
+        
+        .btn-rerecord .btn-record-content i {
+            font-size: 1.2rem;
+        }
+        
+        .btn-rerecord .btn-record-content span {
+            font-size: 1rem;
         }
     </style>
 </head>
@@ -277,12 +278,12 @@
                 </div>
             </div>
 
-            <!-- 录制您的发音（带实时指导） -->
+            <!-- 录制您的发音 -->
             <div class="step-card">
                 <div class="step-header">
                     <h4 class="mb-0">
                         <span class="step-number">3</span>
-                        录制您的发音（带实时指导）
+                        录制您的发音
                     </h4>
                 </div>
                 <div class="card-body p-4">
@@ -294,26 +295,22 @@
                         </div>
                     </div>
 
-                    <!-- 录音模式说明 -->
-                    <div class="recording-mode-info">
-                        <div class="alert alert-info mb-3">
-                            <i class="fas fa-magic me-2"></i>
-                            <strong>实时指导录音模式</strong><br>
-                            <small>系统将为您提供实时朗读提示，包括倒计时准备和逐字指导</small>
-                        </div>
-                    </div>
                     
                     <!-- 录音控件 -->
-                    <div class="audio-controls">
-                        <button class="btn btn-danger" id="recordBtn">
-                            <i class="fas fa-microphone me-2"></i>
-                            开始录音
+                    <div class="recording-controls-container">
+                        <button class="btn-record-primary" id="recordBtn">
+                            <div class="btn-record-content">
+                                <i class="fas fa-microphone"></i>
+                                <span>开始录音</span>
+                            </div>
                         </button>
-                        <button class="btn btn-secondary" id="stopBtn" disabled>
-                            <i class="fas fa-stop me-2"></i>
-                            停止录音
+                        <button class="btn btn-rerecord" id="rerecordBtn" style="display: none;">
+                            <div class="btn-record-content">
+                                <i class="fas fa-redo"></i>
+                                <span>重新录制</span>
+                            </div>
                         </button>
-                        <button class="btn btn-outline-primary" id="uploadBtn" style="display: none;">
+                        <button class="btn btn-outline-primary mt-3" id="uploadBtn" style="display: none;">
                             <i class="fas fa-upload me-2"></i>
                             上传音频文件
                         </button>
@@ -324,24 +321,15 @@
                         <div class="status-indicator recording-pulse"></div>
                         <span class="status-text">录音进行中...</span>
                         <button class="btn btn-sm btn-danger ms-auto" id="quickStopBtn">
-                            <i class="fas fa-stop"></i> 立即停止
+                            <i class="fas fa-stop"></i> 停止录音
                         </button>
-                    </div>
-                    
-                    <!-- 实时指导区域 -->
-                    <div class="recording-guide-area" id="recordingGuideArea" style="display: block;">
-                        <div class="guide-container-placeholder">
-                            <i class="fas fa-magic me-2"></i>
-                            实时录音指导区域<br>
-                            <small>点击"开始录音"后，这里将显示倒计时准备和实时朗读提示</small>
-                        </div>
                     </div>
                     
                     <!-- 波形容器和音频播放器 -->
                     <div class="waveform-container" id="waveformContainer">
                         <span class="text-muted">
-                            <i class="fas fa-magic me-2"></i>
-                            点击"开始录音"启动实时指导录音
+                            <i class="fas fa-microphone me-2"></i>
+                            点击"开始录音"开始录制您的发音
                         </span>
                     </div>
                     
@@ -381,8 +369,6 @@
     <!-- 录音API适配器 -->
     <script src="{{ url_for('static', filename='js/recording-api.js') }}"></script>
     
-    <!-- 录音指导组件 -->
-    <script src="{{ url_for('static', filename='js/recording-guide.js') }}"></script>
     
     <!-- 通用JS -->
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
@@ -395,7 +381,6 @@
         let userFileId = null;
         let currentText = '';
         let currentCharTimestamps = [];
-        let recordingGuide = null;
         let socket = null;
         let isDialogueMode = false;
         let dialogueData = null;
@@ -405,13 +390,12 @@
         // DOM元素
         const practiceText = document.getElementById('practiceText');
         const recordBtn = document.getElementById('recordBtn');
-        const stopBtn = document.getElementById('stopBtn');
+        const rerecordBtn = document.getElementById('rerecordBtn');
         const uploadBtn = document.getElementById('uploadBtn');
         const userAudio = document.getElementById('userAudio');
         const compareBtn = document.getElementById('compareBtn');
         const waveformContainer = document.getElementById('waveformContainer');
         const recordingStatusBar = document.getElementById('recordingStatusBar');
-        const recordingGuideArea = document.getElementById('recordingGuideArea');
         const quickStopBtn = document.getElementById('quickStopBtn');
         const backToStandardBtn = document.getElementById('backToStandardBtn');
         const backToStandardBtn2 = document.getElementById('backToStandardBtn2');
@@ -434,11 +418,6 @@
             
             // 设置事件监听器
             setupEventListeners();
-            
-            // 初始化实时指导录音界面
-            setTimeout(() => {
-                initializeGuidedRecordingInterface();
-            }, 1000);
             
             console.log('✓ 录音页面初始化完成');
         });
@@ -540,8 +519,8 @@
         // 设置事件监听器
         function setupEventListeners() {
             // 录音控制按钮
-            recordBtn.addEventListener('click', startRecording);
-            stopBtn.addEventListener('click', stopRecording);
+            recordBtn.addEventListener('click', handleRecordButtonClick);
+            rerecordBtn.addEventListener('click', handleRerecordButtonClick);
             quickStopBtn.addEventListener('click', forceStopRecording);
             
             // 文件上传
@@ -554,6 +533,65 @@
             // 返回按钮
             backToStandardBtn.addEventListener('click', goBackToStandard);
             backToStandardBtn2.addEventListener('click', goBackToStandard);
+        }
+        
+        // 处理录音按钮点击
+        async function handleRecordButtonClick() {
+            if (recordBtn.disabled) return;
+            
+            if (recordBtn.classList.contains('recording')) {
+                // 当前正在录音，点击停止
+                await stopRecording();
+            } else {
+                // 当前未录音，点击开始
+                await startRecording();
+            }
+        }
+        
+        // 处理重新录制按钮点击
+        async function handleRerecordButtonClick() {
+            console.log('点击重新录制按钮');
+            
+            // 重置UI状态
+            resetRecordingUI();
+            
+            // 清除之前的录音数据
+            userFileId = null;
+            userAudio.src = '';
+            userAudio.style.display = 'none';
+            
+            // 隐藏重新录制和比对按钮
+            rerecordBtn.style.display = 'none';
+            compareBtn.style.display = 'none';
+            
+            // 开始新的录音
+            await startRecording();
+            
+            showAlert('开始重新录制...', 'info');
+        }
+        
+        // 重置录音UI状态
+        function resetRecordingUI() {
+            // 重置波形容器
+            waveformContainer.classList.remove('recording');
+            waveformContainer.innerHTML = `
+                <span class="text-muted">
+                    <i class="fas fa-microphone me-2"></i>
+                    点击"开始录音"开始录制您的发音
+                </span>
+            `;
+            
+            // 重置录音按钮
+            recordBtn.classList.remove('recording');
+            recordBtn.innerHTML = `
+                <div class="btn-record-content">
+                    <i class="fas fa-microphone"></i>
+                    <span>开始录音</span>
+                </div>
+            `;
+            
+            // 隐藏录音状态栏
+            recordingStatusBar.style.display = 'none';
         }
         
         // 返回标准发音页面
@@ -584,29 +622,17 @@
                     return;
                 }
                 
-                // 启动录音指导（实时指导录音模式）
-                const guideStarted = startRecordingGuide();
-                if (!guideStarted) {
-                    showAlert('缺少时间戳数据，将以基础录音方式进行，录音完成后可进行音高比对', 'info');
-                    // 没有指导时，立即开始录音
-                    var result = await recordingAdapter.startRecording();
-                } else {
-                    // 有指导时，标记延迟录音启动，等待准备阶段结束
-                    console.log('🕐 检测到录音指导，将延迟录音启动至准备阶段结束');
-                    if (recordingGuide) {
-                        recordingGuide.delayedRecordingStart = true;
-                    }
-                    // 暂时返回成功状态，实际录音将在准备阶段结束后启动
-                    var result = {
-                        success: true,
-                        mode: recordingAdapter.getMode(),
-                        message: '录音指导已开始，录音将在准备阶段结束后自动启动'
-                    };
-                }
+                // 直接开始录音
+                const result = await recordingAdapter.startRecording();
                 
                 if (result.success) {
-                    recordBtn.disabled = true;
-                    stopBtn.disabled = false;
+                    recordBtn.classList.add('recording');
+                    recordBtn.innerHTML = `
+                        <div class="btn-record-content">
+                            <i class="fas fa-stop"></i>
+                            <span>点击停止</span>
+                        </div>
+                    `;
                     
                     // 显示录音状态栏
                     recordingStatusBar.style.display = 'flex';
@@ -614,13 +640,8 @@
                     const mode = recordingAdapter.getMode();
                     const modeText = mode === 'browser' ? '浏览器录音' : '服务器录音';
                     
-                    // 如果指导启动成功，显示指导相关信息
-                    if (guideStarted) {
-                        waveformContainer.innerHTML = `<i class="fas fa-microphone text-danger me-2"></i>正在录音中 (${modeText})... 请跟随上方的实时指导进行朗读`;
-                    } else {
-                        waveformContainer.classList.add('recording');
-                        waveformContainer.innerHTML = `<i class="fas fa-microphone text-danger me-2"></i>录音中 (${modeText})... 可以点击上方的"立即停止"按钮结束录音`;
-                    }
+                    waveformContainer.classList.add('recording');
+                    waveformContainer.innerHTML = `<i class="fas fa-microphone text-danger me-2"></i>录音中 (${modeText})... 请自然说出练习文本`;
                     
                     console.log(`🎙️ ${modeText}开始成功`);
                 } else {
@@ -647,8 +668,15 @@
                 const result = await recordingAdapter.stopRecording();
                 
                 if (result.success) {
-                    recordBtn.disabled = false;
-                    stopBtn.disabled = true;
+                    // 重置录音按钮状态
+                    recordBtn.classList.remove('recording');
+                    recordBtn.innerHTML = `
+                        <div class="btn-record-content">
+                            <i class="fas fa-microphone"></i>
+                            <span>开始录音</span>
+                        </div>
+                    `;
+                    
                     waveformContainer.classList.remove('recording');
                     
                     // 隐藏录音状态栏
@@ -657,26 +685,7 @@
                     const mode = recordingAdapter.getMode();
                     const modeText = mode === 'browser' ? '浏览器录音' : '服务器录音';
                     
-                    // 检查是否有录音指导
-                    if (recordingGuide) {
-                        waveformContainer.innerHTML = `<i class="fas fa-check text-success me-2"></i>录音和指导完成 (${modeText})`;
-                        
-                        // 停止录音指导并获取结果
-                        const guideResult = recordingGuide.getGuidanceResult();
-                        console.log('录音指导结果:', guideResult);
-                        
-                        // 显示简要统计
-                        if (guideResult.stats) {
-                            const accuracy = guideResult.stats.accuracy || 0;
-                            showAlert(`录音指导完成！准确率: ${accuracy.toFixed(1)}%`, 
-                                     accuracy >= 80 ? 'success' : accuracy >= 60 ? 'warning' : 'info');
-                        }
-                        
-                        recordingGuide.stopGuide();
-                        recordingGuide = null;
-                    } else {
-                        waveformContainer.innerHTML = `<i class="fas fa-check text-success me-2"></i>录音完成 (${modeText})`;
-                    }
+                    waveformContainer.innerHTML = `<i class="fas fa-check text-success me-2"></i>录音完成 (${modeText})`;
                     
                     // 设置用户文件ID和显示音频
                     if (result.file_id) {
@@ -702,7 +711,7 @@
                             waveformContainer.innerHTML = `
                                 <div class="recording-complete-indicator">
                                     <i class="fas fa-check-circle text-success me-2"></i>
-                                    <span class="text-success">录音和指导完成</span>
+                                    <span class="text-success">录音完成</span>
                                     ${mode === 'browser' ? '（浏览器录音）' : '（服务器录音）'}
                                 </div>
                             `;
@@ -711,6 +720,7 @@
                         }
                         
                         compareBtn.style.display = 'inline-block';
+                        rerecordBtn.style.display = 'inline-block';
                         
                         const duration = result.duration || result.pitch_info?.duration || 0;
                         showAlert(`录音完成！时长: ${duration.toFixed(2)}秒`, 'success');
@@ -731,16 +741,10 @@
         async function forceStopRecording() {
             console.log('强制停止录音');
             
-            // 停止录音指导
-            if (recordingGuide) {
-                recordingGuide.stopGuide();
-                recordingGuide = null;
-            }
-            
             // 停止录音
             await stopRecording();
             
-            showAlert('录音已强制停止', 'info');
+            showAlert('录音已停止', 'info');
         }
         
         
@@ -776,6 +780,7 @@
                     });
                     
                     compareBtn.style.display = 'inline-block';
+                    rerecordBtn.style.display = 'inline-block';
                     showAlert('音频文件上传成功！', 'success');
                 } else {
                     console.error('文件上传失败:', data.error);
@@ -811,103 +816,6 @@
             navigateTo('/results', params);
         }
         
-        
-        // 启动录音指导
-        function startRecordingGuide() {
-            if (!currentCharTimestamps.length) {
-                showAlert('无时间戳数据，无法启动录音指导', 'warning');
-                return false;
-            }
-            
-            try {
-                console.log('🎙️ 准备启动录音指导...');
-                
-                // 清理之前的录音指导组件（如果存在）
-                if (recordingGuide) {
-                    recordingGuide.stopGuide();
-                    recordingGuide = null;
-                }
-                
-                // 清理容器内容，确保干净的状态
-                recordingGuideArea.innerHTML = '';
-                
-                // 重新创建录音指导组件，确保每次都是新的实例
-                recordingGuide = new RecordingGuide(recordingGuideArea, {
-                    showRecordingHints: true,
-                    enableVoiceDetection: false,  // 暂时禁用语音检测
-                    missedThreshold: 0.5
-                });
-                
-                // 开始指导（使用新的配置参数）
-                recordingGuide.startRecordingGuide(currentCharTimestamps, {
-                    enableVoiceDetection: false,
-                    warningBeforeTime: 0.5,
-                    reactionTime: 0.5,        // 用户反应时间补偿
-                    preparationTime: 3.0,     // 录音前准备时间
-                    flexibleWindow: 1.0,      // 宽松时间窗口
-                    enablePreparationPhase: true  // 启用准备阶段
-                });
-                
-                // 监听指导停止事件
-                recordingGuideArea.addEventListener('guidestopped', (event) => {
-                    const result = event.detail;
-                    console.log('录音指导结束:', result);
-                    
-                    // 发送指导结果到服务器
-                    if (socket && socket.connected) {
-                        socket.emit('recording_guide_stopped', {
-                            session_id: standardFileId,
-                            progress: result.progress,
-                            stats: result.stats,
-                            duration: result.duration
-                        });
-                    }
-                });
-                
-                console.log('✅ 录音指导启动成功');
-                return true;
-                
-            } catch (error) {
-                console.error('❌ 录音指导启动失败:', error);
-                showAlert('录音指导功能启动失败', 'danger');
-                return false;
-            }
-        }
-        
-        // 初始化实时指导录音界面
-        function initializeGuidedRecordingInterface() {
-            console.log('🔍 初始化实时指导录音界面...');
-            
-            // 清理并重置指导区域为占位符状态
-            recordingGuideArea.innerHTML = `
-                <div class="guide-container-placeholder">
-                    <i class="fas fa-magic me-2"></i>
-                    实时录音指导区域<br>
-                    <small>点击"开始录音"后，这里将显示倒计时准备和实时朗读提示</small>
-                </div>
-            `;
-            
-            // 显示指导区域
-            recordingGuideArea.style.display = 'block';
-            
-            // 检查是否有时间戳数据
-            if (!currentCharTimestamps.length) {
-                console.warn('缺少时间戳数据，显示提示信息');
-                waveformContainer.innerHTML = `
-                    <span class="text-muted">
-                        <i class="fas fa-magic me-2"></i>
-                        实时指导录音：请先确保有时间戳数据，然后开始录音获得实时朗读提示
-                    </span>
-                `;
-            } else {
-                waveformContainer.innerHTML = `
-                    <span class="text-muted">
-                        <i class="fas fa-magic me-2"></i>
-                        实时指导录音：点击"开始录音"后将显示倒计时准备和实时朗读指导
-                    </span>
-                `;
-            }
-        }
         
         // 初始化WebSocket连接
         function initializeWebSocket() {
