@@ -1931,6 +1931,12 @@
                     userAudio.load(); // 强制重新加载音频
                     userAudio.style.display = 'block';
                     
+                    // 🔧 确保用户录音可以重复播放
+                    userAudio.addEventListener('ended', function() {
+                        console.log('🎵 用户录音播放结束，重置播放位置');
+                        this.currentTime = 0;
+                    });
+                    
                     // 停止录音指导
                     if (recordingGuide) {
                         recordingGuide.stopGuide();
@@ -2034,7 +2040,7 @@
                     </div>
                     
                     <div class="audio-player mb-3">
-                        <audio controls style="width: 100%;">
+                        <audio controls style="width: 100%;" preload="metadata" id="playbackAudio">
                             <source src="${audioUrl}" type="audio/wav">
                             您的浏览器不支持音频播放。
                         </audio>
@@ -2055,6 +2061,27 @@
             
             // 保存audioBlob到全局变量，供确认函数使用
             window.currentAudioBlob = audioBlob;
+            
+            // 🔧 修复播放问题：确保音频可以重复播放
+            setTimeout(() => {
+                const playbackAudioElement = document.getElementById('playbackAudio');
+                if (playbackAudioElement) {
+                    // 设置音频源
+                    playbackAudioElement.src = audioUrl;
+                    
+                    // 添加事件监听器确保音频可以重复播放
+                    playbackAudioElement.addEventListener('ended', function() {
+                        console.log('🎵 录音播放结束，重置播放位置');
+                        this.currentTime = 0;
+                        this.load(); // 重新加载音频，确保可以再次播放
+                    });
+                    
+                    // 强制加载音频
+                    playbackAudioElement.load();
+                    
+                    console.log('✅ 录音播放器初始化完成，支持重复播放');
+                }
+            }, 100);
         }
         
         // 确认录音并开始比对
@@ -2162,6 +2189,13 @@
                     userAudio.src = audioUrlWithTimestamp;
                     userAudio.load(); // 强制重新加载音频
                     userAudio.style.display = 'block';
+                    
+                    // 🔧 确保上传的录音可以重复播放
+                    userAudio.addEventListener('ended', function() {
+                        console.log('🎵 上传录音播放结束，重置播放位置');
+                        this.currentTime = 0;
+                    });
+                    
                     compareBtn.style.display = 'inline-block';
                     showAlert('音频文件上传成功！', 'success');
                 } else {

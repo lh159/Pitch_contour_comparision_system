@@ -692,6 +692,12 @@
                             userAudio.load(); // 强制重新加载音频
                             userAudio.style.display = 'block';
                             
+                            // 🔧 确保用户录音可以重复播放
+                            userAudio.addEventListener('ended', function() {
+                                console.log('🎵 用户录音播放结束，重置播放位置');
+                                this.currentTime = 0;
+                            });
+                            
                             // 更新波形容器显示录音完成状态
                             waveformContainer.innerHTML = `
                                 <div class="recording-complete-indicator">
@@ -762,6 +768,13 @@
                     userAudio.src = audioUrlWithTimestamp;
                     userAudio.load(); // 强制重新加载音频
                     userAudio.style.display = 'block';
+                    
+                    // 🔧 确保上传的录音可以重复播放
+                    userAudio.addEventListener('ended', function() {
+                        console.log('🎵 上传录音播放结束，重置播放位置');
+                        this.currentTime = 0;
+                    });
+                    
                     compareBtn.style.display = 'inline-block';
                     showAlert('音频文件上传成功！', 'success');
                 } else {
