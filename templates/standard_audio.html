@@ -973,7 +973,7 @@
             
             // 禁用按钮
             analyzeStandardBtn.disabled = true;
-            analyzeStandardBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>分析中...';
+            analyzeStandardBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             
             try {
                 // 调用音高提取API
@@ -1011,7 +1011,7 @@
             } finally {
                 // 恢复按钮
                 analyzeStandardBtn.disabled = false;
-                analyzeStandardBtn.innerHTML = '<i class="fas fa-chart-line me-2"></i>分析音高';
+                analyzeStandardBtn.innerHTML = '<i class="fas fa-chart-line"></i>';
             }
         }
         
@@ -1163,7 +1163,7 @@
                 // 启用同步显示
                 syncContainer.style.display = 'block';
                 syncContainer.classList.add('active');
-                toggleSyncBtn.innerHTML = '<i class="fas fa-sync-alt"></i>关闭同步显示';
+                toggleSyncBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
                 
                 // 初始化实时同步组件
                 initializeRealtimeSync();
@@ -1172,7 +1172,7 @@
                 // 关闭同步显示
                 syncContainer.style.display = 'none';
                 syncContainer.classList.remove('active');
-                toggleSyncBtn.innerHTML = '<i class="fas fa-sync-alt"></i>启用同步显示';
+                toggleSyncBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
                 
                 // 销毁同步组件
                 if (realtimeSync) {
