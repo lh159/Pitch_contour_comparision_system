@@ -138,23 +138,23 @@
             </div>
             
             <!-- 场景对话展示区域 -->
-            <div class="step-card" id="dialogueContainer" style="display: none;">
+            <div class="step-card dialogue-container-card" id="dialogueContainer" style="display: none;">
                 <div class="step-header">
                     <h4 class="mb-0">
                         <i class="fas fa-theater-masks me-2"></i>
                         <span id="scenarioTitle">场景对话</span>
                     </h4>
                 </div>
-                <div class="card-body p-4">
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <div class="alert alert-primary mb-0">
+                <div class="card-body dialogue-card-body">
+                    <div class="role-info-container">
+                        <div class="role-info-item user-role-info">
+                            <div class="alert alert-primary role-alert">
                                 <i class="fas fa-user me-2"></i>
                                 <span class="user-role">您的角色：用户</span>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="alert alert-success mb-0">
+                        <div class="role-info-item ai-role-info">
+                            <div class="alert alert-success role-alert">
                                 <i class="fas fa-robot me-2"></i>
                                 <span class="ai-role">AI角色：助手</span>
                             </div>
@@ -166,10 +166,10 @@
                     </div>
                     
                     <div class="nav-buttons">
-                        <button class="btn btn-success" id="startDialogueBtn">
+                        <button class="btn btn-dialogue-primary" id="startDialogueBtn">
                             <i class="fas fa-play me-2"></i>开始对话
                         </button>
-                        <button class="btn btn-info" id="regenerateBtn">
+                        <button class="btn btn-dialogue-secondary" id="regenerateBtn">
                             <i class="fas fa-redo me-2"></i>重新生成
                         </button>
                     </div>
@@ -438,9 +438,11 @@
                 dialogueItem.className = `dialogue-item ${dialogue.speaker}-dialogue`;
                 dialogueItem.innerHTML = `
                     <div class="dialogue-speaker">${dialogue.speaker === 'user' ? dialogueData.user_role : dialogueData.ai_role}</div>
-                    <div class="dialogue-text">${dialogue.text}</div>
-                    <div class="dialogue-status" id="status-${dialogue.order}">
-                        ${dialogue.speaker === 'user' ? '待练习' : '待播放'}
+                    <div class="dialogue-bubble">
+                        <div class="dialogue-text">${dialogue.text}</div>
+                        <div class="dialogue-status" id="status-${dialogue.order}">
+                            ${dialogue.speaker === 'user' ? '待练习' : '待播放'}
+                        </div>
                     </div>
                 `;
                 dialogueContent.appendChild(dialogueItem);
@@ -481,74 +483,332 @@
         // 场景对话相关样式
         const dialogueStyles = `
             <style>
-            .dialogue-content {
-                max-height: 400px;
-                overflow-y: auto;
-                border: 1px solid #e9ecef;
-                border-radius: 10px;
-                padding: 15px;
-                background: #f8f9fa;
+            /* 对话容器卡片样式 */
+            .dialogue-container-card {
+                margin-top: 20px;
             }
             
-            .dialogue-item {
+            .dialogue-card-body {
+                padding: 16px !important;
+            }
+            
+            /* 角色信息容器 */
+            .role-info-container {
                 display: flex;
-                align-items: flex-start;
-                margin-bottom: 15px;
-                padding: 12px;
+                gap: 12px;
+                margin-bottom: 16px;
+            }
+            
+            .role-info-item {
+                flex: 1;
+            }
+            
+            .role-alert {
+                margin-bottom: 0;
+                padding: 8px 12px;
+                font-size: 13px;
                 border-radius: 10px;
+                border: none;
+            }
+            
+            /* 对话容器优化 - 移动端友好 */
+            .dialogue-content {
+                max-height: 50vh;
+                overflow-y: auto;
+                border: none;
+                border-radius: 15px;
+                padding: 8px;
+                background: #ffffff;
+                margin-bottom: 20px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            
+            /* 移动端对话项布局优化 */
+            .dialogue-item {
+                margin-bottom: 12px;
+                padding: 0;
+                border-radius: 0;
                 position: relative;
                 transition: all 0.3s ease;
+                display: block;
             }
             
+            /* 用户对话气泡 - 右侧蓝色 */
             .dialogue-item.user-dialogue {
-                background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-                border-left: 4px solid #2196f3;
+                text-align: right;
+                margin-left: 15%;
             }
             
+            .dialogue-item.user-dialogue .dialogue-bubble {
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                color: white;
+                border-radius: 18px 18px 5px 18px;
+                padding: 12px 16px;
+                display: inline-block;
+                max-width: 85%;
+                word-wrap: break-word;
+                box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+                position: relative;
+            }
+            
+            /* AI对话气泡 - 左侧绿色 */
             .dialogue-item.ai-dialogue {
-                background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
-                border-left: 4px solid #4caf50;
+                text-align: left;
+                margin-right: 15%;
             }
             
+            .dialogue-item.ai-dialogue .dialogue-bubble {
+                background: linear-gradient(135deg, #11998e, #38ef7d);
+                color: white;
+                border-radius: 18px 18px 18px 5px;
+                padding: 12px 16px;
+                display: inline-block;
+                max-width: 85%;
+                word-wrap: break-word;
+                box-shadow: 0 2px 8px rgba(17, 153, 142, 0.3);
+                position: relative;
+            }
+            
+            /* 角色名称样式 */
             .dialogue-speaker {
-                font-weight: bold;
-                font-size: 14px;
+                font-size: 11px;
                 color: #666;
-                min-width: 80px;
-                margin-right: 15px;
+                margin-bottom: 4px;
+                font-weight: 500;
             }
             
+            .user-dialogue .dialogue-speaker {
+                text-align: right;
+            }
+            
+            .ai-dialogue .dialogue-speaker {
+                text-align: left;
+            }
+            
+            /* 对话文本样式 */
             .dialogue-text {
-                flex: 1;
-                font-size: 16px;
-                line-height: 1.5;
-                color: #333;
+                font-size: 15px;
+                line-height: 1.4;
+                margin: 0;
             }
             
+            /* 状态标签样式 */
             .dialogue-status {
-                font-size: 12px;
-                padding: 4px 8px;
-                border-radius: 12px;
-                background: #f0f0f0;
-                color: #666;
-                min-width: 60px;
-                text-align: center;
+                font-size: 10px;
+                padding: 2px 6px;
+                border-radius: 10px;
+                background: rgba(255,255,255,0.2);
+                color: rgba(255,255,255,0.8);
+                margin-top: 4px;
+                display: inline-block;
+                backdrop-filter: blur(10px);
             }
             
             .dialogue-status.active {
-                background: #2196f3;
+                background: rgba(255,255,255,0.3);
                 color: white;
                 animation: pulse 1.5s infinite;
             }
             
             .dialogue-status.playing {
-                background: #ff9800;
+                background: rgba(255,152,0,0.8);
                 color: white;
             }
             
             .dialogue-status.completed {
-                background: #4caf50;
+                background: rgba(76,175,80,0.8);
                 color: white;
+            }
+            
+            /* 按钮容器样式 */
+            .nav-buttons {
+                display: flex;
+                gap: 12px;
+                margin-top: 20px;
+                padding: 0 8px;
+            }
+            
+            /* 美化的对话按钮样式 */
+            .btn-dialogue-primary {
+                flex: 1;
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                border: none;
+                color: white;
+                padding: 14px 20px;
+                border-radius: 25px;
+                font-size: 16px;
+                font-weight: 600;
+                text-transform: none;
+                letter-spacing: 0.5px;
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+                transition: all 0.3s ease;
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .btn-dialogue-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+                background: linear-gradient(135deg, #764ba2, #667eea);
+                color: white;
+            }
+            
+            .btn-dialogue-primary:active {
+                transform: translateY(0);
+                box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
+            }
+            
+            .btn-dialogue-secondary {
+                flex: 1;
+                background: linear-gradient(135deg, #11998e, #38ef7d);
+                border: none;
+                color: white;
+                padding: 14px 20px;
+                border-radius: 25px;
+                font-size: 16px;
+                font-weight: 600;
+                text-transform: none;
+                letter-spacing: 0.5px;
+                box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4);
+                transition: all 0.3s ease;
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .btn-dialogue-secondary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(17, 153, 142, 0.6);
+                background: linear-gradient(135deg, #38ef7d, #11998e);
+                color: white;
+            }
+            
+            .btn-dialogue-secondary:active {
+                transform: translateY(0);
+                box-shadow: 0 2px 10px rgba(17, 153, 142, 0.4);
+            }
+            
+            /* 按钮点击波纹效果 */
+            .btn-dialogue-primary::before,
+            .btn-dialogue-secondary::before {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 0;
+                height: 0;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.3);
+                transform: translate(-50%, -50%);
+                transition: width 0.6s, height 0.6s;
+            }
+            
+            .btn-dialogue-primary:active::before,
+            .btn-dialogue-secondary:active::before {
+                width: 300px;
+                height: 300px;
+            }
+            
+            /* 移动端优化 */
+            @media (max-width: 768px) {
+                .dialogue-card-body {
+                    padding: 12px !important;
+                }
+                
+                .role-info-container {
+                    gap: 8px;
+                    margin-bottom: 12px;
+                }
+                
+                .role-alert {
+                    padding: 6px 10px;
+                    font-size: 12px;
+                }
+                
+                .dialogue-content {
+                    padding: 4px;
+                    margin-bottom: 15px;
+                    max-height: 45vh;
+                }
+                
+                .dialogue-item.user-dialogue {
+                    margin-left: 8%;
+                }
+                
+                .dialogue-item.ai-dialogue {
+                    margin-right: 8%;
+                }
+                
+                .dialogue-bubble {
+                    max-width: 90% !important;
+                    font-size: 14px !important;
+                    padding: 10px 14px !important;
+                }
+                
+                .dialogue-speaker {
+                    font-size: 10px;
+                    margin-bottom: 3px;
+                }
+                
+                .nav-buttons {
+                    gap: 8px;
+                    padding: 0 4px;
+                    margin-top: 15px;
+                }
+                
+                .btn-dialogue-primary,
+                .btn-dialogue-secondary {
+                    padding: 12px 16px;
+                    font-size: 14px;
+                    border-radius: 20px;
+                }
+            }
+            
+            /* 超小屏幕优化 */
+            @media (max-width: 480px) {
+                .dialogue-card-body {
+                    padding: 8px !important;
+                }
+                
+                .role-info-container {
+                    flex-direction: column;
+                    gap: 6px;
+                    margin-bottom: 10px;
+                }
+                
+                .role-alert {
+                    padding: 5px 8px;
+                    font-size: 11px;
+                    text-align: center;
+                }
+                
+                .dialogue-content {
+                    max-height: 40vh;
+                    padding: 2px;
+                }
+                
+                .dialogue-item.user-dialogue {
+                    margin-left: 5%;
+                }
+                
+                .dialogue-item.ai-dialogue {
+                    margin-right: 5%;
+                }
+                
+                .dialogue-bubble {
+                    max-width: 95% !important;
+                    font-size: 13px !important;
+                    padding: 8px 12px !important;
+                }
+                
+                .nav-buttons {
+                    flex-direction: column;
+                    gap: 10px;
+                }
+                
+                .btn-dialogue-primary,
+                .btn-dialogue-secondary {
+                    width: 100%;
+                }
             }
             
             @keyframes pulse {
