@@ -159,12 +159,15 @@ class AlibabaEmotionTTS(TTSEngineBase, DialogueTTSEngine):
             # 构建合成文本
             synthesis_text = self._prepare_text(text, emotion, voice_config)
             
-            # 使用SDK进行语音合成
+            # 使用SDK进行语音合成，传递情感参数
+            print(f"🔧 调用阿里云TTS API: model={voice_config['model']}, voice={voice_config['voice']}, emotion={emotion}, format={format_type}")
             result = SpeechSynthesizer.call(
                 model=voice_config['model'],
                 text=synthesis_text,
                 voice=voice_config['voice'],
-                format=format_type
+                format=format_type,
+                # 对于多情感模型，需要传递情感参数
+                **({'emotion': emotion} if 'emo' in voice_key else {})
             )
             
             if result.get_response().status_code == 200:
