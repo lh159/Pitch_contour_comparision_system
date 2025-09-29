@@ -161,14 +161,22 @@ class AlibabaEmotionTTS(TTSEngineBase, DialogueTTSEngine):
             
             # 使用SDK进行语音合成，传递情感参数
             print(f"🔧 调用阿里云TTS API: model={voice_config['model']}, voice={voice_config['voice']}, emotion={emotion}, format={format_type}")
-            result = SpeechSynthesizer.call(
-                model=voice_config['model'],
-                text=synthesis_text,
-                voice=voice_config['voice'],
-                format=format_type,
-                # 对于多情感模型，需要传递情感参数
-                **({'emotion': emotion} if 'emo' in voice_key else {})
-            )
+            print(f"📝 合成文本: {synthesis_text}")
+            
+            # 构建API调用参数
+            api_params = {
+                'model': voice_config['model'],
+                'text': synthesis_text,
+                'voice': voice_config['voice'],
+                'format': format_type
+            }
+            
+            # 对于多情感模型，传递情感参数
+            if 'emo' in voice_key and emotion != 'neutral':
+                api_params['emotion'] = emotion
+                print(f"🎭 添加情感参数: emotion={emotion}")
+            
+            result = SpeechSynthesizer.call(**api_params)
             
             if result.get_response().status_code == 200:
                 # 确保输出目录存在
@@ -252,7 +260,7 @@ class AlibabaEmotionTTS(TTSEngineBase, DialogueTTSEngine):
     
     def _prepare_text(self, text: str, emotion: str, voice_config: Dict) -> str:
         """
-        准备合成文本
+        准备合成文本，使用SSML格式传递情感
         
         Args:
             text: 原始文本
@@ -260,11 +268,17 @@ class AlibabaEmotionTTS(TTSEngineBase, DialogueTTSEngine):
             voice_config: 发音人配置
         
         Returns:
-            str: 处理后的文本
+            str: 处理后的文本（SSML格式）
         """
-        # 直接返回原始文本，让阿里云的情感TTS引擎自然处理情感
-        # 不需要在文本中添加情感提示，避免被读出来
-        return text
+        # 对于多情感模型，使用SSML格式包装文本以传递情感
+        if 'emo' in voice_config.get('voice', '') and emotion != 'neutral':
+            # 使用SSML emotion标签包装文本
+            ssml_text = f'<speak><emotion category="{emotion}">{text}</emotion></speak>'
+            print(f"🎭 使用SSML情感标签: {ssml_text}")
+            return ssml_text
+        else:
+            # 非情感模型或中性情感，直接返回原文
+            return text
     
 
 def create_alibaba_tts(api_key: str) -> Optional[AlibabaEmotionTTS]:
