@@ -369,13 +369,13 @@ def stop_recording():
         file_id = str(uuid.uuid4())
         wav_filename = f"user_{file_id}.wav"  # 使用与upload_audio一致的命名格式
         wav_filepath = os.path.join(Config.UPLOAD_FOLDER, wav_filename)
-            
-            # 将音频数据保存为WAV文件
-            with wave.open(wav_filepath, 'wb') as wav_file:
-                wav_file.setnchannels(session.audio_format['channels'])
-                wav_file.setsampwidth(session.audio_format['sample_width'])
-                wav_file.setframerate(session.audio_format['frame_rate'])
-                wav_file.writeframes(audio_data)
+        
+        # 将音频数据保存为WAV文件
+        with wave.open(wav_filepath, 'wb') as wav_file:
+            wav_file.setnchannels(session.audio_format['channels'])
+            wav_file.setsampwidth(session.audio_format['sample_width'])
+            wav_file.setframerate(session.audio_format['frame_rate'])
+            wav_file.writeframes(audio_data)
             
             # 清理录音会话
             del recording_sessions[session_id]

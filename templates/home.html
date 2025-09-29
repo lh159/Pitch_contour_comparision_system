@@ -20,7 +20,7 @@
     <!-- 防止页面缩放和滚动弹性 -->
     <meta name="msapplication-tap-highlight" content="no">
     
-    <title>音高曲线比对系统</title>
+    <title>语训平台</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
@@ -32,18 +32,10 @@
             <div class="text-center mb-4">
                 <h1 class="display-4 text-primary mb-3">
                     <i class="fas fa-microphone me-3"></i>
-                    音高曲线比对系统
+                    语训平台
                 </h1>
-                <p class="lead text-muted">
-                    AI智能发音练习与评估平台，帮助您改进中文发音准确性
-                </p>
             </div>
 
-            <!-- 系统状态 -->
-            <div class="alert alert-info alert-custom" id="systemStatus">
-                <i class="fas fa-info-circle me-2"></i>
-                正在检查系统状态...
-            </div>
 
             <!-- 选择练习模式 -->
             <div class="step-card">
@@ -99,11 +91,11 @@
                         <div class="row mt-3">
                             <div class="col-md-6">
                                 <label for="voiceGender" class="form-label">
-                                    <i class="fas fa-user me-1"></i>选择声音性别:
+                                    <i class="fas fa-user me-1"></i>选择发音人:
                                 </label>
                                 <select class="form-select" id="voiceGender">
-                                    <option value="female">女声 (zhimiao_emo)</option>
-                                    <option value="male">男声 (zhichu_emo)</option>
+                                    <option value="female">知妙女声 (情感语音)</option>
+                                    <option value="male">知硕男声 (标准语音)</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
@@ -111,23 +103,12 @@
                                     <i class="fas fa-heart me-1"></i>选择情感风格:
                                 </label>
                                 <select class="form-select" id="voiceEmotion">
-                                    <option value="neutral">中性 (自然)</option>
-                                    <option value="happy">开心 (愉悦)</option>
-                                    <option value="sad">难过 (低沉)</option>
-                                    <option value="angry">生气 (严厉)</option>
-                                    <option value="fearful">恐惧 (紧张)</option>
-                                    <option value="surprised">惊讶 (兴奋)</option>
-                                    <option value="disgusted">厌恶 (嫌弃)</option>
-                                    <option value="arousal">兴奋 (激动)</option>
-                                    <option value="valence">愉悦 (满意)</option>
-                                    <option value="cheerful">欢快 (活泼)</option>
-                                    <option value="depressed">沮丧 (失落)</option>
-                                    <option value="irritated">烦躁 (不耐烦)</option>
-                                    <option value="envious">嫉妒 (酸涩)</option>
-                                    <option value="embarrassed">尴尬 (羞涩)</option>
-                                    <option value="serious">严肃 (正式)</option>
-                                    <option value="gentle">温柔 (亲切)</option>
-                                    <option value="newscast">播音 (标准)</option>
+                                    <option value="neutral">中性</option>
+                                    <option value="happy">开心</option>
+                                    <option value="sad">悲伤</option>
+                                    <option value="angry">生气</option>
+                                    <option value="gentle">温柔</option>
+                                    <option value="serious">严肃</option>
                                 </select>
                             </div>
                         </div>
@@ -231,9 +212,6 @@
         // 页面初始化
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 首页初始化...');
-            
-            // 检查系统状态
-            checkSystemStatus();
             
             // 设置事件监听器
             setupEventListeners();
