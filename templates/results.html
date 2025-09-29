@@ -961,103 +961,17 @@
                 return;
             }
             
-            // 进入下一轮对话
-            currentOrder++;
+            // 🎯 直接跳转到标准发音页面，让下一句（无论是AI还是用户）在那里处理
+            // 这样可以提供完整的对话场景体验
+            const params = {
+                mode: 'dialogue',
+                session_id: currentSession,
+                dialogue_data: JSON.stringify(dialogueData),
+                current_order: currentOrder + 1, // 下一句的order
+                from_results: true // 标记是从结果页面跳转过来的
+            };
             
-            // 处理下一个对话
-            await processNextDialogue();
-        }
-        
-        // 处理下一个对话
-        async function processNextDialogue() {
-            const nextDialogue = dialogueData.dialogues.find(d => d.order === currentOrder);
-            
-            if (!nextDialogue) {
-                // 对话已完成
-                dialogueCompleteCard.style.display = 'block';
-                mainNavButtons.style.display = 'none';
-                showAlert('恭喜！您已完成整个场景对话练习！', 'success');
-                return;
-            }
-            
-            if (nextDialogue.speaker === 'user') {
-                // 用户台词 - 跳转到标准发音页面
-                const params = {
-                    mode: 'dialogue',
-                    session_id: currentSession,
-                    dialogue_data: JSON.stringify(dialogueData),
-                    current_order: currentOrder
-                };
-                
-                navigateTo('/standard-audio', params);
-            } else {
-                // AI台词 - 播放AI语音然后继续
-                try {
-                    // 获取AI角色语音
-                    const response = await fetch('/api/scenario/next', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            session_id: currentSession,
-                            current_order: currentOrder - 1
-                        })
-                    });
-                    
-                    const result = await response.json();
-                    
-                    if (result.success && result.dialogue && result.dialogue.audio_url) {
-                        // 播放AI角色语音
-                        console.log('🎵 播放AI角色语音:', result.dialogue.voice_type);
-                        
-                        const audio = new Audio(result.dialogue.audio_url);
-                        
-                        audio.onplay = () => {
-                            showAlert(`AI (${result.dialogue.voice_description || '默认语音'}): ${nextDialogue.text}`, 'info');
-                        };
-                        
-                        audio.onended = () => {
-                            // 播放完成后自动进入下一轮对话
-                            setTimeout(() => {
-                                currentOrder++;
-                                processNextDialogue();
-                            }, 1000);
-                        };
-                        
-                        audio.onerror = (e) => {
-                            console.error('AI角色语音播放出错:', e);
-                            showAlert('AI角色语音播放失败，跳过到下一句', 'warning');
-                            
-                            // 播放失败也要继续对话
-                            setTimeout(() => {
-                                currentOrder++;
-                                processNextDialogue();
-                            }, 1000);
-                        };
-                        
-                        await audio.play();
-                        
-                    } else {
-                        // 没有音频URL，显示文本并继续
-                        console.log('⚠️ 没有获取到AI角色语音，仅显示文本');
-                        showAlert(`AI说: ${nextDialogue.text}`, 'info');
-                        
-                        setTimeout(() => {
-                            currentOrder++;
-                            processNextDialogue();
-                        }, 2000);
-                    }
-                    
-                } catch (error) {
-                    console.error('获取AI角色语音失败:', error);
-                    showAlert('AI角色语音获取失败，跳过到下一句', 'warning');
-                    
-                    // 出错也要继续对话
-                    setTimeout(() => {
-                        currentOrder++;
-                        processNextDialogue();
-                    }, 1000);
-                }
-            }
+            navigateTo('/standard-audio', params);
         }
         
         // 重新练习
