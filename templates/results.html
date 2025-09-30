@@ -308,16 +308,16 @@
             margin-top: 5px;
         }
 
-        /* 🎯 美化的继续对话按钮 */
+        /* 🎯 美化的继续对话按钮 - 与重新练习按钮保持一致的样式 */
         #continueBtn {
             background: linear-gradient(135deg, #ffc107, #ff9800);
             color: white;
             border: none;
-            padding: 15px 35px;
-            border-radius: 50px;
+            padding: 12px 30px;  /* 🎯 与retryBtn保持一致 */
+            border-radius: 10px;  /* 🎯 改为与retryBtn一致的圆角 */
             font-size: 16px;
             font-weight: 600;
-            box-shadow: 0 8px 25px rgba(255, 193, 7, 0.4);
+            box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);  /* 🎯 调整阴影与retryBtn一致 */
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
@@ -335,8 +335,8 @@
         }
 
         #continueBtn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 35px rgba(255, 193, 7, 0.5);
+            transform: translateY(-2px);  /* 🎯 与retryBtn保持一致 */
+            box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);  /* 🎯 调整阴影效果 */
             background: linear-gradient(135deg, #ffb300, #f57c00);
         }
 
@@ -346,7 +346,7 @@
 
         #continueBtn:active {
             transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
+            box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);  /* 🎯 与初始状态保持一致 */
         }
 
         #continueBtn i {
@@ -536,8 +536,8 @@
             }
             
             #continueBtn {
-                padding: 12px 28px;
-                font-size: 15px;
+                padding: 10px 24px;  /* 🎯 与retryBtn移动端样式保持一致 */
+                font-size: 14px;     /* 🎯 与retryBtn移动端样式保持一致 */
             }
         }
 

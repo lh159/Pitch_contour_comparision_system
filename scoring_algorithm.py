@@ -119,6 +119,21 @@ class ScoringSystem:
             metrics.get('pitch_range_ratio', 0)
         )
         
+        # 🔧 应用质量调整到各个小模块（而不是总分）
+        if is_low_quality:
+            quality_adjustments = self._calculate_quality_adjustments(quality_warning)
+            
+            # 根据质量问题的性质，对不同模块应用不同程度的调整
+            correlation_score *= quality_adjustments['correlation']
+            rmse_score *= quality_adjustments['stability'] 
+            trend_score *= quality_adjustments['trend']
+            range_score *= quality_adjustments['range']
+            
+            print(f"📉 质量调整应用到各模块: 相关性×{quality_adjustments['correlation']:.2f}, "
+                  f"稳定性×{quality_adjustments['stability']:.2f}, "
+                  f"趋势×{quality_adjustments['trend']:.2f}, "
+                  f"音域×{quality_adjustments['range']:.2f}")
+        
         # 🎵 声调特征增强评分
         tone_enhancement = 0.0
         tone_analysis = None
@@ -138,34 +153,14 @@ class ScoringSystem:
                     tone_analysis.get('tone_analysis', [])
                 )
         
-        # 🎯 计算加权总分 (新权重：趋势50%, 相关性25%, 稳定性15%, 音域10%)
+        # 🎯 计算加权总分 (实际权重：相关性50%, 趋势25%, 稳定性15%, 音域10%)
+        # 现在总分就是各小模块分数的纯加权和，无额外调整
         total_score = (
             correlation_score * self.weights['correlation'] +
             trend_score * self.weights['trend'] +
             rmse_score * self.weights['stability'] +
             range_score * self.weights['range']
         )
-        
-        # 🔧 如果是低质量录音，应用惩罚系数
-        quality_penalty = 1.0
-        if is_low_quality:
-            # 根据有效比例和有效点数计算惩罚
-            valid_ratio = quality_warning.get('valid_ratio', 0)
-            valid_points = quality_warning.get('valid_points', 0)
-            
-            # 有效比例惩罚: 0.50 -> 0.7x, 0.30 -> 0.5x, 0.10 -> 0.3x
-            ratio_penalty = max(0.3, min(0.7, valid_ratio))
-            
-            # 有效点数惩罚: 80点 -> 0.8x, 50点 -> 0.6x, 20点 -> 0.4x
-            points_penalty = max(0.4, min(0.8, valid_points / 100))
-            
-            # 综合惩罚系数
-            quality_penalty = (ratio_penalty + points_penalty) / 2
-            
-            print(f"📉 低质量录音评分惩罚: {quality_penalty:.2f}x (有效比例:{valid_ratio:.1%}, 有效点数:{valid_points})")
-        
-        # 应用质量惩罚
-        total_score = total_score * quality_penalty
         
         # 限制在0-100分范围内
         total_score = max(0, min(100, total_score))
@@ -197,7 +192,7 @@ class ScoringSystem:
         # 🔧 如果有质量警告，添加到结果中
         if is_low_quality:
             result['quality_warning'] = quality_warning
-            result['quality_penalty'] = round(quality_penalty, 2)
+            # 不再提供单一的质量惩罚系数，因为现在是分模块调整
         
         return result
     
@@ -331,6 +326,59 @@ class ScoringSystem:
             return 30 + 30 * (range_ratio - self.thresholds['range']['poor']) / (self.thresholds['range']['fair'] - self.thresholds['range']['poor'])
         else:
             return max(0, 30 * range_ratio / self.thresholds['range']['poor'])
+    
+    def _calculate_quality_adjustments(self, quality_warning: dict) -> dict:
+        """
+        根据录音质量问题计算各模块的调整系数
+        
+        🎯 设计理念：
+        - 不同质量问题对不同模块的影响程度不同
+        - 相关性最容易受噪声影响，稳定性次之
+        - 趋势和音域相对更稳健
+        """
+        valid_ratio = quality_warning.get('valid_ratio', 1.0)
+        valid_points = quality_warning.get('valid_points', 100)
+        
+        # 🔧 基础调整系数计算
+        # 有效比例影响：50%+ -> 0.95-1.0, 40%+ -> 0.90-0.95, 30%+ -> 0.85-0.90
+        if valid_ratio >= 0.50:
+            base_ratio_factor = 0.95 + 0.05 * (valid_ratio - 0.50) / 0.50
+        elif valid_ratio >= 0.40:
+            base_ratio_factor = 0.90 + 0.05 * (valid_ratio - 0.40) / 0.10
+        elif valid_ratio >= 0.30:
+            base_ratio_factor = 0.85 + 0.05 * (valid_ratio - 0.30) / 0.10
+        elif valid_ratio >= 0.20:
+            base_ratio_factor = 0.80 + 0.05 * (valid_ratio - 0.20) / 0.10
+        else:
+            base_ratio_factor = max(0.75, 0.80 * valid_ratio / 0.20)
+        
+        # 有效点数影响：60+ -> 0.95-1.0, 40+ -> 0.90-0.95, 20+ -> 0.85-0.90
+        if valid_points >= 60:
+            base_points_factor = 0.95 + 0.05 * min(1.0, (valid_points - 60) / 40)
+        elif valid_points >= 40:
+            base_points_factor = 0.90 + 0.05 * (valid_points - 40) / 20
+        elif valid_points >= 20:
+            base_points_factor = 0.85 + 0.05 * (valid_points - 20) / 20
+        else:
+            base_points_factor = max(0.80, 0.85 * valid_points / 20)
+        
+        # 综合基础调整系数
+        base_factor = (base_ratio_factor * 0.6 + base_points_factor * 0.4)
+        
+        # 🎯 针对不同模块应用不同的调整策略
+        return {
+            # 相关性最易受噪声影响，应用较强调整
+            'correlation': base_factor * 0.95,
+            
+            # 稳定性(RMSE)也容易受噪声影响，但稍轻一些  
+            'stability': base_factor * 0.97,
+            
+            # 趋势相对稳健，调整较轻
+            'trend': base_factor * 0.98,
+            
+            # 音域最稳健，调整最轻
+            'range': base_factor * 0.99
+        }
     
     def _get_score_level(self, score: float) -> str:
         """根据分数确定评级"""
