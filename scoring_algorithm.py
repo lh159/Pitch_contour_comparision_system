@@ -65,12 +65,42 @@ class ScoringSystem:
             return {
                 'total_score': 0.0,
                 'component_scores': {},
-                'level': '错误',
-                'feedback': comparison_metrics['error'],
+                'level': '录音质量问题',
+                'feedback': comparison_metrics.get('error', '未知错误') + 
+                          (f"\n建议：{comparison_metrics['suggestion']}" if 'suggestion' in comparison_metrics else ""),
                 'tone_analysis': None
             }
         
         metrics = comparison_metrics.get('metrics', {})
+        
+        # 🎯 检测严重质量问题（静音和极少语音内容），直接返回0分
+        critical_quality_flags = ['insufficient_data', 'insufficient_speech', 'silence_detected']
+        if metrics.get('quality_flag') in critical_quality_flags:
+            quality_issue = metrics.get('quality_flag')
+            
+            # 根据不同的质量问题提供不同的反馈
+            if quality_issue == 'silence_detected':
+                feedback = '🔇 检测到静音录音，无法进行音高比较。请重新录音并确保正常说话。'
+            else:
+                feedback = '🎙️ 录音中检测到的有效语音内容太少，请重新录音并确保正常说话。'
+                
+            return {
+                'total_score': 0.0,
+                'component_scores': {
+                    'accuracy': 0.0,
+                    'trend': 0.0,
+                    'stability': 0.0,
+                    'range': 0.0
+                },
+                'level': '录音质量不足',
+                'feedback': feedback,
+                'tone_analysis': None,
+                'quality_issue': quality_issue
+            }
+        
+        # 🔧 检查是否有低质量警告（来自pitch_comparison.py）
+        quality_warning = comparison_metrics.get('quality_warning')
+        is_low_quality = quality_warning is not None
         
         # 🎯 基本评分计算
         correlation_score = self._calculate_correlation_score(
@@ -116,6 +146,27 @@ class ScoringSystem:
             range_score * self.weights['range']
         )
         
+        # 🔧 如果是低质量录音，应用惩罚系数
+        quality_penalty = 1.0
+        if is_low_quality:
+            # 根据有效比例和有效点数计算惩罚
+            valid_ratio = quality_warning.get('valid_ratio', 0)
+            valid_points = quality_warning.get('valid_points', 0)
+            
+            # 有效比例惩罚: 0.50 -> 0.7x, 0.30 -> 0.5x, 0.10 -> 0.3x
+            ratio_penalty = max(0.3, min(0.7, valid_ratio))
+            
+            # 有效点数惩罚: 80点 -> 0.8x, 50点 -> 0.6x, 20点 -> 0.4x
+            points_penalty = max(0.4, min(0.8, valid_points / 100))
+            
+            # 综合惩罚系数
+            quality_penalty = (ratio_penalty + points_penalty) / 2
+            
+            print(f"📉 低质量录音评分惩罚: {quality_penalty:.2f}x (有效比例:{valid_ratio:.1%}, 有效点数:{valid_points})")
+        
+        # 应用质量惩罚
+        total_score = total_score * quality_penalty
+        
         # 限制在0-100分范围内
         total_score = max(0, min(100, total_score))
         
@@ -124,10 +175,10 @@ class ScoringSystem:
         
         # 🎵 为听障人士生成专门反馈
         hearing_impaired_feedback = self._generate_hearing_impaired_feedback(
-            total_score, trend_score, correlation_score, tone_feedback
+            total_score, trend_score, correlation_score, tone_feedback, is_low_quality, quality_warning
         )
         
-        return {
+        result = {
             'total_score': round(total_score, 1),
             'component_scores': {
                 'accuracy': round(correlation_score, 1),
@@ -142,6 +193,13 @@ class ScoringSystem:
             'feedback': hearing_impaired_feedback,
             'tone_feedback': tone_feedback
         }
+        
+        # 🔧 如果有质量警告，添加到结果中
+        if is_low_quality:
+            result['quality_warning'] = quality_warning
+            result['quality_penalty'] = round(quality_penalty, 2)
+        
+        return result
     
     def _analyze_chinese_tones(self, comparison_metrics: dict, text: str) -> dict:
         """分析中文声调特征"""
@@ -174,9 +232,17 @@ class ScoringSystem:
     def _generate_hearing_impaired_feedback(self, total_score: float, 
                                           trend_score: float, 
                                           correlation_score: float,
-                                          tone_feedback: str) -> str:
+                                          tone_feedback: str,
+                                          is_low_quality: bool = False,
+                                          quality_warning: dict = None) -> str:
         """为听障人士生成专门的反馈建议"""
         feedback_parts = []
+        
+        # 🔧 如果是低质量录音，优先提示质量问题
+        if is_low_quality and quality_warning:
+            feedback_parts.append(f"⚠️ {quality_warning.get('message', '录音质量较低')}")
+            feedback_parts.append(f"💡 {quality_warning.get('suggestion', '建议重新录音')}")
+            feedback_parts.append("\n--- 基于当前录音的分析结果 ---")
         
         # 🎯 总体评价
         if total_score >= 85:
@@ -186,6 +252,8 @@ class ScoringSystem:
         elif total_score >= 55:
             feedback_parts.append("📈 还不错，继续练习会更好。")
         else:
+            if is_low_quality:
+                feedback_parts.append("📊 由于录音质量问题，评分可能不够准确。")
             feedback_parts.append("💪 需要多练习，重点关注音调变化。")
         
         # 🎵 音调变化重点反馈
@@ -207,8 +275,13 @@ class ScoringSystem:
         return "\n".join(feedback_parts)
     
     def _calculate_correlation_score(self, correlation: float) -> float:
-        """计算相关性得分"""
-        if correlation >= self.thresholds['correlation']['excellent']:
+        """计算相关性得分 - 修复负相关性处理"""
+        # 🎯 严格处理负相关性和极低相关性
+        if correlation <= -0.1:
+            return 0.0  # 负相关性直接0分
+        elif correlation < 0.15:
+            return 0.0  # 极低相关性也是0分，防止噪声得分
+        elif correlation >= self.thresholds['correlation']['excellent']:
             return 95 + 5 * (correlation - self.thresholds['correlation']['excellent']) / (1 - self.thresholds['correlation']['excellent'])
         elif correlation >= self.thresholds['correlation']['good']:
             return 80 + 15 * (correlation - self.thresholds['correlation']['good']) / (self.thresholds['correlation']['excellent'] - self.thresholds['correlation']['good'])
@@ -217,7 +290,8 @@ class ScoringSystem:
         elif correlation >= self.thresholds['correlation']['poor']:
             return 30 + 30 * (correlation - self.thresholds['correlation']['poor']) / (self.thresholds['correlation']['fair'] - self.thresholds['correlation']['poor'])
         else:
-            return max(0, 30 * correlation / self.thresholds['correlation']['poor'])
+            # 对于0到poor阈值之间的值，线性递减到10分
+            return max(10, 30 * correlation / self.thresholds['correlation']['poor'])
     
     def _calculate_rmse_score(self, rmse: float) -> float:
         """计算RMSE得分（值越小越好）"""

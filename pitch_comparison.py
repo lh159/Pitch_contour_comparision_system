@@ -326,6 +326,25 @@ class PitchExtractor:
             # 计算初始有效比例
             initial_valid_ratio = np.sum(~np.isnan(pitch_values)) / len(pitch_values) if len(pitch_values) > 0 else 0
             
+            # 🎯 记录音频质量信息（用于后续比对阶段的静音检测）
+            audio_quality_info = {}
+            if len(pitch_values) > 0:
+                try:
+                    audio_values = snd.values[0]
+                    rms_energy = np.sqrt(np.mean(audio_values**2))
+                    max_amplitude = np.max(np.abs(audio_values))
+                    
+                    audio_quality_info = {
+                        'rms_energy': rms_energy,
+                        'max_amplitude': max_amplitude,
+                        'initial_valid_ratio': initial_valid_ratio
+                    }
+                    
+                    # 只记录信息，不在提取阶段拒绝
+                    print(f"📊 音频质量信息：RMS={rms_energy:.6f}, Max={max_amplitude:.4f}, 有效音高={initial_valid_ratio:.1%}")
+                except Exception as e:
+                    print(f"质量信息收集失败: {e}")
+            
             # 🎯 如果音高检测效果很差，尝试更激进的音频增强
             if initial_valid_ratio < 0.05:
                 print(f"⚠️ 初始音高检测效果差({initial_valid_ratio:.1%})，尝试增强音频...")
@@ -363,7 +382,8 @@ class PitchExtractor:
                 'pitch_values': pitch_values,
                 'smooth_pitch': pitch_values,  # 使用原始值，保持接口兼容性
                 'duration': times[-1] if len(times) > 0 else 0,
-                'valid_ratio': initial_valid_ratio
+                'valid_ratio': initial_valid_ratio,
+                'audio_quality': audio_quality_info  # 携带音频质量信息
             }
             
         except Exception as e:
@@ -813,13 +833,57 @@ class PitchComparator:
         if standard_pitch['valid_ratio'] < 0.05:
             return {'error': '标准发音音高提取失败，可能是音频质量问题'}
         
-        # 🔧 手机录音音高检测更宽松的阈值
+        # 🔧 严格的静音录音检测 - 只在比对阶段进行
         user_valid_ratio = user_pitch['valid_ratio']
-        if user_valid_ratio < 0.01:  # 进一步降低到0.01
-            return {'error': f'用户发音音高提取失败，请检查录音质量（有效音高比例：{user_valid_ratio:.1%}）'}
+        user_valid_points = np.sum(~np.isnan(user_pitch['pitch_values']))
+        total_points = len(user_pitch['pitch_values'])
+        
+        # 获取音频质量信息（从提取阶段记录的）
+        audio_quality = user_pitch.get('audio_quality', {})
+        rms_energy = audio_quality.get('rms_energy', 0)
+        max_amplitude = audio_quality.get('max_amplitude', 0)
+        
+        print(f"🔍 比对阶段质量检测：有效点={user_valid_points}/{total_points}, 比例={user_valid_ratio:.1%}, RMS={rms_energy:.6f}")
+        
+        # 🎯 严格的静音检测（只在比对阶段拒绝）
+        is_silence = (
+            rms_energy < 0.005 or  # RMS能量过低
+            max_amplitude < 0.01 or  # 最大振幅过小
+            user_valid_ratio < 0.15 or  # 有效音高比例过低
+            user_valid_points < 30  # 有效点数过少
+        )
+        
+        if is_silence:
+            print(f"🚫 检测到静音录音！RMS={rms_energy:.6f}, 有效比例={user_valid_ratio:.1%}, 有效点数={user_valid_points}")
+            return {
+                'error': '检测到静音或极低音量录音，无法进行音高比较',
+                'suggestion': '请重新录音，确保正常说话并检查麦克风音量。',
+                'valid_ratio': user_valid_ratio,
+                'valid_points': user_valid_points,
+                'metrics': {'quality_flag': 'silence_detected'}
+            }
+        
+        # 🎯 低质量录音检测（不报错，标记低质量并继续比对，让评分系统给低分）
+        is_low_quality = (
+            user_valid_ratio < 0.50 or  # 有效比例低于50%
+            user_valid_points < 80  # 有效点数少于80个
+        )
+        
+        # 🔧 不再返回error，而是标记低质量并继续比对
+        quality_warning = None
+        if is_low_quality:
+            print(f"⚠️ 录音质量较低：有效比例={user_valid_ratio:.1%}，有效点数={user_valid_points}")
+            print(f"💡 继续比对分析，将通过低评分反馈录音质量问题")
+            quality_warning = {
+                'level': 'low_quality',
+                'message': f'录音质量较低（有效比例：{user_valid_ratio:.1%}，有效点数：{user_valid_points}）',
+                'suggestion': '建议重新录音以获得更准确的评分。请确保清晰发音并避免背景噪音。',
+                'valid_ratio': user_valid_ratio,
+                'valid_points': user_valid_points
+            }
         
         # 如果音高提取质量较低，给出友好提示但继续处理
-        if user_valid_ratio < 0.05:
+        if user_valid_ratio < 0.60:
             print(f"⚠️ 用户录音音高质量较低（{user_valid_ratio:.1%}），但继续处理")
         
         # 3. 对齐音高曲线 - 使用增强对齐或标准对齐
@@ -875,6 +939,7 @@ class PitchComparator:
                 'standard': actual_standard_audio,
                 'user': actual_user_audio
             },
+            'quality_warning': quality_warning,  # 🔧 添加质量警告信息
             'success': True
         }
         
@@ -885,23 +950,48 @@ class PitchComparator:
         
         # 过滤有效值
         valid_mask = ~(np.isnan(standard) | np.isnan(user))
-        if np.sum(valid_mask) < 3:
+        valid_count = np.sum(valid_mask)
+        
+        # 🎯 严格检测：如果有效点太少，直接返回最低分
+        if valid_count < 50:  # 大幅提高最小有效点要求到50个
+            print(f"❌ 有效数据点不足：{valid_count} < 50")
             return {
-                'correlation': 0.0,
+                'correlation': -1.0,  # 设为负值，表示完全不匹配
                 'rmse': float('inf'),
                 'trend_consistency': 0.0,
                 'pitch_range_ratio': 0.0,
-                'valid_points': 0
+                'valid_points': valid_count,
+                'quality_flag': 'insufficient_data'  # 标记数据不足
+            }
+        
+        # 🎯 进一步检测：如果有效比例过低，也返回低分
+        total_points = len(standard)
+        valid_ratio = valid_count / total_points
+        if valid_ratio < 0.40:  # 有效比例低于40%
+            print(f"❌ 有效数据比例过低：{valid_ratio:.1%} < 40%")
+            return {
+                'correlation': -1.0,  # 设为负值，表示完全不匹配
+                'rmse': float('inf'),
+                'trend_consistency': 0.0,
+                'pitch_range_ratio': 0.0,
+                'valid_points': valid_count,
+                'quality_flag': 'low_valid_ratio'
             }
         
         std_valid = standard[valid_mask]
         user_valid = user[valid_mask]
         
-        # 1. 皮尔逊相关系数
+        # 1. 皮尔逊相关系数 - 增加噪声检测
         try:
-            correlation, _ = stats.pearsonr(std_valid, user_valid)
+            correlation, p_value = stats.pearsonr(std_valid, user_valid)
             if np.isnan(correlation):
                 correlation = 0.0
+            
+            # 🎯 检测是否为随机噪声（p值过大表示无显著相关性）
+            if p_value > 0.05:  # p值大于0.05表示相关性不显著
+                print(f"⚠️ 检测到随机噪声：相关性p值={p_value:.4f} > 0.05")
+                correlation = max(correlation * 0.1, -0.5)  # 大幅降低相关性分数
+                
         except:
             correlation = 0.0
         
@@ -1146,114 +1236,6 @@ class PitchComparator:
             'speech_ratio_consistency': 1.0 - ratio_diff if ratio_diff < 1.0 else 0.0
         }
     
-    def compare_with_fun_asr_visualization(self, standard_audio: str, user_audio: str, 
-                                         original_text: str, output_path: str) -> dict:
-        """
-        使用Fun-ASR进行TTS音频时间戳分析并生成可视化结果
-        :param standard_audio: 标准发音音频路径（TTS生成）
-        :param user_audio: 用户发音音频路径
-        :param original_text: 生成TTS时使用的原始文本
-        :param output_path: 可视化结果输出路径
-        :return: 完整的比对结果
-        """
-        try:
-            print(f"🎯 开始Fun-ASR增强音高比对分析...")
-            print(f"标准音频: {standard_audio}")
-            print(f"用户音频: {user_audio}")
-            print(f"原始文本: {original_text}")
-            
-            # 1. 执行标准音高比对
-            comparison_result = self.compare_pitch_curves(
-                standard_audio, user_audio, original_text, True
-            )
-            
-            if not comparison_result:
-                print("❌ 基础音高比对失败")
-                return None
-            
-            # 2. 计算评分
-            from scoring_algorithm import ScoringSystem
-            scorer = ScoringSystem()
-            score_result = scorer.calculate_score(comparison_result.get('metrics', {}), original_text)
-            
-            # 3. 生成Fun-ASR增强可视化
-            if self.use_fun_asr and FUN_ASR_AVAILABLE:
-                try:
-                    print("📊 正在生成Fun-ASR时间戳可视化...")
-                    visualizer = PitchVisualizationWithFunASR()
-                    
-                    success = visualizer.plot_comparison_with_fun_asr_timestamps(
-                        comparison_result=comparison_result,
-                        score_result=score_result,
-                        output_path=output_path,
-                        tts_audio_path=standard_audio,  # TTS音频用于时间戳分析
-                        original_text=original_text
-                    )
-                    
-                    if success:
-                        print(f"✅ Fun-ASR增强可视化完成: {output_path}")
-                    else:
-                        print("⚠️ Fun-ASR可视化失败，使用标准可视化")
-                        self._fallback_to_standard_visualization(
-                            comparison_result, score_result, output_path, original_text
-                        )
-                        
-                except Exception as e:
-                    print(f"⚠️ Fun-ASR可视化过程出错: {e}")
-                    self._fallback_to_standard_visualization(
-                        comparison_result, score_result, output_path, original_text
-                    )
-            else:
-                print("⚠️ Fun-ASR不可用，使用标准可视化")
-                self._fallback_to_standard_visualization(
-                    comparison_result, score_result, output_path, original_text
-                )
-            
-            # 4. 构建完整结果
-            result = {
-                'comparison_result': comparison_result,
-                'score_result': score_result,
-                'visualization_path': output_path,
-                'original_text': original_text,
-                'fun_asr_enabled': self.use_fun_asr,
-                'timestamp': comparison_result.get('timestamp')
-            }
-            
-            print(f"🎉 Fun-ASR增强音高比对分析完成!")
-            return result
-            
-        except Exception as e:
-            print(f"❌ Fun-ASR增强音高比对失败: {e}")
-            import traceback
-            traceback.print_exc()
-            return None
-    
-    def _fallback_to_standard_visualization(self, comparison_result, score_result, 
-                                          output_path, original_text):
-        """
-        回退到标准可视化方法
-        """
-        try:
-            from visualization import PitchVisualization
-            visualizer = PitchVisualization()
-            
-            text_alignment_data = comparison_result.get('text_alignment_data')
-            
-            success = visualizer.plot_pitch_comparison(
-                comparison_result=comparison_result,
-                score_result=score_result,
-                output_path=output_path,
-                input_text=original_text,
-                text_alignment_data=text_alignment_data
-            )
-            
-            if success:
-                print(f"✅ 标准可视化完成: {output_path}")
-            else:
-                print("❌ 标准可视化也失败了")
-                
-        except Exception as e:
-            print(f"❌ 标准可视化回退失败: {e}")
 
 
 # 使用示例
