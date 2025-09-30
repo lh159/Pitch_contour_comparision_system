@@ -314,13 +314,17 @@
             color: white;
             border: none;
             padding: 12px 30px;  /* 🎯 与retryBtn保持一致 */
-            border-radius: 10px;  /* 🎯 改为与retryBtn一致的圆角 */
+            border-radius: 25px;  /* 🎯 改为与retryBtn一致的圆角 */
             font-size: 16px;
-            font-weight: 600;
-            box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);  /* 🎯 调整阴影与retryBtn一致 */
+            font-weight: 500;  /* 🎯 改为与retryBtn一致的字重 */
+            box-shadow: 0 8px 20px rgba(255, 193, 7, 0.4);  /* 🎯 调整阴影与retryBtn一致 */
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+            /* 🎯 添加与retryBtn一致的移动端优化 */
+            min-height: 44px;
+            min-width: 44px;
+            touch-action: manipulation;
         }
 
         #continueBtn::before {
@@ -536,15 +540,19 @@
             }
             
             #continueBtn {
-                padding: 10px 24px;  /* 🎯 与retryBtn移动端样式保持一致 */
-                font-size: 14px;     /* 🎯 与retryBtn移动端样式保持一致 */
+                padding: 14px 24px;  /* 🎯 与retryBtn移动端样式保持一致 */
+                font-size: 16px;     /* 🎯 与retryBtn移动端样式保持一致 */
+                border-radius: 20px; /* 🎯 与retryBtn移动端样式保持一致 */
             }
         }
 
         @media (max-width: 576px) {
             #continueBtn {
-                padding: 10px 24px;
-                font-size: 14px;
+                padding: 16px 20px;  /* 🎯 与retryBtn移动端样式保持一致 */
+                font-size: 16px;     /* 🎯 与retryBtn移动端样式保持一致 */
+                border-radius: 18px; /* 🎯 与retryBtn移动端样式保持一致 */
+                width: 100%;         /* 🎯 与retryBtn移动端样式保持一致 */
+                margin-bottom: 10px; /* 🎯 与retryBtn移动端样式保持一致 */
             }
         }
     </style>
