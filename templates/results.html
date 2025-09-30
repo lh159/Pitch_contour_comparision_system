@@ -301,6 +301,63 @@
         .score-value.fair { color: #ffc107; }
         .score-value.poor { color: #dc3545; }
 
+        .score-item .score-description {
+            font-size: 0.75rem;
+            color: #6c757d;
+            line-height: 1.3;
+            margin-top: 5px;
+        }
+
+        /* 🎯 美化的继续对话按钮 */
+        #continueBtn {
+            background: linear-gradient(135deg, #ffc107, #ff9800);
+            color: white;
+            border: none;
+            padding: 15px 35px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            box-shadow: 0 8px 25px rgba(255, 193, 7, 0.4);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #continueBtn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        #continueBtn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(255, 193, 7, 0.5);
+            background: linear-gradient(135deg, #ffb300, #f57c00);
+        }
+
+        #continueBtn:hover::before {
+            left: 100%;
+        }
+
+        #continueBtn:active {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
+        }
+
+        #continueBtn i {
+            animation: arrowBounce 1s ease-in-out infinite;
+        }
+
+        @keyframes arrowBounce {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(5px); }
+        }
+
         /* 完成对话按钮样式 */
         .dialogue-complete-card {
             background: linear-gradient(135deg, #fff3cd, #ffeaa7);
@@ -477,6 +534,18 @@
                 padding: 12px 24px;
                 font-size: 14px;
             }
+            
+            #continueBtn {
+                padding: 12px 28px;
+                font-size: 15px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            #continueBtn {
+                padding: 10px 24px;
+                font-size: 14px;
+            }
         }
     </style>
 </head>
@@ -557,20 +626,24 @@
                     <!-- 详细评分 -->
                     <div class="score-details">
                         <div class="score-item">
-                            <h6>音高准确性</h6>
+                            <h6>音高准确性 <small style="color: #6c757d;">(50%)</small></h6>
                             <div class="score-value" id="accuracyScore">--</div>
+                            <div class="score-description">对比两条音高曲线的相关性</div>
                         </div>
                         <div class="score-item">
-                            <h6>音调变化</h6>
+                            <h6>音调变化 <small style="color: #6c757d;">(25%)</small></h6>
                             <div class="score-value" id="trendScore">--</div>
+                            <div class="score-description">评估升降变化的一致性</div>
                         </div>
                         <div class="score-item">
-                            <h6>发音稳定性</h6>
+                            <h6>发音稳定性 <small style="color: #6c757d;">(15%)</small></h6>
                             <div class="score-value" id="stabilityScore">--</div>
+                            <div class="score-description">计算音高偏差的均方根误差</div>
                         </div>
                         <div class="score-item">
-                            <h6>音域适配</h6>
+                            <h6>音域适配 <small style="color: #6c757d;">(10%)</small></h6>
                             <div class="score-value" id="rangeScore">--</div>
+                            <div class="score-description">比较音高变化范围的匹配度</div>
                         </div>
                     </div>
                     
