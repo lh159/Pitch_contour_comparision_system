@@ -232,22 +232,58 @@
         .btn-rerecord .btn-record-content span {
             font-size: 1rem;
         }
+
+        /* 美化的返回播放按钮 */
+        .back-button {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+            z-index: 1000;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .back-button:hover {
+            transform: translateX(-50%) translateY(-3px);
+            box-shadow: 0 12px 35px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+
+        .back-button:active {
+            transform: translateX(-50%) translateY(-1px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .back-button {
+                bottom: 20px;
+                padding: 12px 24px;
+                font-size: 14px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container-fluid">
         <div class="main-container">
-            <!-- 导航栏 -->
-            <div class="nav-buttons mb-4">
-                <button class="btn btn-outline-secondary" id="backToStandardBtn">
-                    <i class="fas fa-arrow-left me-2"></i>返回播放
-                </button>
-                <div class="text-center">
-                    <h4 class="mb-0 text-primary">
-                        <i class="fas fa-microphone me-2"></i>录制您的发音
-                    </h4>
-                </div>
-                <div></div> <!-- 占位符保持布局 -->
+            <!-- 页面标题 -->
+            <div class="text-center mb-4">
+                <h4 class="mb-0 text-primary">
+                    <i class="fas fa-microphone me-2"></i>录制您的发音
+                </h4>
             </div>
 
             <!-- 场景对话信息（仅在对话模式下显示） -->
@@ -320,9 +356,6 @@
                     <div class="recording-status-bar" id="recordingStatusBar" style="display: none;">
                         <div class="status-indicator recording-pulse"></div>
                         <span class="status-text">录音进行中...</span>
-                        <button class="btn btn-sm btn-danger ms-auto" id="quickStopBtn">
-                            <i class="fas fa-stop"></i> 停止录音
-                        </button>
                     </div>
                     
                     <!-- 波形容器和音频播放器 -->
@@ -341,11 +374,8 @@
                 </div>
             </div>
 
-            <!-- 导航按钮 -->
-            <div class="nav-buttons">
-                <button class="btn btn-outline-secondary" id="backToStandardBtn2">
-                    <i class="fas fa-arrow-left me-2"></i>返回播放
-                </button>
+            <!-- 开始比对分析按钮 -->
+            <div class="text-center mb-5">
                 <button class="btn btn-custom" id="compareBtn" style="display: none;">
                     <i class="fas fa-chart-bar me-2"></i>
                     开始比对分析
@@ -353,6 +383,12 @@
             </div>
         </div>
     </div>
+
+    <!-- 美化的返回播放按钮 -->
+    <button class="back-button" id="backToStandardBtn">
+        <i class="fas fa-arrow-left"></i>
+        返回播放
+    </button>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -396,9 +432,7 @@
         const compareBtn = document.getElementById('compareBtn');
         const waveformContainer = document.getElementById('waveformContainer');
         const recordingStatusBar = document.getElementById('recordingStatusBar');
-        const quickStopBtn = document.getElementById('quickStopBtn');
         const backToStandardBtn = document.getElementById('backToStandardBtn');
-        const backToStandardBtn2 = document.getElementById('backToStandardBtn2');
         const dialogueInfoCard = document.getElementById('dialogueInfoCard');
         const audioFileInput = document.getElementById('audioFileInput');
         
@@ -521,7 +555,6 @@
             // 录音控制按钮
             recordBtn.addEventListener('click', handleRecordButtonClick);
             rerecordBtn.addEventListener('click', handleRerecordButtonClick);
-            quickStopBtn.addEventListener('click', forceStopRecording);
             
             // 文件上传
             uploadBtn.addEventListener('click', () => audioFileInput.click());
@@ -532,7 +565,6 @@
             
             // 返回按钮
             backToStandardBtn.addEventListener('click', goBackToStandard);
-            backToStandardBtn2.addEventListener('click', goBackToStandard);
         }
         
         // 处理录音按钮点击
