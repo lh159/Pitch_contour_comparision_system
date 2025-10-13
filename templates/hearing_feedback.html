@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="format-detection" content="telephone=no, email=no, address=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#17a2b8">
+    
+    <title>听觉反馈训练 - 语训平台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/common.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/hearing-feedback.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <!-- 页面标题 -->
+            <div class="text-center mb-3">
+                <h2 class="text-info">
+                    <i class="fas fa-headphones me-2"></i>
+                    听觉反馈训练
+                </h2>
+                <button class="btn btn-outline-secondary btn-sm" onclick="window.location.href='/home'">
+                    <i class="fas fa-arrow-left me-1"></i>返回首页
+                </button>
+            </div>
+            
+            <!-- 场景信息卡片 -->
+            <div class="card mb-3 scenario-card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-book me-2"></i>
+                        <span id="scenarioTitle">场景训练</span>
+                    </h5>
+                    <p class="card-text text-muted" id="scenarioDescription">加载中...</p>
+                </div>
+            </div>
+            
+            <!-- 进度条 -->
+            <div class="progress-section mb-4">
+                <div class="progress" style="height: 30px;">
+                    <div class="progress-bar bg-info progress-bar-striped progress-bar-animated" 
+                         role="progressbar" 
+                         id="progressBar" 
+                         style="width: 0%;">
+                        <span id="progressText">第 0 / 0 句</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 音频播放卡片 -->
+            <div class="card mb-3 audio-card">
+                <div class="card-body text-center">
+                    <h5 class="card-title mb-3">
+                        <i class="fas fa-volume-up me-2"></i>
+                        播放音频
+                    </h5>
+                    
+                    <button class="btn btn-primary btn-lg play-btn" id="playBtn">
+                        <i class="fas fa-play me-2"></i>
+                        播放音频
+                    </button>
+                    
+                    <div class="play-controls mt-3">
+                        <div class="row">
+                            <div class="col-6">
+                                <small class="text-muted">播放次数: <span id="playCount" class="badge bg-secondary">0</span></small>
+                            </div>
+                            <div class="col-6">
+                                <label for="speedControl" class="form-label small">播放速度:</label>
+                                <select class="form-select form-select-sm" id="speedControl">
+                                    <option value="0.75">0.75x (慢速)</option>
+                                    <option value="1" selected>1x (正常)</option>
+                                    <option value="1.25">1.25x (快速)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 文字输入卡片 -->
+            <div class="card mb-3 input-card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-keyboard me-2"></i>
+                        请输入您听到的内容
+                    </h5>
+                    
+                    <textarea class="form-control form-control-lg" 
+                              id="userInput" 
+                              rows="4" 
+                              placeholder="请在这里输入您听到的文字内容..."
+                              style="font-size: 1.1rem;"></textarea>
+                    
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <small class="text-muted">
+                            字数: <span id="charCount" class="badge bg-info">0</span>
+                        </small>
+                        
+                        <div>
+                            <button class="btn btn-outline-secondary" id="clearBtn">
+                                <i class="fas fa-eraser me-1"></i>清空
+                            </button>
+                            <button class="btn btn-success btn-lg ms-2" id="submitBtn">
+                                <i class="fas fa-check me-1"></i>提交
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 结果展示卡片（初始隐藏）-->
+            <div class="card mb-3 result-card" id="resultCard" style="display: none;">
+                <div class="card-body">
+                    <h5 class="card-title text-center mb-4">
+                        <i class="fas fa-chart-line me-2"></i>
+                        比对结果
+                    </h5>
+                    
+                    <!-- 准确率显示 -->
+                    <div class="text-center mb-4">
+                        <div class="accuracy-display">
+                            <h2 class="mb-0">
+                                准确率: <span id="accuracyValue" class="text-info">0%</span>
+                            </h2>
+                        </div>
+                    </div>
+                    
+                    <!-- 原文展示 -->
+                    <div class="mb-3">
+                        <h6 class="text-muted">
+                            <i class="fas fa-file-alt me-2"></i>原文：
+                        </h6>
+                        <div class="original-text p-3 bg-light rounded" id="originalText">
+                            <!-- 原文内容 -->
+                        </div>
+                    </div>
+                    
+                    <!-- 用户输入展示（带错误标记）-->
+                    <div class="mb-3">
+                        <h6 class="text-muted">
+                            <i class="fas fa-pen me-2"></i>您的输入：
+                        </h6>
+                        <div class="user-text p-3 bg-light rounded" id="userText">
+                            <!-- 用户输入内容（带错误标记）-->
+                        </div>
+                    </div>
+                    
+                    <!-- 错误统计 -->
+                    <div class="error-stats mb-3" id="errorStats">
+                        <!-- 错误统计信息 -->
+                    </div>
+                    
+                    <!-- 激励信息 -->
+                    <div class="feedback-message text-center p-3 rounded" id="feedbackMessage">
+                        <!-- 激励信息 -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div class="action-buttons text-center mb-4">
+                <button class="btn btn-outline-info btn-lg me-2" id="replayBtn" disabled>
+                    <i class="fas fa-redo me-1"></i>重新听一遍
+                </button>
+                <button class="btn btn-info btn-lg" id="nextBtn" style="display: none;">
+                    <i class="fas fa-arrow-right me-1"></i>下一句
+                </button>
+                <button class="btn btn-success btn-lg" id="finishBtn" style="display: none;">
+                    <i class="fas fa-flag-checkered me-1"></i>完成训练
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 完美答题动画容器 -->
+    <div class="celebration-overlay" id="celebrationOverlay">
+        <div class="celebration-content">
+            <div class="celebration-icon">🎉</div>
+            <h2 class="celebration-text">完全正确！</h2>
+            <p class="celebration-subtext">太棒了！</p>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 通用JS -->
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+    
+    <!-- 听觉反馈JS -->
+    <script src="{{ url_for('static', filename='js/hearing-feedback.js') }}"></script>
+    
+    <script>
+        // 从URL参数获取会话信息
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id');
+        const dialogueDataStr = urlParams.get('dialogue_data');
+        
+        if (!sessionId || !dialogueDataStr) {
+            showAlert('缺少训练数据，请从首页重新开始', 'danger');
+            setTimeout(() => {
+                window.location.href = '/home';
+            }, 2000);
+        } else {
+            try {
+                const dialogueData = JSON.parse(dialogueDataStr);
+                
+                // 初始化听觉反馈训练器
+                const trainer = new HearingFeedbackTrainer(sessionId, dialogueData);
+                trainer.start();
+            } catch (error) {
+                console.error('初始化失败:', error);
+                showAlert('数据解析失败，请重试', 'danger');
+            }
+        }
+    </script>
+</body>
+</html>
+

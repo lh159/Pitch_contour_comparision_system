@@ -32,6 +32,9 @@ import queue
 # 导入场景对话模块
 from deepseek_integration import get_deepseek_generator
 
+# 导入文字比对模块
+from text_comparator import TextComparator
+
 def detect_dialogue_emotion(text: str) -> str:
     """
     改进的对话情感检测
@@ -187,9 +190,13 @@ analyzer = None
 visualizer = None
 voice_manager = None
 emotion_analyzer = None
+text_comparator = None
 
 # 场景对话会话存储
 dialogue_sessions = {}
+
+# 听觉反馈会话存储
+feedback_sessions = {}
 
 # 录音会话管理
 recording_sessions = {}
@@ -240,7 +247,7 @@ class RecordingSession:
 
 def init_system():
     """初始化系统组件"""
-    global tts_manager, enhanced_tts_manager, comparator, scoring_system, analyzer, visualizer, voice_manager, emotion_analyzer
+    global tts_manager, enhanced_tts_manager, comparator, scoring_system, analyzer, visualizer, voice_manager, emotion_analyzer, text_comparator
     
     try:
         print("正在初始化系统组件...")
@@ -275,11 +282,50 @@ def init_system():
             voice_manager = None
             emotion_analyzer = None
         
+        # 初始化文字比对器
+        try:
+            text_comparator = TextComparator()
+            print("✓ 文字比对器初始化成功")
+        except Exception as e:
+            print(f"⚠ 文字比对器初始化失败: {e}")
+            text_comparator = None
+        
         print("✓ 系统初始化完成")
         return True
         
     except Exception as e:
         print(f"✗ 系统初始化失败: {e}")
+        traceback.print_exc()
+        return False
+
+def generate_tts_audio(text: str, output_path: str) -> bool:
+    """
+    生成TTS音频的辅助函数
+    
+    Args:
+        text: 要转换的文本
+        output_path: 输出音频文件路径
+        
+    Returns:
+        bool: 是否成功生成音频
+    """
+    try:
+        if not tts_manager:
+            print("⚠ TTS管理器未初始化")
+            return False
+        
+        # 使用标准发音生成音频
+        success = tts_manager.generate_standard_audio(
+            text=text,
+            output_path=output_path,
+            voice_gender='female',
+            voice_emotion='neutral'
+        )
+        
+        return success
+        
+    except Exception as e:
+        print(f"✗ TTS音频生成失败: {e}")
         traceback.print_exc()
         return False
 
@@ -314,6 +360,11 @@ def results():
 def legacy():
     """原有的单页面应用（保留作为备用）"""
     return render_template('index.html')
+
+@app.route('/hearing-feedback')
+def hearing_feedback():
+    """听觉反馈训练页面"""
+    return render_template('hearing_feedback.html')
 
 @app.route('/api/tts/engines', methods=['GET'])
 def get_tts_engines():
@@ -2003,6 +2054,216 @@ def test_scenario_api():
         })
         
     except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# === 听觉反馈API端点 ===
+
+@app.route('/api/feedback/start', methods=['POST'])
+def start_feedback_session():
+    """开始听觉反馈训练会话"""
+    try:
+        data = request.get_json()
+        scenario = data.get('scenario', '').strip()
+        
+        if not scenario:
+            return jsonify({
+                'success': False,
+                'error': '请输入场景描述'
+            }), 400
+        
+        if len(scenario) > 200:
+            return jsonify({
+                'success': False,
+                'error': '场景描述不能超过200个字符'
+            }), 400
+        
+        print(f"🎧 开始听觉反馈训练会话: {scenario}")
+        
+        # 调用DeepSeek生成对话
+        generator = get_deepseek_generator()
+        result = generator.generate_scenario_dialogue(scenario, Config.DEFAULT_DIALOGUE_ROUNDS)
+        
+        if result.get('success'):
+            dialogue_data = result['data']
+            
+            # 为每句对话生成TTS音频
+            print(f"🔊 开始为 {len(dialogue_data['dialogues'])} 句对话生成音频...")
+            for i, dialogue in enumerate(dialogue_data['dialogues']):
+                text = dialogue['text']
+                print(f"   [{i+1}] 生成音频: '{text}'")
+                
+                try:
+                    # 调用TTS生成音频
+                    audio_filename = f"feedback_{uuid.uuid4().hex[:8]}_{i}.mp3"
+                    audio_path = os.path.join(Config.UPLOAD_FOLDER, audio_filename)
+                    
+                    # 使用系统TTS生成音频
+                    tts_result = generate_tts_audio(text, audio_path)
+                    
+                    if tts_result:
+                        dialogue['audio_url'] = f'/uploads/{audio_filename}'
+                        print(f"   ✓ 音频生成成功: {audio_filename}")
+                    else:
+                        print(f"   ✗ 音频生成失败，使用文本模式")
+                        dialogue['audio_url'] = None
+                        
+                except Exception as e:
+                    print(f"   ✗ 音频生成异常: {e}")
+                    dialogue['audio_url'] = None
+            
+            # 创建训练会话
+            session_id = str(uuid.uuid4())
+            feedback_sessions[session_id] = {
+                'dialogue_data': dialogue_data,
+                'scenario': scenario,
+                'start_time': time.time(),
+                'records': [],
+                'current_index': 0
+            }
+            
+            print(f"✓ 听觉反馈会话创建成功: {session_id}")
+            print(f"场景: {dialogue_data.get('scenario_title', 'N/A')}")
+            print(f"对话句数: {len(dialogue_data.get('dialogues', []))}")
+            
+            return jsonify({
+                'success': True,
+                'session_id': session_id,
+                'dialogue_data': dialogue_data
+            })
+        else:
+            print(f"✗ 对话生成失败: {result.get('error', '未知错误')}")
+            return jsonify({
+                'success': False,
+                'error': result.get('error', '对话生成失败')
+            }), 500
+            
+    except Exception as e:
+        print(f"✗ 听觉反馈会话创建异常: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'服务器错误: {str(e)}'
+        }), 500
+
+@app.route('/api/feedback/compare', methods=['POST'])
+def compare_feedback_text():
+    """文字比对API"""
+    try:
+        data = request.get_json()
+        original = data.get('original', '').strip()
+        user_input = data.get('user_input', '').strip()
+        session_id = data.get('session_id')
+        sentence_index = data.get('sentence_index', 0)
+        
+        if not original:
+            return jsonify({
+                'success': False,
+                'error': '缺少原文'
+            }), 400
+        
+        if not user_input:
+            return jsonify({
+                'success': False,
+                'error': '用户输入为空'
+            }), 400
+        
+        print(f"📝 文字比对请求:")
+        print(f"   会话ID: {session_id}")
+        print(f"   句子索引: {sentence_index}")
+        print(f"   原文: '{original}'")
+        print(f"   用户输入: '{user_input}'")
+        
+        # 检查文字比对器是否初始化
+        if not text_comparator:
+            return jsonify({
+                'success': False,
+                'error': '文字比对器未初始化'
+            }), 500
+        
+        # 进行文字比对
+        result = text_comparator.compare(original, user_input)
+        
+        print(f"✓ 比对完成: 准确率 {result['accuracy']}%, 错误数 {result['error_count']}")
+        
+        # 保存到会话记录（如果提供了session_id）
+        if session_id and session_id in feedback_sessions:
+            feedback_sessions[session_id]['records'].append({
+                'index': sentence_index,
+                'original': original,
+                'user_input': user_input,
+                'accuracy': result['accuracy'],
+                'error_count': result['error_count'],
+                'timestamp': time.time()
+            })
+            
+            print(f"✓ 记录已保存到会话: {session_id}")
+        
+        return jsonify({
+            'success': True,
+            **result
+        })
+        
+    except Exception as e:
+        print(f"✗ 文字比对失败: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'比对失败: {str(e)}'
+        }), 500
+
+@app.route('/api/feedback/stats/<session_id>', methods=['GET'])
+def get_feedback_stats(session_id):
+    """获取训练统计"""
+    try:
+        if session_id not in feedback_sessions:
+            return jsonify({
+                'success': False,
+                'error': '会话不存在'
+            }), 404
+        
+        session = feedback_sessions[session_id]
+        records = session['records']
+        
+        # 计算统计数据
+        total_sentences = len(session['dialogue_data'].get('dialogues', []))
+        completed_sentences = len(records)
+        
+        if completed_sentences > 0:
+            total_accuracy = sum(r['accuracy'] for r in records)
+            avg_accuracy = total_accuracy / completed_sentences
+            perfect_count = sum(1 for r in records if r['accuracy'] == 100)
+            perfect_rate = (perfect_count / completed_sentences) * 100
+        else:
+            avg_accuracy = 0
+            perfect_count = 0
+            perfect_rate = 0
+        
+        training_duration = time.time() - session['start_time']
+        
+        stats = {
+            'total_sentences': total_sentences,
+            'completed_sentences': completed_sentences,
+            'average_accuracy': round(avg_accuracy, 2),
+            'perfect_count': perfect_count,
+            'perfect_rate': round(perfect_rate, 2),
+            'training_duration': round(training_duration, 2),
+            'records': records
+        }
+        
+        print(f"📊 获取会话统计: {session_id}")
+        print(f"   完成: {completed_sentences}/{total_sentences}")
+        print(f"   平均准确率: {avg_accuracy:.2f}%")
+        
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+        
+    except Exception as e:
+        print(f"✗ 获取统计失败: {e}")
         return jsonify({
             'success': False,
             'error': str(e)

@@ -49,7 +49,7 @@
                     <!-- 练习模式选择 -->
                     <div class="mb-4">
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="practiceMode" id="basicMode" value="basic" checked>
                                     <label class="form-check-label fw-bold" for="basicMode">
@@ -58,13 +58,22 @@
                                     <div class="form-text text-muted ms-4">直接输入词汇进行发音练习</div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="practiceMode" id="scenarioMode" value="scenario">
                                     <label class="form-check-label fw-bold" for="scenarioMode">
-                                        <i class="fas fa-theater-masks me-2 text-success"></i>场景对话模式 <span class="badge bg-success ms-1">NEW</span>
+                                        <i class="fas fa-theater-masks me-2 text-success"></i>场景对话模式
                                     </label>
                                     <div class="form-text text-muted ms-4">AI生成情景对话，沉浸式练习</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="practiceMode" id="feedbackMode" value="feedback">
+                                    <label class="form-check-label fw-bold" for="feedbackMode">
+                                        <i class="fas fa-headphones me-2 text-info"></i>听觉反馈 <span class="badge bg-info ms-1">辅助</span>
+                                    </label>
+                                    <div class="form-text text-muted ms-4">帮助听障人士检测听力理解</div>
                                 </div>
                             </div>
                         </div>
@@ -134,6 +143,29 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- 听觉反馈模式输入区域 -->
+                    <div id="feedbackModeInput" style="display: none;">
+                        <div class="alert alert-info mb-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>听觉反馈训练</strong>：系统将播放场景对话，您听完后输入听到的内容，系统会智能比对并给出反馈。
+                        </div>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <label for="feedbackScenarioInput" class="form-label">请描述听力训练场景:</label>
+                                <textarea class="form-control form-control-lg" id="feedbackScenarioInput" 
+                                          placeholder="例如：餐厅点餐对话、银行办理业务、商场购物咨询等..."
+                                          rows="3" maxlength="200"></textarea>
+                                <div class="form-text">选择一个日常场景，系统将生成对话供您进行听力训练</div>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button class="btn btn-custom w-100" id="startFeedbackBtn">
+                                    <i class="fas fa-headphones me-2"></i>
+                                    开始听力训练
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -197,10 +229,14 @@
         const generateBtn = document.getElementById('generateBtn');
         const basicModeRadio = document.getElementById('basicMode');
         const scenarioModeRadio = document.getElementById('scenarioMode');
+        const feedbackModeRadio = document.getElementById('feedbackMode');
         const basicModeInput = document.getElementById('basicModeInput');
         const scenarioModeInput = document.getElementById('scenarioModeInput');
+        const feedbackModeInput = document.getElementById('feedbackModeInput');
         const scenarioInput = document.getElementById('scenarioInput');
+        const feedbackScenarioInput = document.getElementById('feedbackScenarioInput');
         const generateScenarioBtn = document.getElementById('generateScenarioBtn');
+        const startFeedbackBtn = document.getElementById('startFeedbackBtn');
         const dialogueContainer = document.getElementById('dialogueContainer');
         const scenarioTitle = document.getElementById('scenarioTitle');
         const dialogueContent = document.getElementById('dialogueContent');
@@ -234,6 +270,10 @@
             // 模式切换
             basicModeRadio.addEventListener('change', handleModeChange);
             scenarioModeRadio.addEventListener('change', handleModeChange);
+            feedbackModeRadio.addEventListener('change', handleModeChange);
+            
+            // 听觉反馈开始按钮
+            startFeedbackBtn.addEventListener('click', startFeedbackTraining);
             
             // 回车键触发生成
             textInput.addEventListener('keypress', function(e) {
@@ -264,15 +304,24 @@
         
         // 处理练习模式切换
         function handleModeChange() {
+            const isFeedbackMode = feedbackModeRadio.checked;
             isDialogueMode = scenarioModeRadio.checked;
             
-            if (isDialogueMode) {
+            if (isFeedbackMode) {
+                basicModeInput.style.display = 'none';
+                scenarioModeInput.style.display = 'none';
+                feedbackModeInput.style.display = 'block';
+                dialogueContainer.style.display = 'none';
+                console.log('✅ 切换到听觉反馈模式');
+            } else if (isDialogueMode) {
                 basicModeInput.style.display = 'none';
                 scenarioModeInput.style.display = 'block';
+                feedbackModeInput.style.display = 'none';
                 console.log('✅ 切换到场景对话模式');
             } else {
                 basicModeInput.style.display = 'block';
                 scenarioModeInput.style.display = 'none';
+                feedbackModeInput.style.display = 'none';
                 dialogueContainer.style.display = 'none';
                 console.log('✅ 切换到基础模式');
             }
@@ -478,6 +527,55 @@
             resetDialogueState();
             dialogueContainer.style.display = 'none';
             generateScenario();
+        }
+        
+        // 开始听觉反馈训练
+        async function startFeedbackTraining() {
+            const scenario = feedbackScenarioInput.value.trim();
+            
+            if (!scenario) {
+                showAlert('请输入听力训练场景描述', 'warning');
+                return;
+            }
+            
+            if (scenario.length > 200) {
+                showAlert('场景描述不能超过200个字符', 'warning');
+                return;
+            }
+            
+            startFeedbackBtn.disabled = true;
+            startFeedbackBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>生成中...';
+            
+            try {
+                console.log('开始生成听力训练场景:', scenario);
+                
+                const response = await fetch('/api/feedback/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ scenario: scenario })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log('听力训练场景生成成功:', data);
+                    
+                    // 跳转到听觉反馈训练页面
+                    navigateTo('/hearing-feedback', {
+                        session_id: data.session_id,
+                        dialogue_data: JSON.stringify(data.dialogue_data)
+                    });
+                } else {
+                    showAlert(`生成失败: ${data.error}`, 'danger');
+                    console.error('训练场景生成失败:', data.error);
+                }
+            } catch (error) {
+                showAlert(`网络错误: ${error.message}`, 'danger');
+                console.error('网络错误:', error);
+            } finally {
+                startFeedbackBtn.disabled = false;
+                startFeedbackBtn.innerHTML = '<i class="fas fa-headphones me-2"></i>开始听力训练';
+            }
         }
         
         // 场景对话相关样式
