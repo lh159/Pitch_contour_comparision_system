@@ -21,7 +21,6 @@ class HearingFeedbackTrainer {
     initElements() {
         // 场景信息
         this.scenarioTitle = document.getElementById('scenarioTitle');
-        this.scenarioDescription = document.getElementById('scenarioDescription');
         
         // 进度条
         this.progressBar = document.getElementById('progressBar');
@@ -96,7 +95,6 @@ class HearingFeedbackTrainer {
         
         // 显示场景信息
         this.scenarioTitle.textContent = this.dialogueData.scenario_title || '场景训练';
-        this.scenarioDescription.textContent = `角色：${this.dialogueData.user_role || '学员'} 与 ${this.dialogueData.ai_role || 'AI助手'}`;
         
         // 加载第一句
         this.loadSentence(0);

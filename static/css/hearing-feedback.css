@@ -455,11 +455,44 @@ select:focus {
     outline-offset: 2px;
 }
 
+/* ==================== 返回首页按钮 ==================== */
+.home-button {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 50px;
+    font-size: 16px;
+    font-weight: 600;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    transition: all 0.3s ease;
+    z-index: 1000;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.home-button:hover {
+    transform: translateX(-50%) translateY(-3px);
+    box-shadow: 0 12px 35px rgba(102, 126, 234, 0.4);
+    color: white;
+}
+
+.home-button:active {
+    transform: translateX(-50%) translateY(-1px);
+}
+
 /* ==================== 打印样式 ==================== */
 @media print {
     .action-buttons,
     .play-controls,
-    .play-btn {
+    .play-btn,
+    .home-button {
         display: none;
     }
     
