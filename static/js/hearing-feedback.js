@@ -132,8 +132,13 @@ class HearingFeedbackTrainer {
         // 准备音频
         this.prepareAudio(dialogue);
         
-        // 自动播放第一次
-        setTimeout(() => this.playAudio(), 500);
+        // 如果是第一句，不自动播放（避免浏览器阻止）
+        // 其他句子可以尝试自动播放
+        if (this.currentIndex > 0) {
+            setTimeout(() => this.playAudio(), 500);
+        } else {
+            console.log('💡 第一句不自动播放，请点击播放按钮');
+        }
     }
     
     /**
@@ -142,20 +147,41 @@ class HearingFeedbackTrainer {
     prepareAudio(dialogue) {
         // 如果有音频URL，使用它
         if (dialogue.audio_url) {
+            console.log('🎵 准备音频:', dialogue.audio_url);
+            
             this.currentAudio = new Audio(dialogue.audio_url);
             this.currentAudio.playbackRate = parseFloat(this.speedControl.value);
             
-            // 音频事件监听
+            // 预加载音频
+            this.currentAudio.preload = 'auto';
+            
+            // 音频加载成功
+            this.currentAudio.addEventListener('canplaythrough', () => {
+                console.log('✓ 音频加载完成，可以播放');
+            });
+            
+            // 音频播放结束
             this.currentAudio.addEventListener('ended', () => {
+                console.log('✓ 音频播放结束');
                 this.playBtn.innerHTML = '<i class="fas fa-play me-2"></i>播放音频';
                 this.playBtn.disabled = false;
                 this.replayBtn.disabled = false;
             });
             
+            // 音频加载或播放失败
             this.currentAudio.addEventListener('error', (e) => {
                 console.error('音频加载失败:', e);
-                showAlert('音频加载失败，请刷新页面重试', 'danger');
+                console.error('音频URL:', dialogue.audio_url);
+                console.error('错误详情:', this.currentAudio.error);
+                
+                this.playBtn.innerHTML = '<i class="fas fa-play me-2"></i>播放音频';
+                this.playBtn.disabled = false;
+                
+                showAlert('音频加载失败，请检查网络连接或联系管理员', 'danger');
             });
+            
+            // 开始加载音频
+            this.currentAudio.load();
         } else {
             console.warn('当前句子没有音频URL');
             showAlert('当前句子没有音频，请联系管理员', 'warning');
@@ -165,23 +191,42 @@ class HearingFeedbackTrainer {
     /**
      * 播放音频
      */
-    playAudio() {
+    async playAudio() {
         if (!this.currentAudio) {
             showAlert('音频未准备好，请稍候', 'warning');
             return;
         }
         
-        // 从头播放
-        this.currentAudio.currentTime = 0;
-        this.currentAudio.play();
-        
-        this.playCount++;
-        this.playCount元素.textContent = this.playCount;
-        
-        this.playBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>播放中...';
-        this.playBtn.disabled = true;
-        
-        console.log(`🔊 播放第 ${this.playCount} 次`);
+        try {
+            // 从头播放
+            this.currentAudio.currentTime = 0;
+            
+            this.playBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>播放中...';
+            this.playBtn.disabled = true;
+            
+            // 播放音频并等待Promise
+            await this.currentAudio.play();
+            
+            this.playCount++;
+            this.playCount元素.textContent = this.playCount;
+            
+            console.log(`🔊 播放第 ${this.playCount} 次`);
+        } catch (error) {
+            console.error('音频播放失败:', error);
+            
+            // 恢复按钮状态
+            this.playBtn.innerHTML = '<i class="fas fa-play me-2"></i>播放音频';
+            this.playBtn.disabled = false;
+            
+            // 根据错误类型给出不同提示
+            if (error.name === 'NotAllowedError') {
+                showAlert('浏览器阻止了自动播放，请点击播放按钮手动播放', 'warning');
+            } else if (error.name === 'NotSupportedError') {
+                showAlert('音频格式不支持，请联系管理员', 'danger');
+            } else {
+                showAlert(`音频播放失败: ${error.message}`, 'danger');
+            }
+        }
     }
     
     /**
