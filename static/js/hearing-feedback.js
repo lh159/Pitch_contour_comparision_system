@@ -468,7 +468,22 @@ class HearingFeedbackTrainer {
             perfectCount
         });
         
-        // 显示完成提示
+        // 检查 SweetAlert2 是否可用
+        if (typeof Swal === 'undefined') {
+            console.warn('⚠️ SweetAlert2 未加载，使用原生对话框');
+            // 使用原生对话框作为回退方案
+            const message = `🎊 训练完成！\n\n完成句数：${totalSentences} 句\n平均准确率：${avgAccuracy}%\n完全正确：${perfectCount} 句\n\n是否查看详细统计？\n（点击"取消"返回首页）`;
+            const showStats = confirm(message);
+            
+            if (showStats) {
+                this.showDetailedStats();
+            } else {
+                window.location.href = '/home';
+            }
+            return;
+        }
+        
+        // 显示完成提示，提供查看详细统计选项
         const result = await Swal.fire({
             title: '🎊 训练完成！',
             html: `
@@ -479,17 +494,23 @@ class HearingFeedbackTrainer {
                 </div>
             `,
             icon: 'success',
-            showCancelButton: true,
+            showDenyButton: true,
             confirmButtonText: '返回首页',
-            cancelButtonText: '查看详细统计',
-            confirmButtonColor: '#17a2b8'
+            denyButtonText: '查看详细统计',
+            confirmButtonColor: '#17a2b8',
+            denyButtonColor: '#6c757d',
+            timer: 3000,
+            timerProgressBar: true,
+            allowOutsideClick: false
         });
         
-        if (result.isConfirmed) {
-            window.location.href = '/home';
-        } else if (result.dismiss === Swal.DismissReason.cancel) {
-            // 跳转到统计页面（待实现）
+        // 处理用户选择
+        if (result.isDenied) {
+            // 显示详细统计
             this.showDetailedStats();
+        } else {
+            // 返回首页
+            window.location.href = '/home';
         }
     }
     
@@ -497,30 +518,106 @@ class HearingFeedbackTrainer {
      * 显示详细统计
      */
     showDetailedStats() {
-        let statsHTML = '<div class="table-responsive"><table class="table table-sm">';
-        statsHTML += '<thead><tr><th>句号</th><th>准确率</th><th>播放次数</th><th>错误数</th></tr></thead>';
-        statsHTML += '<tbody>';
+        // 计算总体统计
+        const totalSentences = this.records.length;
+        const totalAccuracy = this.records.reduce((sum, r) => sum + r.accuracy, 0);
+        const avgAccuracy = totalSentences > 0 ? (totalAccuracy / totalSentences).toFixed(2) : 0;
+        const perfectCount = this.records.filter(r => r.accuracy === 100).length;
+        const totalPlayCount = this.records.reduce((sum, r) => sum + r.play_count, 0);
+        
+        // 检查 SweetAlert2 是否可用
+        if (typeof Swal === 'undefined') {
+            console.warn('⚠️ SweetAlert2 未加载，使用原生alert');
+            // 使用原生 alert 作为回退方案
+            let message = `📊 详细统计报告\n\n`;
+            message += `📈 总体表现\n`;
+            message += `平均准确率：${avgAccuracy}%\n`;
+            message += `完全正确：${perfectCount} 句\n`;
+            message += `总播放次数：${totalPlayCount} 次\n\n`;
+            message += `📝 每句详情\n`;
+            message += `${'='.repeat(40)}\n`;
+            
+            this.records.forEach((record, index) => {
+                const statusText = record.accuracy === 100 ? '完美' : 
+                                 record.accuracy >= 90 ? '优秀' : 
+                                 record.accuracy >= 70 ? '良好' : '加油';
+                message += `句${index + 1}: ${record.accuracy}% (${statusText}) - 播放${record.play_count}次, 错误${record.error_count}个\n`;
+            });
+            
+            alert(message);
+            window.location.href = '/home';
+            return;
+        }
+        
+        let statsHTML = `
+            <div style="text-align: left;">
+                <div class="mb-4 p-3 bg-light rounded">
+                    <h6 class="fw-bold mb-3">📈 总体表现</h6>
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="fs-4 fw-bold text-info">${avgAccuracy}%</div>
+                            <small class="text-muted">平均准确率</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-4 fw-bold text-success">${perfectCount}</div>
+                            <small class="text-muted">完全正确</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-4 fw-bold text-warning">${totalPlayCount}</div>
+                            <small class="text-muted">总播放次数</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <h6 class="fw-bold mb-3">📝 每句详情</h6>
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>句号</th>
+                                <th>准确率</th>
+                                <th>播放</th>
+                                <th>错误</th>
+                                <th>状态</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
         
         this.records.forEach((record, index) => {
             const accuracyClass = this.getAccuracyClass(record.accuracy);
+            const statusIcon = record.accuracy === 100 ? '🏆' : 
+                             record.accuracy >= 90 ? '👍' : 
+                             record.accuracy >= 70 ? '👌' : '💪';
+            const statusText = record.accuracy === 100 ? '完美' : 
+                             record.accuracy >= 90 ? '优秀' : 
+                             record.accuracy >= 70 ? '良好' : '加油';
+            
             statsHTML += `
                 <tr>
-                    <td>${index + 1}</td>
-                    <td class="${accuracyClass}">${record.accuracy}%</td>
-                    <td>${record.play_count}</td>
-                    <td>${record.error_count}</td>
+                    <td><strong>${index + 1}</strong></td>
+                    <td class="${accuracyClass} fw-bold">${record.accuracy}%</td>
+                    <td>${record.play_count} 次</td>
+                    <td>${record.error_count} 个</td>
+                    <td>${statusIcon} ${statusText}</td>
                 </tr>
             `;
         });
         
-        statsHTML += '</tbody></table></div>';
+        statsHTML += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
         
         Swal.fire({
-            title: '📊 详细统计',
+            title: '📊 详细统计报告',
             html: statsHTML,
-            width: '600px',
+            width: '700px',
             confirmButtonText: '返回首页',
-            confirmButtonColor: '#17a2b8'
+            confirmButtonColor: '#17a2b8',
+            allowOutsideClick: false
         }).then(() => {
             window.location.href = '/home';
         });
