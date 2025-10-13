@@ -18,7 +18,8 @@
 }
 
 .scenario-card .card-text {
-    color: rgba(255, 255, 255, 0.9);
+    color: #ffffff;
+    font-weight: 500;
 }
 
 /* ==================== 进度条 ==================== */
@@ -95,6 +96,43 @@
 #charCount {
     font-size: 1rem;
     padding: 0.35rem 0.65rem;
+}
+
+/* 清空和提交按钮样式 */
+#clearBtn {
+    border-radius: 25px;
+    padding: 10px 25px;
+    font-size: 1rem;
+    border: 2px solid #6c757d;
+    transition: all 0.3s ease;
+}
+
+#clearBtn:hover {
+    background-color: #6c757d;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+#submitBtn {
+    border-radius: 25px;
+    padding: 12px 35px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border: none;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    transition: all 0.3s ease;
+}
+
+#submitBtn:hover {
+    background: linear-gradient(135deg, #218838 0%, #1aa179 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+
+#submitBtn:active {
+    transform: translateY(0);
 }
 
 /* ==================== 结果展示卡片 ==================== */
