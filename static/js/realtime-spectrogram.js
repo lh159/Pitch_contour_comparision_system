@@ -41,6 +41,10 @@ class RealtimeSpectrogramRenderer {
         this.energyHistory = [];
         this.energyThreshold = -40;  // dB
         
+        // 共振峰检测
+        this.formants = [];  // 存储当前检测到的共振峰
+        this.showFormants = true;  // 是否显示共振峰标注
+        
         // 性能优化
         this.offscreenCanvas = document.createElement('canvas');
         this.offscreenCanvas.width = this.width;
@@ -161,6 +165,11 @@ class RealtimeSpectrogramRenderer {
         // VOT检测
         this.detectVOT(energy);
         
+        // 共振峰检测
+        if (this.showFormants) {
+            this.detectFormants(this.dataArray);
+        }
+        
         // 添加当前帧到历史
         this.spectrogramData.push(new Uint8Array(this.dataArray));
         if (this.spectrogramData.length > this.maxFrames) {
@@ -201,6 +210,11 @@ class RealtimeSpectrogramRenderer {
         
         // 绘制VOT标记
         this.drawVOTMarkers(ctx, spectrogramHeight);
+        
+        // 绘制共振峰标注
+        if (this.showFormants) {
+            this.drawFormants(ctx, spectrogramHeight);
+        }
         
         // 绘制时间轴
         this.drawTimeAxis(ctx, spectrogramHeight);
@@ -378,6 +392,163 @@ class RealtimeSpectrogramRenderer {
         }
     }
     
+    /**
+     * 检测共振峰频率
+     * 共振峰是频谱中的能量峰值，代表声道的共振特性
+     */
+    detectFormants(spectrumData) {
+        if (!spectrumData || spectrumData.length === 0) return;
+        
+        const nyquist = this.audioContext.sampleRate / 2;
+        const binWidth = nyquist / spectrumData.length;
+        
+        // 寻找频谱峰值
+        const peaks = this.findPeaks(spectrumData, binWidth);
+        
+        // 过滤并选择前4个共振峰（F1-F4）
+        // 典型人声共振峰范围：
+        // F1: 200-1200 Hz（元音高低）
+        // F2: 600-3000 Hz（元音前后）
+        // F3: 1400-4000 Hz（音色）
+        // F4: 2000-5000 Hz（音色细节）
+        const formantRanges = [
+            { name: 'F1', min: 200, max: 1200, color: '#ff3333' },
+            { name: 'F2', min: 600, max: 3000, color: '#33ff33' },
+            { name: 'F3', min: 1400, max: 4000, color: '#3333ff' },
+            { name: 'F4', min: 2000, max: 5000, color: '#ffff33' }
+        ];
+        
+        this.formants = [];
+        
+        for (const range of formantRanges) {
+            // 在指定范围内找到最强峰值
+            const peaksInRange = peaks.filter(peak => 
+                peak.frequency >= range.min && peak.frequency <= range.max
+            );
+            
+            if (peaksInRange.length > 0) {
+                // 选择最强的峰值
+                peaksInRange.sort((a, b) => b.magnitude - a.magnitude);
+                const formant = peaksInRange[0];
+                
+                this.formants.push({
+                    name: range.name,
+                    frequency: formant.frequency,
+                    magnitude: formant.magnitude,
+                    color: range.color
+                });
+            }
+        }
+    }
+    
+    /**
+     * 在频谱数据中找峰值
+     */
+    findPeaks(data, binWidth) {
+        const peaks = [];
+        const minPeakHeight = 80;  // 最小峰值高度（0-255范围）
+        const minPeakDistance = 3;  // 最小峰值间距（bin数）
+        
+        for (let i = minPeakDistance; i < data.length - minPeakDistance; i++) {
+            const current = data[i];
+            
+            // 跳过低能量点
+            if (current < minPeakHeight) continue;
+            
+            // 检查是否是局部最大值
+            let isPeak = true;
+            for (let j = 1; j <= minPeakDistance; j++) {
+                if (data[i - j] >= current || data[i + j] >= current) {
+                    isPeak = false;
+                    break;
+                }
+            }
+            
+            if (isPeak) {
+                const frequency = i * binWidth;
+                peaks.push({
+                    frequency: frequency,
+                    magnitude: current,
+                    binIndex: i
+                });
+            }
+        }
+        
+        return peaks;
+    }
+    
+    /**
+     * 绘制共振峰标注
+     */
+    drawFormants(ctx, height) {
+        if (!this.formants || this.formants.length === 0) return;
+        
+        // const nyquist = this.audioContext.sampleRate / 2;
+        const maxDisplayFreq = this.options.maxFrequency;
+        
+        // 在频谱图右侧绘制共振峰标注
+        const rightX = this.width - 150;
+        
+        for (let i = 0; i < this.formants.length; i++) {
+            const formant = this.formants[i];
+            
+            // 计算频率对应的Y坐标
+            const y = height * (1 - formant.frequency / maxDisplayFreq);
+            
+            if (y < 0 || y > height) continue;  // 超出显示范围
+            
+            // 绘制横线标记
+            ctx.strokeStyle = formant.color;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 3]);
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(this.width, y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // 绘制圆点标记
+            ctx.fillStyle = formant.color;
+            ctx.beginPath();
+            ctx.arc(rightX, y, 5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 绘制标签背景
+            const label = `${formant.name}: ${Math.round(formant.frequency)}Hz`;
+            ctx.font = 'bold 12px Arial';
+            const textWidth = ctx.measureText(label).width;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(rightX + 10, y - 10, textWidth + 10, 20);
+            
+            // 绘制标签文字
+            ctx.fillStyle = formant.color;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, rightX + 15, y);
+        }
+        
+        // 在左上角显示共振峰信息汇总
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(5, 5, 180, 25 + this.formants.length * 18);
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('共振峰检测', 10, 20);
+        
+        ctx.font = '11px Arial';
+        for (let i = 0; i < this.formants.length; i++) {
+            const formant = this.formants[i];
+            ctx.fillStyle = formant.color;
+            ctx.fillText(
+                `${formant.name}: ${Math.round(formant.frequency)} Hz`, 
+                10, 
+                40 + i * 18
+            );
+        }
+    }
+    
     getColor(value) {
         // 颜色映射
         switch (this.options.colorScheme) {
@@ -443,7 +614,20 @@ class RealtimeSpectrogramRenderer {
     // 公共方法：更新配置
     updateOptions(newOptions) {
         Object.assign(this.options, newOptions);
+        
+        // 处理共振峰显示选项
+        if ('showFormants' in newOptions) {
+            this.showFormants = newOptions.showFormants;
+        }
+        
         console.log('配置已更新:', this.options);
+    }
+    
+    // 公共方法：切换共振峰显示
+    toggleFormants(show) {
+        this.showFormants = show !== undefined ? show : !this.showFormants;
+        console.log('共振峰显示:', this.showFormants ? '开启' : '关闭');
+        return this.showFormants;
     }
     
     // 公共方法：截图

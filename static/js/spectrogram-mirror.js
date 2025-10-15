@@ -43,6 +43,21 @@ class SpectrogramMirror {
                 indicator.style.display = 'none';
             });
         }
+        
+        // 共振峰显示开关
+        const formantToggle = document.getElementById('formant-toggle');
+        if (formantToggle) {
+            formantToggle.addEventListener('change', (e) => {
+                this.toggleFormants(e.target.checked);
+            });
+        }
+    }
+    
+    toggleFormants(show) {
+        console.log('切换共振峰显示:', show);
+        if (this.realtimeRenderer) {
+            this.realtimeRenderer.toggleFormants(show);
+        }
     }
 
     async startMonitoring() {
@@ -66,7 +81,8 @@ class SpectrogramMirror {
                     showFrequencyLabels: true,
                     maxFrequency: 8000,
                     minDecibels: -90,
-                    maxDecibels: -10
+                    maxDecibels: -10,
+                    showFormants: true  // 默认显示共振峰
                 });
             }
             
@@ -121,8 +137,7 @@ class SpectrogramMirror {
 }
 
 // 初始化
-let spectrogramMirror;
 document.addEventListener('DOMContentLoaded', () => {
-    spectrogramMirror = new SpectrogramMirror();
+    const _spectrogramMirror = new SpectrogramMirror();
     console.log('✓ 频谱镜子已加载（简化版）');
 });

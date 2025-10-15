@@ -31,6 +31,14 @@
                 <span class="pulse-dot"></span>
                 <span>实时监测中...</span>
             </div>
+            
+            <!-- 共振峰显示控制 -->
+            <div class="formant-toggle" style="margin-left: 20px;">
+                <label class="toggle-label">
+                    <input type="checkbox" id="formant-toggle" checked>
+                    <span class="toggle-text">🎯 显示共振峰</span>
+                </label>
+            </div>
         </div>
 
         <!-- 频谱图显示区域 -->
@@ -45,6 +53,29 @@
                     <div class="placeholder-content">
                         <span class="placeholder-icon">🎵</span>
                         <p>点击"开始实时监测"，立即看到你的发音频谱图</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 共振峰说明 -->
+            <div class="formant-info" id="formant-info" style="margin-top: 20px;">
+                <h3>🎯 共振峰说明</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="formant-label" style="color: #ff3333;">F1 (200-1200Hz)</span>
+                        <span class="formant-desc">元音开口度：F1越高，口腔开口越大（如 a → i）</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="formant-label" style="color: #33ff33;">F2 (600-3000Hz)</span>
+                        <span class="formant-desc">舌位前后：F2越高，舌位越靠前（如 u → i）</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="formant-label" style="color: #3333ff;">F3 (1400-4000Hz)</span>
+                        <span class="formant-desc">音色特征：影响声音的圆润度和清晰度</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="formant-label" style="color: #ffff33;">F4 (2000-5000Hz)</span>
+                        <span class="formant-desc">音色细节：影响声音的明亮度和穿透力</span>
                     </div>
                 </div>
             </div>
