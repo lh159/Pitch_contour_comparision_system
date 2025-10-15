@@ -13,6 +13,10 @@ class SpectrogramMirror {
         this.showTemplate = false;
         this.history = JSON.parse(localStorage.getItem('spectrogram_history') || '[]');
         
+        // 实时模式
+        this.realtimeMode = false;
+        this.realtimeRenderer = null;
+        
         this.init();
     }
 
@@ -37,6 +41,11 @@ class SpectrogramMirror {
         document.getElementById('show-template').addEventListener('change', (e) => {
             this.showTemplate = e.target.checked;
             this.updateCanvas();
+        });
+
+        // 实时模式切换
+        document.getElementById('realtime-mode').addEventListener('change', (e) => {
+            this.toggleRealtimeMode(e.target.checked);
         });
 
         // 清空历史
@@ -408,6 +417,63 @@ class SpectrogramMirror {
 
     showLoading(show) {
         document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
+    }
+
+    // 实时模式控制
+    async toggleRealtimeMode(enabled) {
+        this.realtimeMode = enabled;
+        
+        if (enabled) {
+            console.log('启用实时监测模式...');
+            
+            // 隐藏占位符
+            document.getElementById('canvas-placeholder').style.display = 'none';
+            
+            // 创建实时渲染器
+            if (!this.realtimeRenderer) {
+                this.realtimeRenderer = new RealtimeSpectrogramRenderer(this.canvas, {
+                    fftSize: 2048,
+                    smoothingTimeConstant: 0.8,
+                    scrollSpeed: 2,
+                    colorScheme: 'hot',
+                    showWaveform: true,
+                    showFrequencyLabels: true,
+                    maxFrequency: 8000
+                });
+            }
+            
+            // 启动实时渲染
+            const success = await this.realtimeRenderer.start();
+            
+            if (success) {
+                // 禁用录音按钮
+                document.getElementById('start-recording').disabled = true;
+                document.getElementById('start-recording').style.opacity = '0.5';
+                
+                console.log('✓ 实时监测模式已启动');
+            } else {
+                // 回退
+                document.getElementById('realtime-mode').checked = false;
+                this.realtimeMode = false;
+            }
+        } else {
+            console.log('关闭实时监测模式...');
+            
+            // 停止实时渲染
+            if (this.realtimeRenderer) {
+                this.realtimeRenderer.stop();
+            }
+            
+            // 恢复录音按钮
+            document.getElementById('start-recording').disabled = false;
+            document.getElementById('start-recording').style.opacity = '1';
+            
+            // 显示占位符
+            this.drawPlaceholder();
+            document.getElementById('canvas-placeholder').style.display = 'flex';
+            
+            console.log('✓ 实时监测模式已关闭');
+        }
     }
 }
 

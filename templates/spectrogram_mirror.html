@@ -77,6 +77,10 @@
                     <input type="checkbox" id="show-template">
                     <span>显示目标模板</span>
                 </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="realtime-mode">
+                    <span>🔴 实时监测模式</span>
+                </label>
             </div>
         </div>
 
@@ -225,6 +229,7 @@
     </div>
 
     <!-- 脚本 -->
+    <script src="{{ url_for('static', filename='js/realtime-spectrogram.js') }}"></script>
     <script src="{{ url_for('static', filename='js/spectrogram-mirror.js') }}"></script>
 </body>
 </html>
