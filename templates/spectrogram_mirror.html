@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>频谱镜子 - 发音可视化训练</title>
+    <title>频谱镜子 - 实时发音可视化</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/spectrogram-mirror.css') }}">
 </head>
@@ -13,218 +13,41 @@
         <header class="header">
             <div class="header-content">
                 <h1>🔍 频谱镜子</h1>
-                <p class="subtitle">将发音转化为可见的频谱图像，精准掌握送气与不送气的差异</p>
-            </div>
-            <div class="nav-buttons">
-                <a href="/" class="btn btn-outline">返回首页</a>
+                <p class="subtitle">实时可视化你的发音频谱，精准掌握发音特征</p>
             </div>
         </header>
 
-        <!-- 功能说明 -->
-        <div class="info-card">
-            <h3>💡 如何使用频谱镜子</h3>
-            <div class="info-grid">
-                <div class="info-item">
-                    <span class="info-icon">1️⃣</span>
-                    <div class="info-text">
-                        <strong>选择目标音素</strong>
-                        <p>选择你想练习的发音（zhi 或 chi）</p>
-                    </div>
-                </div>
-                <div class="info-item">
-                    <span class="info-icon">2️⃣</span>
-                    <div class="info-text">
-                        <strong>开始录音</strong>
-                        <p>点击"开始录音"并清晰发音</p>
-                    </div>
-                </div>
-                <div class="info-item">
-                    <span class="info-icon">3️⃣</span>
-                    <div class="info-text">
-                        <strong>查看频谱图</strong>
-                        <p>观察你的发音特征：zhi是"瘦条"，chi是"胖云"</p>
-                    </div>
-                </div>
-                <div class="info-item">
-                    <span class="info-icon">4️⃣</span>
-                    <div class="info-text">
-                        <strong>根据反馈改进</strong>
-                        <p>查看AI分析，调整发音直到达到目标</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- 控制面板 -->
-        <div class="control-panel">
-            <div class="mode-selector">
-                <label class="mode-label">练习模式：</label>
-                <div class="mode-buttons">
-                    <button class="mode-btn active" data-mode="free">
-                        自由练习
-                    </button>
-                    <button class="mode-btn" data-mode="zhi">
-                        练习 zhi（不送气）
-                    </button>
-                    <button class="mode-btn" data-mode="chi">
-                        练习 chi（送气）
-                    </button>
-                </div>
-            </div>
-
-            <div class="template-controls">
-                <label class="toggle-label">
-                    <input type="checkbox" id="show-template">
-                    <span>显示目标模板</span>
-                </label>
-                <label class="toggle-label">
-                    <input type="checkbox" id="realtime-mode">
-                    <span>🔴 实时监测模式</span>
-                </label>
-            </div>
-        </div>
-
-        <!-- 录音控制 -->
-        <div class="recording-controls">
-            <button id="start-recording" class="btn btn-primary btn-large">
+        <div class="control-panel-simple">
+            <button id="start-monitoring" class="btn btn-primary btn-large btn-glow">
                 <span class="btn-icon">🎤</span>
-                开始录音
+                开始实时监测
             </button>
-            <button id="stop-recording" class="btn btn-danger btn-large" style="display: none;">
+            <button id="stop-monitoring" class="btn btn-danger btn-large" style="display: none;">
                 <span class="btn-icon">⏹️</span>
-                停止录音
+                停止监测
             </button>
-            <div id="recording-indicator" class="recording-indicator" style="display: none;">
+            <div id="monitoring-indicator" class="monitoring-indicator" style="display: none;">
                 <span class="pulse-dot"></span>
-                <span>录音中...</span>
+                <span>实时监测中...</span>
             </div>
         </div>
 
         <!-- 频谱图显示区域 -->
         <div class="spectrogram-section">
             <div class="section-header">
-                <h2>📊 你的发音频谱图</h2>
-                <div class="spec-info">
-                    <span class="info-badge">
-                        <strong>瘦条</strong> = 不送气 (zhi)
-                    </span>
-                    <span class="info-badge">
-                        <strong>胖云</strong> = 送气 (chi)
-                    </span>
-                </div>
+                <h2>📊 实时发音频谱图</h2>
             </div>
             
             <div class="canvas-wrapper">
-                <canvas id="spectrogram-canvas" width="1000" height="400"></canvas>
+                <canvas id="spectrogram-canvas" width="1200" height="500"></canvas>
                 <div id="canvas-placeholder" class="canvas-placeholder">
                     <div class="placeholder-content">
                         <span class="placeholder-icon">🎵</span>
-                        <p>开始录音后，这里将显示你的发音频谱图</p>
+                        <p>点击"开始实时监测"，立即看到你的发音频谱图</p>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- 分析结果 -->
-        <div id="analysis-section" class="analysis-section" style="display: none;">
-            <h2>🔬 AI 分析结果</h2>
-            
-            <div class="results-grid">
-                <!-- 识别结果 -->
-                <div class="result-card">
-                    <h3>识别结果</h3>
-                    <div class="result-content">
-                        <div id="prediction-result" class="prediction-large">
-                            <span class="phoneme-text">--</span>
-                            <span class="confidence-text">置信度: --%</span>
-                        </div>
-                        <div id="score-display" class="score-display" style="display: none;">
-                            <div class="score-circle">
-                                <span id="score-value" class="score-value">--</span>
-                                <span class="score-label">分</span>
-                            </div>
-                            <div id="grade-badge" class="grade-badge">-</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 特征参数 -->
-                <div class="result-card">
-                    <h3>发音特征</h3>
-                    <div class="result-content">
-                        <div class="feature-item">
-                            <label>VOT (送气时长):</label>
-                            <div class="feature-value">
-                                <span id="vot-value">--</span> ms
-                                <div class="feature-bar">
-                                    <div id="vot-bar" class="bar-fill"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="feature-item">
-                            <label>送气强度:</label>
-                            <div class="feature-value">
-                                <span id="aspiration-value">--</span> / 100
-                                <div class="feature-bar">
-                                    <div id="aspiration-bar" class="bar-fill"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 对比分析 -->
-                <div class="result-card full-width">
-                    <h3>音素对比</h3>
-                    <div class="result-content">
-                        <div class="comparison-bars">
-                            <div class="comparison-item">
-                                <label>zhi (不送气)</label>
-                                <div class="comparison-bar">
-                                    <div id="zhi-bar" class="bar-fill zhi-color"></div>
-                                    <span id="zhi-percent" class="bar-label">--%</span>
-                                </div>
-                            </div>
-                            <div class="comparison-item">
-                                <label>chi (送气)</label>
-                                <div class="comparison-bar">
-                                    <div id="chi-bar" class="bar-fill chi-color"></div>
-                                    <span id="chi-percent" class="bar-label">--%</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 改进建议 -->
-            <div class="feedback-card">
-                <h3>💡 改进建议</h3>
-                <div id="feedback-text" class="feedback-content">
-                    等待分析结果...
-                </div>
-            </div>
-        </div>
-
-        <!-- 历史记录 -->
-        <div class="history-section">
-            <div class="section-header">
-                <h2>📝 练习记录</h2>
-                <button id="clear-history" class="btn btn-outline btn-small">清空记录</button>
-            </div>
-            <div id="history-list" class="history-list">
-                <div class="empty-state">
-                    <p>暂无练习记录</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 加载提示 -->
-    <div id="loading-overlay" class="loading-overlay" style="display: none;">
-        <div class="loading-spinner">
-            <div class="spinner"></div>
-            <p>正在分析频谱...</p>
         </div>
     </div>
 
