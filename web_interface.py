@@ -35,6 +35,9 @@ from deepseek_integration import get_deepseek_generator
 # 导入文字比对模块
 from text_comparator import TextComparator
 
+# 导入频谱分析模块
+from spectrogram_analyzer import get_analyzer
+
 def detect_dialogue_emotion(text: str) -> str:
     """
     改进的对话情感检测
@@ -2268,6 +2271,175 @@ def get_feedback_stats(session_id):
             'success': False,
             'error': str(e)
         }), 500
+
+# === 频谱镜子API端点 ===
+
+@app.route('/spectrogram_mirror')
+def spectrogram_mirror():
+    """频谱镜子页面"""
+    return render_template('spectrogram_mirror.html')
+
+@app.route('/api/spectrogram/analyze', methods=['POST'])
+def analyze_spectrogram():
+    """分析音频频谱"""
+    try:
+        # 获取上传的音频文件
+        audio_file = request.files.get('audio')
+        target_phoneme = request.form.get('target_phoneme')  # 'zhi' 或 'chi'
+        
+        if not audio_file:
+            return jsonify({
+                'success': False,
+                'error': '未上传音频文件'
+            }), 400
+        
+        # 保存临时文件
+        temp_filename = f'temp_spec_{uuid.uuid4().hex}.wav'
+        temp_path = os.path.join(Config.TEMP_FOLDER, temp_filename)
+        audio_file.save(temp_path)
+        
+        print(f"📊 开始频谱分析: {temp_filename}")
+        print(f"   目标音素: {target_phoneme if target_phoneme else '未指定'}")
+        
+        # 获取分析器
+        analyzer = get_analyzer(sample_rate=16000)
+        
+        # 完整分析
+        result = analyzer.analyze_audio(temp_path, target_phoneme)
+        
+        # 清理临时文件
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+        
+        if result['success']:
+            print(f"✓ 频谱分析完成")
+            print(f"   识别结果: {result['classification']['prediction']}")
+            print(f"   置信度: {result['classification']['confidence']*100:.1f}%")
+            print(f"   VOT: {result['features']['vot_ms']:.1f}ms")
+            print(f"   送气强度: {result['features']['aspiration_score']:.1f}")
+            if result.get('score'):
+                print(f"   评分: {result['score']:.1f} ({result['grade']})")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"✗ 频谱分析失败: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/spectrogram/classify', methods=['POST'])
+def classify_phoneme():
+    """快速分类 zhi/chi"""
+    try:
+        audio_file = request.files.get('audio')
+        
+        if not audio_file:
+            return jsonify({
+                'success': False,
+                'error': '未上传音频文件'
+            }), 400
+        
+        # 保存临时文件
+        temp_filename = f'temp_classify_{uuid.uuid4().hex}.wav'
+        temp_path = os.path.join(Config.TEMP_FOLDER, temp_filename)
+        audio_file.save(temp_path)
+        
+        # 获取分析器
+        analyzer = get_analyzer()
+        
+        # 分类
+        result = analyzer.classify_zhi_chi(temp_path)
+        
+        # 清理
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/spectrogram/compare', methods=['POST'])
+def compare_with_template():
+    """与标准模板对比"""
+    try:
+        audio_file = request.files.get('audio')
+        template_type = request.form.get('template_type', 'zhi')  # 'zhi' 或 'chi'
+        
+        if not audio_file:
+            return jsonify({
+                'success': False,
+                'error': '未上传音频文件'
+            }), 400
+        
+        # 保存临时文件
+        temp_filename = f'temp_compare_{uuid.uuid4().hex}.wav'
+        temp_path = os.path.join(Config.TEMP_FOLDER, temp_filename)
+        audio_file.save(temp_path)
+        
+        # 分析
+        analyzer = get_analyzer()
+        result = analyzer.analyze_audio(temp_path, target_phoneme=template_type)
+        
+        # 清理
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/spectrogram/vot', methods=['POST'])
+def detect_vot_api():
+    """VOT检测API"""
+    try:
+        audio_file = request.files.get('audio')
+        
+        if not audio_file:
+            return jsonify({
+                'success': False,
+                'error': '未上传音频文件'
+            }), 400
+        
+        # 保存临时文件
+        temp_filename = f'temp_vot_{uuid.uuid4().hex}.wav'
+        temp_path = os.path.join(Config.TEMP_FOLDER, temp_filename)
+        audio_file.save(temp_path)
+        
+        # VOT检测
+        analyzer = get_analyzer()
+        result = analyzer.detect_vot(temp_path)
+        
+        # 清理
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 
 @app.errorhandler(413)
 def too_large(e):

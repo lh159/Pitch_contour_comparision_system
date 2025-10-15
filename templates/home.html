@@ -49,7 +49,7 @@
                     <!-- 练习模式选择 -->
                     <div class="mb-4">
                         <div class="row">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="practiceMode" id="basicMode" value="basic" checked>
                                     <label class="form-check-label fw-bold" for="basicMode">
@@ -58,7 +58,7 @@
                                     <div class="form-text text-muted ms-4">直接输入词汇进行发音练习</div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="practiceMode" id="scenarioMode" value="scenario">
                                     <label class="form-check-label fw-bold" for="scenarioMode">
@@ -67,13 +67,22 @@
                                     <div class="form-text text-muted ms-4">AI生成情景对话，沉浸式练习</div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="practiceMode" id="feedbackMode" value="feedback">
                                     <label class="form-check-label fw-bold" for="feedbackMode">
                                         <i class="fas fa-headphones me-2 text-info"></i>听觉反馈 <span class="badge bg-info ms-1">辅助</span>
                                     </label>
                                     <div class="form-text text-muted ms-4">帮助听障人士检测听力理解</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="practiceMode" id="spectrogramMode" value="spectrogram">
+                                    <label class="form-check-label fw-bold" for="spectrogramMode">
+                                        <i class="fas fa-chart-area me-2 text-warning"></i>频谱镜子 <span class="badge bg-warning ms-1">可视化</span>
+                                    </label>
+                                    <div class="form-text text-muted ms-4">实时查看发音频谱图</div>
                                 </div>
                             </div>
                         </div>
@@ -166,6 +175,24 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- 频谱镜子模式输入区域 -->
+                    <div id="spectrogramModeInput" style="display: none;">
+                        <div class="alert alert-warning mb-3">
+                            <i class="fas fa-chart-area me-2"></i>
+                            <strong>频谱镜子</strong>：实时可视化您的发音频谱图，帮助您直观地看到声音的频率特征和共振峰分布。
+                        </div>
+                        <div class="text-center">
+                            <button class="btn btn-custom btn-lg" id="startSpectrogramBtn">
+                                <i class="fas fa-chart-area me-2"></i>
+                                进入频谱镜子
+                            </button>
+                            <div class="form-text mt-3">
+                                <i class="fas fa-info-circle me-1"></i>
+                                点击按钮后将进入实时频谱分析界面，您可以通过麦克风录音并查看频谱图
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -230,13 +257,16 @@
         const basicModeRadio = document.getElementById('basicMode');
         const scenarioModeRadio = document.getElementById('scenarioMode');
         const feedbackModeRadio = document.getElementById('feedbackMode');
+        const spectrogramModeRadio = document.getElementById('spectrogramMode');
         const basicModeInput = document.getElementById('basicModeInput');
         const scenarioModeInput = document.getElementById('scenarioModeInput');
         const feedbackModeInput = document.getElementById('feedbackModeInput');
+        const spectrogramModeInput = document.getElementById('spectrogramModeInput');
         const scenarioInput = document.getElementById('scenarioInput');
         const feedbackScenarioInput = document.getElementById('feedbackScenarioInput');
         const generateScenarioBtn = document.getElementById('generateScenarioBtn');
         const startFeedbackBtn = document.getElementById('startFeedbackBtn');
+        const startSpectrogramBtn = document.getElementById('startSpectrogramBtn');
         const dialogueContainer = document.getElementById('dialogueContainer');
         const scenarioTitle = document.getElementById('scenarioTitle');
         const dialogueContent = document.getElementById('dialogueContent');
@@ -271,9 +301,13 @@
             basicModeRadio.addEventListener('change', handleModeChange);
             scenarioModeRadio.addEventListener('change', handleModeChange);
             feedbackModeRadio.addEventListener('change', handleModeChange);
+            spectrogramModeRadio.addEventListener('change', handleModeChange);
             
             // 听觉反馈开始按钮
             startFeedbackBtn.addEventListener('click', startFeedbackTraining);
+            
+            // 频谱镜子开始按钮
+            startSpectrogramBtn.addEventListener('click', startSpectrogram);
             
             // 回车键触发生成
             textInput.addEventListener('keypress', function(e) {
@@ -305,23 +339,34 @@
         // 处理练习模式切换
         function handleModeChange() {
             const isFeedbackMode = feedbackModeRadio.checked;
+            const isSpectrogramMode = spectrogramModeRadio.checked;
             isDialogueMode = scenarioModeRadio.checked;
             
             if (isFeedbackMode) {
                 basicModeInput.style.display = 'none';
                 scenarioModeInput.style.display = 'none';
                 feedbackModeInput.style.display = 'block';
+                spectrogramModeInput.style.display = 'none';
                 dialogueContainer.style.display = 'none';
                 console.log('✅ 切换到听觉反馈模式');
             } else if (isDialogueMode) {
                 basicModeInput.style.display = 'none';
                 scenarioModeInput.style.display = 'block';
                 feedbackModeInput.style.display = 'none';
+                spectrogramModeInput.style.display = 'none';
                 console.log('✅ 切换到场景对话模式');
+            } else if (isSpectrogramMode) {
+                basicModeInput.style.display = 'none';
+                scenarioModeInput.style.display = 'none';
+                feedbackModeInput.style.display = 'none';
+                spectrogramModeInput.style.display = 'block';
+                dialogueContainer.style.display = 'none';
+                console.log('✅ 切换到频谱镜子模式');
             } else {
                 basicModeInput.style.display = 'block';
                 scenarioModeInput.style.display = 'none';
                 feedbackModeInput.style.display = 'none';
+                spectrogramModeInput.style.display = 'none';
                 dialogueContainer.style.display = 'none';
                 console.log('✅ 切换到基础模式');
             }
@@ -576,6 +621,13 @@
                 startFeedbackBtn.disabled = false;
                 startFeedbackBtn.innerHTML = '<i class="fas fa-headphones me-2"></i>开始听力训练';
             }
+        }
+        
+        // 开始频谱镜子
+        function startSpectrogram() {
+            console.log('进入频谱镜子模式');
+            // 直接跳转到频谱镜子页面
+            window.location.href = '/spectrogram_mirror';
         }
         
         // 场景对话相关样式
