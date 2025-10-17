@@ -51,12 +51,54 @@ class SpectrogramMirror {
                 this.toggleFormants(e.target.checked);
             });
         }
+        
+        // 拼音显示开关
+        const pinyinToggle = document.getElementById('pinyin-toggle');
+        const clearPinyinBtn = document.getElementById('clear-pinyin');
+        const pinyinInfo = document.getElementById('pinyin-info');
+        
+        if (pinyinToggle) {
+            pinyinToggle.addEventListener('change', (e) => {
+                this.togglePinyin(e.target.checked);
+                
+                // 显示/隐藏清除按钮
+                if (clearPinyinBtn) {
+                    clearPinyinBtn.style.display = e.target.checked ? 'inline-flex' : 'none';
+                }
+                
+                // 显示/隐藏拼音说明
+                if (pinyinInfo) {
+                    pinyinInfo.style.display = e.target.checked ? 'block' : 'none';
+                }
+            });
+        }
+        
+        // 清除拼音按钮
+        if (clearPinyinBtn) {
+            clearPinyinBtn.addEventListener('click', () => {
+                this.clearPinyinMarkers();
+            });
+        }
     }
     
     toggleFormants(show) {
         console.log('切换共振峰显示:', show);
         if (this.realtimeRenderer) {
             this.realtimeRenderer.toggleFormants(show);
+        }
+    }
+    
+    togglePinyin(show) {
+        console.log('切换拼音显示:', show);
+        if (this.realtimeRenderer) {
+            this.realtimeRenderer.togglePinyin(show);
+        }
+    }
+    
+    clearPinyinMarkers() {
+        console.log('清除拼音标记');
+        if (this.realtimeRenderer) {
+            this.realtimeRenderer.clearPinyinMarkers();
         }
     }
 
@@ -84,6 +126,19 @@ class SpectrogramMirror {
                     maxDecibels: -10,
                     showFormants: true  // 默认显示共振峰
                 });
+                
+                // 同步拼音开关状态
+                const pinyinToggle = document.getElementById('pinyin-toggle');
+                if (pinyinToggle && pinyinToggle.checked) {
+                    this.realtimeRenderer.showPinyin = true;
+                    console.log('同步拼音开关状态: 已开启');
+                }
+                
+                // 同步共振峰开关状态
+                const formantToggle = document.getElementById('formant-toggle');
+                if (formantToggle) {
+                    this.realtimeRenderer.showFormants = formantToggle.checked;
+                }
             }
             
             // 启动实时渲染

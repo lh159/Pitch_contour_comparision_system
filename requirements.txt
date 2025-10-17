@@ -54,6 +54,11 @@ funasr>=1.0.0            # 可能安装失败，但不影响核心功能
 jieba>=0.42.1
 pypinyin>=0.44.0         # 中文拼音转换
 
+# 语音识别服务（国内）
+baidu-aip>=4.16.0        # 百度AI开放平台 (语音识别)
+aliyun-python-sdk-core>=2.13.0  # 阿里云SDK核心
+# aliyun-nls-python3-sdk  # 阿里云语音识别SDK (需要单独安装)
+
 # 系统工具
 psutil>=5.8.0            # 系统资源监控
 pathlib2>=2.3.6         # 路径处理 (Python<3.4兼容)

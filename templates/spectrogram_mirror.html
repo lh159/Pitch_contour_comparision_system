@@ -6,6 +6,11 @@
     <title>频谱镜子 - 实时发音可视化</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/spectrogram-mirror.css') }}">
+    
+    <!-- cnchar 库 - 用于拼音转换 -->
+    <script src="https://cdn.jsdelivr.net/npm/cnchar/cnchar.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cnchar/plugins/pinyin/cnchar.pinyin.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cnchar/plugins/tone/cnchar.tone.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -39,6 +44,20 @@
                     <span class="toggle-text">🎯 显示共振峰</span>
                 </label>
             </div>
+            
+            <!-- 拼音显示控制 -->
+            <div class="formant-toggle" style="margin-left: 10px;">
+                <label class="toggle-label">
+                    <input type="checkbox" id="pinyin-toggle" checked>
+                    <span class="toggle-text">📝 显示拼音</span>
+                </label>
+            </div>
+            
+            <!-- 清除拼音按钮 -->
+            <button id="clear-pinyin" class="btn btn-secondary" style="margin-left: 10px;">
+                <span class="btn-icon">🗑️</span>
+                清除拼音
+            </button>
         </div>
 
         <!-- 频谱图显示区域 -->
@@ -77,6 +96,34 @@
                         <span class="formant-label" style="color: #ffff33;">F4 (2000-5000Hz)</span>
                         <span class="formant-desc">音色细节：影响声音的明亮度和穿透力</span>
                     </div>
+                </div>
+            </div>
+            
+            <!-- 拼音说明 -->
+            <div class="formant-info" id="pinyin-info" style="margin-top: 20px;">
+                <h3>📝 拼音标注说明</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="formant-label" style="color: #64c8ff;">实时识别</span>
+                        <span class="formant-desc">使用 Web Speech API 实时识别你的发音</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="formant-label" style="color: #64c8ff;">自动转换</span>
+                        <span class="formant-desc">自动将识别的汉字转换为带声调的拼音</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="formant-label" style="color: #64c8ff;">时间对齐</span>
+                        <span class="formant-desc">拼音标注随频谱图滚动，精确时间对齐</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="formant-label" style="color: #64c8ff;">渐隐效果</span>
+                        <span class="formant-desc">标注显示 5 秒后自动淡出并消失</span>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; padding: 12px; background: rgba(100, 200, 255, 0.1); border-left: 3px solid #64c8ff; border-radius: 4px;">
+                    <p style="margin: 0; color: #64c8ff; font-size: 14px;">
+                        <strong>💡 提示：</strong>拼音功能需要使用 <strong>Chrome</strong> 或 <strong>Edge</strong> 浏览器，并允许麦克风权限和网络连接。
+                    </p>
                 </div>
             </div>
         </div>

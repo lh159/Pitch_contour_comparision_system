@@ -74,7 +74,7 @@ def check_system_files(mode='full'):
     # 基础文件
     base_files = [
         'web_interface.py',
-        'config.py',
+        'config/__init__.py',
         'tts_module.py',
         'pitch_comparison.py',
         'scoring_algorithm.py',

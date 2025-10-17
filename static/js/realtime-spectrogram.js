@@ -35,6 +35,7 @@ class RealtimeSpectrogramRenderer {
         this.microphone = null;
         this.dataArray = null;
         this.waveformArray = null;
+        this.microphoneStream = null;  // 保存麦克风流，用于语音识别复用
         
         // VOT检测
         this.votMarkers = [];
@@ -44,6 +45,16 @@ class RealtimeSpectrogramRenderer {
         // 共振峰检测
         this.formants = [];  // 存储当前检测到的共振峰
         this.showFormants = true;  // 是否显示共振峰标注
+        
+        // 拼音识别
+        this.showPinyin = false;  // 是否显示拼音标注
+        this.pinyinMarkers = [];  // 存储拼音标记
+        this.recognition = null;  // 语音识别对象
+        this.recognitionActive = false;  // 语音识别是否活跃
+        this.recognitionLanguage = 'zh-CN';
+        this.pinyinDisplayDuration = 8000;  // 拼音显示时长（毫秒）
+        this.startTime = null;  // 记录启动时间
+        this.recognitionLatency = 2000;  // 识别时延（毫秒），用于逆推标记位置
         
         // 性能优化
         this.offscreenCanvas = document.createElement('canvas');
@@ -67,7 +78,7 @@ class RealtimeSpectrogramRenderer {
         
         try {
             // 请求麦克风权限
-            const stream = await navigator.mediaDevices.getUserMedia({
+            this.microphoneStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     sampleRate: 16000,
                     channelCount: 1,
@@ -79,7 +90,7 @@ class RealtimeSpectrogramRenderer {
             
             // 创建音频上下文
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            this.microphone = this.audioContext.createMediaStreamSource(stream);
+            this.microphone = this.audioContext.createMediaStreamSource(this.microphoneStream);
             
             // 创建分析器
             this.analyser = this.audioContext.createAnalyser();
@@ -100,10 +111,19 @@ class RealtimeSpectrogramRenderer {
             this.spectrogramData = [];
             this.votMarkers = [];
             this.energyHistory = [];
+            this.pinyinMarkers = [];
+            
+            // 记录启动时间
+            this.startTime = Date.now();
             
             // 开始渲染
             this.isRunning = true;
             this.render();
+            
+            // 如果启用拼音识别，启动语音识别
+            if (this.showPinyin) {
+                this.startSpeechRecognition();
+            }
             
             console.log('✓ 实时频谱渲染已启动');
             console.log(`  FFT大小: ${this.options.fftSize}`);
@@ -129,9 +149,18 @@ class RealtimeSpectrogramRenderer {
             this.animationId = null;
         }
         
+        // 停止语音识别
+        this.stopSpeechRecognition();
+        
         if (this.microphone) {
             this.microphone.disconnect();
             this.microphone = null;
+        }
+        
+        // 停止麦克风流
+        if (this.microphoneStream) {
+            this.microphoneStream.getTracks().forEach(track => track.stop());
+            this.microphoneStream = null;
         }
         
         if (this.audioContext) {
@@ -191,9 +220,25 @@ class RealtimeSpectrogramRenderer {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, this.width, this.height);
         
-        // 计算频谱显示区域
-        const spectrogramHeight = this.options.showWaveform ? this.height * 0.75 : this.height;
-        const waveformHeight = this.height - spectrogramHeight;
+        // 计算布局
+        let spectrogramHeight = this.height;
+        let waveformHeight = 0;
+        let pinyinHeight = 0;
+        
+        if (this.options.showWaveform && this.showPinyin) {
+            // 三层布局：频谱 70%，波形 15%，拼音 15%
+            spectrogramHeight = this.height * 0.70;
+            waveformHeight = this.height * 0.15;
+            pinyinHeight = this.height * 0.15;
+        } else if (this.options.showWaveform) {
+            // 两层布局：频谱 75%，波形 25%
+            spectrogramHeight = this.height * 0.75;
+            waveformHeight = this.height * 0.25;
+        } else if (this.showPinyin) {
+            // 两层布局：频谱 85%，拼音 15%
+            spectrogramHeight = this.height * 0.85;
+            pinyinHeight = this.height * 0.15;
+        }
         
         // 绘制频谱图
         this.drawSpectrogram(ctx, spectrogramHeight);
@@ -201,6 +246,12 @@ class RealtimeSpectrogramRenderer {
         // 绘制波形
         if (this.options.showWaveform) {
             this.drawWaveform(ctx, spectrogramHeight, waveformHeight);
+        }
+        
+        // 绘制拼音区域
+        if (this.showPinyin) {
+            const pinyinOffsetY = spectrogramHeight + waveformHeight;
+            this.drawPinyinArea(ctx, pinyinOffsetY, pinyinHeight);
         }
         
         // 绘制频率标签
@@ -611,6 +662,633 @@ class RealtimeSpectrogramRenderer {
         this.ctx.fillText('点击"开始实时监测"查看频谱', this.width / 2, this.height / 2);
     }
     
+    /**
+     * 启动语音识别
+     * 优先使用后端API（百度/阿里云），fallback到浏览器 Web Speech API
+     */
+    async startSpeechRecognition() {
+        // 检查是否已启动实时监测（必须先启动才能使用拼音功能）
+        if (!this.isRunning || !this.microphoneStream) {
+            console.warn('⚠️ 请先启动实时监测，拼音功能需要复用麦克风输入');
+            alert('请先点击"启动实时监测"按钮，然后再启用拼音标注');
+            return;
+        }
+        console.log('✓ 检测到实时监测已运行，复用麦克风输入');
+        
+        // 检查 cnchar 库
+        if (typeof cnchar === 'undefined' || typeof cnchar.spell !== 'function') {
+            console.error('❌ cnchar 库未加载，拼音功能无法使用');
+            alert('拼音功能需要加载 cnchar 库，请检查网络连接后刷新页面');
+            return;
+        }
+        console.log('✓ cnchar 库已加载');
+        
+        // 语音识别方案选择：
+        // - 'web_speech': 浏览器 Web Speech API（Google 在线服务）
+        // - 'backend': 后端 API（百度/阿里云）⭐ 推荐 - 快速准确
+        const recognitionMethod = 'backend';  // 选择识别方法 - 使用百度语音识别
+        
+        if (recognitionMethod === 'backend') {
+            console.log('🔄 使用后端语音识别API（百度/阿里云）');
+            this.startBackendSpeechRecognition(recognitionMethod);
+            return;
+        }
+        
+        // 使用浏览器 Web Speech API + 本地 cnchar 拼音转换
+        console.log('🔄 使用本地方案：Web Speech API + cnchar 拼音库（低延迟）');
+        
+        // 检查浏览器支持
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            console.error('❌ 浏览器不支持 Web Speech API');
+            alert('拼音功能需要使用 Chrome 或 Edge 浏览器');
+            return;
+        }
+        console.log('✓ Web Speech API 已支持');
+        
+        try {
+            this.recognition = new SpeechRecognition();
+            this.recognition.continuous = true;
+            this.recognition.interimResults = true;
+            this.recognition.lang = this.recognitionLanguage;
+            
+            this.recognition.onresult = (event) => {
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    const transcript = result[0].transcript;
+                    
+                    // 调试信息
+                    if (!result.isFinal) {
+                        console.log('⚡ 识别中（实时）:', transcript);
+                    }
+                    
+                    // 处理临时结果（低延迟）或最终结果
+                    if (result.isFinal) {
+                        console.log('✓ 识别完成（最终）:', transcript);
+                        this.processPinyinFromText(transcript, true);
+                    } else {
+                        // 实时显示临时结果（可选，降低延迟）
+                        // 如果希望更快反馈，可以启用临时结果
+                        // this.processPinyinFromText(transcript, false);
+                    }
+                }
+            };
+            
+            this.recognition.onerror = (event) => {
+                console.error('❌ 语音识别错误:', event.error);
+                
+                // 详细的错误说明
+                if (event.error === 'network') {
+                    console.error('详细说明: "network" 错误的真正原因（不是网络问题！）:');
+                    console.error('1. 🌐 Web Speech API 使用 Google 在线服务');
+                    console.error('2. 🔒 需要 HTTPS 连接（localhost 除外）');
+                    console.error('3. 🚫 某些地区可能无法访问 Google 服务');
+                    console.error('');
+                    console.error('✅ 解决方法:');
+                    console.error('- 确保使用 http://localhost:5001 访问（不要用 IP 地址）');
+                    console.error('- 检查是否可以访问 Google 服务');
+                    console.error('- 或考虑使用离线语音识别方案');
+                    this.recognitionActive = false;
+                } else if (event.error === 'not-allowed') {
+                    console.error('详细说明: 麦克风权限被拒绝');
+                    console.error('请在浏览器地址栏左侧点击 🔒 图标，允许使用麦克风');
+                    this.recognitionActive = false;
+                } else if (event.error === 'no-speech') {
+                    console.warn('⚠️ 没有检测到语音，继续监听...');
+                } else {
+                    console.error('详细说明:', event.error);
+                }
+            };
+            
+            this.recognition.onend = () => {
+                console.log('语音识别结束');
+                // 如果还在运行，自动重启（但避免太快重启）
+                if (this.isRunning && this.showPinyin && this.recognitionActive) {
+                    setTimeout(() => {
+                        if (this.isRunning && this.showPinyin) {
+                            try {
+                                this.recognition.start();
+                                console.log('重启语音识别');
+                            } catch (e) {
+                                console.warn('重启识别失败:', e);
+                                this.recognitionActive = false;
+                            }
+                        }
+                    }, 100);  // 延迟 100ms 再重启
+                }
+            };
+            
+            this.recognitionActive = true;
+            this.recognition.start();
+            console.log('✓ 语音识别已启动，语言:', this.recognitionLanguage);
+        } catch (error) {
+            console.error('启动语音识别失败:', error);
+        }
+    }
+    
+    /**
+     * 处理识别文字，转换为拼音并显示（字级别）
+     * @param {string} text - 识别出的文字
+     * @param {boolean} isFinal - 是否为最终结果
+     */
+    processPinyinFromText(text, isFinal) {
+        if (!text || text.trim().length === 0) {
+            return;
+        }
+        
+        try {
+            // 提取中文字符（忽略标点、数字等）
+            const chineseChars = text.match(/[\u4e00-\u9fa5]/g);
+            if (!chineseChars || chineseChars.length === 0) {
+                console.log('⚠️ 未检测到中文字符:', text);
+                return;
+            }
+            
+            console.log(`📝 检测到 ${chineseChars.length} 个汉字，开始逐字转换拼音...`);
+            
+            // 逐字处理，生成拼音标注
+            for (const char of chineseChars) {
+                // 使用 cnchar 获取拼音（带声调）
+                // 参数说明：
+                // - 'tone': 返回带声调的拼音（如 "zhōng"）
+                // - 'poly': 如果是多音字，返回所有读音的数组
+                const pinyin = cnchar.spell(char, 'tone', 'poly');
+                
+                // 如果是多音字，取第一个常用读音
+                let pinyinText;
+                if (Array.isArray(pinyin)) {
+                    pinyinText = pinyin[0];  // 第一个通常是最常用的读音
+                } else {
+                    pinyinText = pinyin;
+                }
+                
+                // 格式化显示：汉字(拼音)
+                const displayText = `${char}(${pinyinText})`;
+                
+                console.log(`  ${displayText} ${isFinal ? '✓' : '⚡'}`);
+                
+                // 添加拼音标注到频谱图
+                this.addPinyinMarker(displayText);
+            }
+            
+            console.log(`✓ 拼音标注完成 (${isFinal ? '最终' : '临时'})`);
+            
+        } catch (error) {
+            console.error('❌ 拼音转换失败:', error);
+        }
+    }
+    
+    /**
+     * 使用后端API进行语音识别（百度/阿里云）
+     * @param {string} method - 识别方法：'backend'
+     */
+    async startBackendSpeechRecognition(method = 'backend') {
+        console.log('🎤 启动 PCM 流式语音识别...');
+        
+        // 检查可用的服务商
+        try {
+            const providersResp = await fetch('/api/speech/providers');
+            const providersData = await providersResp.json();
+            
+            if (!providersData.success) {
+                console.error('❌ 获取语音识别服务商失败:', providersData.error);
+                alert('后端语音识别服务不可用');
+                return;
+            }
+            
+            // 找到可用的云端服务商（百度/阿里云）
+            const availableProvider = providersData.providers.find(p => p.available);
+            
+            if (!availableProvider) {
+                console.error('❌ 没有可用的语音识别服务商');
+                console.error('请配置百度或阿里云密钥，参考: config/speech_config.py');
+                alert('请先配置语音识别服务（百度或阿里云）\n详见 env.example 文件');
+                return;
+            }
+            
+            console.log('✓ 使用语音识别服务:', availableProvider.name);
+            this.recognitionProvider = availableProvider.id;
+            
+            // ========== 使用 AudioWorklet 捕获 PCM 数据 ==========
+            
+            // 创建 AudioContext（16kHz 采样率，语音识别标准）
+            this.recognitionAudioContext = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 48000  // 保持默认采样率，由 worklet 降采样
+            });
+            
+            // 加载 PCM 捕获处理器
+            try {
+                await this.recognitionAudioContext.audioWorklet.addModule('/static/js/pcm-capture-processor.js');
+                console.log('✓ PCM 捕获处理器加载成功');
+            } catch (error) {
+                console.error('❌ 加载 PCM 处理器失败:', error);
+                alert('加载音频处理器失败，请刷新页面重试');
+                return;
+            }
+            
+            // 创建音频源
+            const source = this.recognitionAudioContext.createMediaStreamSource(this.microphoneStream);
+            
+            // 创建 PCM 捕获节点
+            this.pcmCaptureNode = new AudioWorkletNode(
+                this.recognitionAudioContext, 
+                'pcm-capture-processor'
+            );
+            
+            // PCM 数据缓冲区（累积时间以提高识别率）
+            this.pcmBuffer = [];
+            this.pcmBufferDuration = 0;
+            this.pcmBufferStartTime = null;  // 记录音频开始时间
+            const TARGET_DURATION = 1.5;  // 累积 1.5 秒后识别
+            const SILENCE_THRESHOLD = 200;  // 静音阈值
+            
+            // 监听 PCM 数据
+            this.pcmCaptureNode.port.onmessage = async (event) => {
+                const { type, data, sampleRate, samples, duration } = event.data;
+                
+                if (type === 'pcm_data') {
+                    // 检测是否为静音（简单的能量检测）
+                    const pcmArray = new Int16Array(data);
+                    let energy = 0;
+                    for (let i = 0; i < pcmArray.length; i++) {
+                        energy += Math.abs(pcmArray[i]);
+                    }
+                    const avgEnergy = energy / pcmArray.length;
+                    
+                    // 如果缓冲区为空，使用更严格的阈值（避免背景噪音触发）
+                    const effectiveThreshold = this.pcmBuffer.length === 0 ? SILENCE_THRESHOLD * 1.5 : SILENCE_THRESHOLD;
+                    const isSilence = avgEnergy < effectiveThreshold;
+                    
+                    if (isSilence) {
+                        console.log(`🔇 检测到静音，跳过 (能量: ${avgEnergy.toFixed(0)}, 阈值: ${effectiveThreshold.toFixed(0)})`);
+                        return;
+                    }
+                    
+                    console.log(`📦 接收到 PCM 数据: ${samples} samples (${duration.toFixed(2)}s, 能量: ${avgEnergy.toFixed(0)})`);
+                    
+                    // 记录音频开始时间（第一次收到数据时）
+                    if (this.pcmBuffer.length === 0) {
+                        this.pcmBufferStartTime = Date.now();
+                    }
+                    
+                    // 累积数据
+                    this.pcmBuffer.push(data);
+                    this.pcmBufferDuration += duration;
+                    
+                    // 达到目标时长，发送识别
+                    if (this.pcmBufferDuration >= TARGET_DURATION) {
+                        // 合并所有 buffer
+                        const totalLength = this.pcmBuffer.reduce((sum, arr) => sum + arr.byteLength / 2, 0);
+                        const mergedData = new Int16Array(totalLength);
+                        let offset = 0;
+                        for (const arr of this.pcmBuffer) {
+                            const int16Array = new Int16Array(arr);
+                            mergedData.set(int16Array, offset);
+                            offset += int16Array.length;
+                        }
+                        
+                        console.log(`📤 累积 ${this.pcmBufferDuration.toFixed(2)}s 数据 (${mergedData.length} samples)，开始识别...`);
+                        
+                        // 记录音频的中点时间（作为发音时间）
+                        const audioMidTime = this.pcmBufferStartTime + (this.pcmBufferDuration * 1000 / 2);
+                        
+                        // 发送 PCM 数据进行识别
+                        await this.sendPCMForRecognition(mergedData.buffer, sampleRate, this.recognitionProvider, audioMidTime);
+                        
+                        // 清空缓冲区
+                        this.pcmBuffer = [];
+                        this.pcmBufferDuration = 0;
+                        this.pcmBufferStartTime = null;
+                    }
+                }
+            };
+            
+            // 连接音频节点
+            source.connect(this.pcmCaptureNode);
+            // 注意：不需要连接到 destination，避免回声
+            
+            this.recognitionActive = true;
+            console.log('✓ PCM 流式语音识别已启动');
+            
+        } catch (error) {
+            console.error('❌ 启动 PCM 语音识别失败:', error);
+            alert('启动语音识别失败: ' + error.message);
+        }
+    }
+    
+    /**
+     * 发送音频到后端进行识别（旧方法，保留兼容性）
+     */
+    async sendAudioForRecognition(audioChunks, provider) {
+        try {
+            // 创建音频 Blob
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'audio.webm');
+            formData.append('provider', provider);
+            
+            console.log('📤 发送音频数据到后端识别...');
+            
+            // 使用百度/阿里云 API 端点
+            const apiEndpoint = '/api/speech/recognize';
+            
+            const response = await fetch(apiEndpoint, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.text) {
+                console.log('✓ 识别结果:', result.text);
+                this.addPinyinMarker(result.text);
+            } else {
+                console.warn('⚠️ 识别无结果:', result.error || '未识别到内容');
+            }
+            
+        } catch (error) {
+            console.error('❌ 发送识别请求失败:', error);
+        }
+    }
+    
+    /**
+     * 发送 PCM 数据到后端进行识别（新方法）
+     * @param {ArrayBuffer} pcmData - Int16 PCM 数据
+     * @param {number} sampleRate - 采样率
+     * @param {string} provider - 服务商 ID
+     * @param {number} audioMidTime - 音频中点时间（毫秒时间戳）
+     */
+    async sendPCMForRecognition(pcmData, sampleRate, provider, audioMidTime) {
+        try {
+            // 创建 Blob
+            const pcmBlob = new Blob([pcmData], { type: 'application/octet-stream' });
+            
+            const formData = new FormData();
+            formData.append('audio', pcmBlob, 'audio.pcm');
+            formData.append('provider', provider);
+            formData.append('format', 'pcm');  // 标记为 PCM 格式
+            formData.append('sample_rate', sampleRate.toString());
+            formData.append('channels', '1');  // 单声道
+            formData.append('sample_width', '2');  // 16-bit = 2 bytes
+            
+            console.log(`📤 发送 PCM 数据: ${pcmBlob.size} bytes, ${sampleRate} Hz`);
+            
+            // 记录发送时间（用于计算时延）
+            const sendTime = Date.now();
+            
+            // 使用百度/阿里云 API 端点
+            const apiEndpoint = '/api/speech/recognize';
+            
+            console.log(`🎯 使用 API: ${apiEndpoint}`);
+            
+            const response = await fetch(apiEndpoint, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.text) {
+                // 计算实际时延（从音频中点到识别完成）
+                const receiveTime = Date.now();
+                const actualLatency = receiveTime - audioMidTime;
+                
+                console.log('✓ 识别结果:', result.text);
+                console.log(`⏱️ 识别时延: ${actualLatency}ms (发送到接收: ${receiveTime - sendTime}ms)`);
+                
+                // 传递实际时延
+                this.addPinyinMarker(result.text, actualLatency);
+            } else {
+                console.warn('⚠️ 识别无结果:', result.error || '未识别到内容');
+            }
+            
+        } catch (error) {
+            console.error('❌ 发送 PCM 识别请求失败:', error);
+        }
+    }
+    
+    /**
+     * 停止语音识别
+     */
+    stopSpeechRecognition() {
+        // 停止 PCM 捕获节点
+        if (this.pcmCaptureNode) {
+            try {
+                this.pcmCaptureNode.port.close();
+                this.pcmCaptureNode.disconnect();
+                this.pcmCaptureNode = null;
+                console.log('✓ PCM 捕获节点已停止');
+            } catch (error) {
+                console.error('停止 PCM 捕获失败:', error);
+            }
+        }
+        
+        // 关闭识别用的 AudioContext
+        if (this.recognitionAudioContext) {
+            try {
+                this.recognitionAudioContext.close();
+                this.recognitionAudioContext = null;
+                console.log('✓ 识别 AudioContext 已关闭');
+            } catch (error) {
+                console.error('关闭 AudioContext 失败:', error);
+            }
+        }
+        
+        // 停止后端识别（旧方法兼容）
+        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+            try {
+                this.mediaRecorder.stop();
+                this.mediaRecorder = null;
+                console.log('✓ 后端语音识别已停止');
+            } catch (error) {
+                console.error('停止后端识别失败:', error);
+            }
+        }
+        
+        // 停止音量检查（旧方法兼容）
+        if (this.audioLevelChecker) {
+            clearInterval(this.audioLevelChecker);
+            this.audioLevelChecker = null;
+        }
+        
+        // 停止浏览器识别
+        if (this.recognition) {
+            try {
+                this.recognition.stop();
+                this.recognition = null;
+                console.log('✓ 浏览器语音识别已停止');
+            } catch (error) {
+                console.error('停止浏览器识别失败:', error);
+            }
+        }
+        
+        this.recognitionActive = false;
+    }
+    
+    /**
+     * 添加拼音标记
+     */
+    addPinyinMarker(text, latency = null) {
+        if (!text || text.trim().length === 0) {
+            console.warn('⚠️ 拼音标注: 文本为空，跳过');
+            return;
+        }
+        
+        // 检查 cnchar 是否可用
+        if (typeof cnchar === 'undefined' || typeof cnchar.spell !== 'function') {
+            console.error('❌ cnchar 库未加载，无法转换拼音');
+            console.error('   请检查网络连接，确保 cnchar 库正确加载');
+            return;
+        }
+        
+        try {
+            // 使用 cnchar 转换拼音
+            const pinyinText = cnchar.spell(text, 'tone');
+            
+            // 计算当前能量
+            const energy = this.getCurrentEnergy();
+            
+            // 计算实际发音时间（逆推识别时延）
+            const actualLatency = latency !== null ? latency : this.recognitionLatency;
+            const actualSpeechTime = Date.now() - actualLatency;
+            
+            // 计算标记在频谱图上的位置（相对于频谱图的时间轴）
+            // 保存发音时刻相对于录音开始的时间，这样标记就会随频谱图一起滚动
+            const speechElapsedSinceStart = actualSpeechTime - this.startTime;
+            
+            // 创建标记
+            const marker = {
+                text: text,
+                pinyin: pinyinText,
+                timestamp: actualSpeechTime,  // 实际发音时间
+                createdAt: Date.now(),  // 标记创建时间
+                speechTime: speechElapsedSinceStart,  // 发音时刻（相对于录音开始）
+                energy: energy,
+                latency: actualLatency
+            };
+            
+            this.pinyinMarkers.push(marker);
+            
+            console.log(`✅ ${text} → ${pinyinText} (时延: ${actualLatency}ms, 发音时刻: ${speechElapsedSinceStart.toFixed(0)}ms)`);
+        } catch (error) {
+            console.error('❌ 转换拼音失败:', error);
+        }
+    }
+    
+    /**
+     * 获取当前能量
+     */
+    getCurrentEnergy() {
+        if (this.energyHistory.length === 0) return -60;
+        return this.energyHistory[this.energyHistory.length - 1];
+    }
+    
+    /**
+     * 绘制拼音区域
+     */
+    drawPinyinArea(ctx, offsetY, height) {
+        if (!this.showPinyin) {
+            return;
+        }
+        
+        // 绘制背景
+        ctx.fillStyle = 'rgba(20, 20, 40, 0.8)';
+        ctx.fillRect(0, offsetY, this.width, height);
+        
+        // 绘制分隔线
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, offsetY);
+        ctx.lineTo(this.width, offsetY);
+        ctx.stroke();
+        
+        // 绘制中线（分隔拼音和汉字）
+        const midY = offsetY + height / 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(0, midY);
+        ctx.lineTo(this.width, midY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // 清理过期的标记
+        const now = Date.now();
+        this.pinyinMarkers = this.pinyinMarkers.filter(marker => {
+            return now - marker.createdAt < this.pinyinDisplayDuration;
+        });
+        
+        // 绘制拼音标记
+        if (this.pinyinMarkers.length === 0) {
+            // 显示提示文字
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('开始说话，拼音和汉字会在这里显示...', this.width / 2, offsetY + height / 2);
+            return;
+        }
+        
+        // 计算时间比例（用于将标记固定在频谱图的时间轴位置）
+        const currentTime = Date.now();
+        const elapsedSinceStart = currentTime - this.startTime;
+        const msPerPixel = (1000 / 60) / this.options.scrollSpeed;  // 每像素对应的毫秒数
+        
+        for (const marker of this.pinyinMarkers) {
+            // 计算标记在频谱图上的位置
+            // 标记固定在发音时刻的频谱柱上，随频谱图一起向左滚动
+            const currentPixelOffset = elapsedSinceStart / msPerPixel;
+            const markerPixelOffset = marker.speechTime / msPerPixel;
+            const x = this.width - (currentPixelOffset - markerPixelOffset);
+            
+            // 调试日志（仅首次绘制时输出）
+            if (!marker._logged) {
+                console.log(`📍 "${marker.text}" 位置: x=${x.toFixed(0)}, 发音时刻=${marker.speechTime.toFixed(0)}ms, 当前时刻=${elapsedSinceStart.toFixed(0)}ms`);
+                marker._logged = true;
+            }
+            
+            // 如果已经滚出屏幕，跳过
+            if (x < -100 || x > this.width + 100) continue;
+            
+            // 计算透明度（渐隐效果）
+            const age = now - marker.createdAt;
+            const alpha = Math.max(0, 1 - age / this.pinyinDisplayDuration);
+            
+            // 绘制连接线（从频谱图到拼音区域）
+            const spectrogramHeight = this.options.showWaveform ? this.height * 0.70 : this.height * 0.85;
+            ctx.strokeStyle = `rgba(100, 200, 255, ${alpha * 0.3})`;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 2]);
+            ctx.beginPath();
+            ctx.moveTo(x, spectrogramHeight);
+            ctx.lineTo(x, offsetY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // 绘制拼音（上半部分）
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = `rgba(100, 200, 255, ${alpha})`;
+            const pinyinY = offsetY + height * 0.3;
+            ctx.fillText(marker.pinyin, x, pinyinY);
+            
+            // 绘制汉字（下半部分）
+            ctx.font = 'bold 20px "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif';
+            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            const textY = offsetY + height * 0.7;
+            ctx.fillText(marker.text, x, textY);
+            
+            // 绘制时延标记（调试用，可选）
+            if (marker.latency) {
+                ctx.font = '9px Arial';
+                ctx.fillStyle = `rgba(150, 150, 150, ${alpha * 0.6})`;
+                ctx.fillText(`${marker.latency}ms`, x, offsetY + height - 5);
+            }
+        }
+    }
+    
     // 公共方法：更新配置
     updateOptions(newOptions) {
         Object.assign(this.options, newOptions);
@@ -628,6 +1306,31 @@ class RealtimeSpectrogramRenderer {
         this.showFormants = show !== undefined ? show : !this.showFormants;
         console.log('共振峰显示:', this.showFormants ? '开启' : '关闭');
         return this.showFormants;
+    }
+    
+    // 公共方法：切换拼音显示
+    togglePinyin(show) {
+        const previousState = this.showPinyin;
+        this.showPinyin = show !== undefined ? show : !this.showPinyin;
+        
+        // 如果从关闭到开启，且正在运行，则启动识别
+        if (!previousState && this.showPinyin && this.isRunning) {
+            this.startSpeechRecognition();
+        }
+        
+        // 如果从开启到关闭，则停止识别
+        if (previousState && !this.showPinyin) {
+            this.stopSpeechRecognition();
+        }
+        
+        console.log('拼音显示:', this.showPinyin ? '开启' : '关闭');
+        return this.showPinyin;
+    }
+    
+    // 公共方法：清除拼音标记
+    clearPinyinMarkers() {
+        this.pinyinMarkers = [];
+        console.log('✓ 拼音标记已清除');
     }
     
     // 公共方法：截图

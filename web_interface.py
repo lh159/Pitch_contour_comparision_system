@@ -522,7 +522,13 @@ def stop_recording():
         wav_filename = f"user_{file_id}.wav"  # 使用与upload_audio一致的命名格式
         wav_filepath = os.path.join(Config.UPLOAD_FOLDER, wav_filename)
         
-        # 将音频数据保存为WAV文件
+        # 🎯 保存 PCM 文件用于百度语音识别（推荐格式）
+        pcm_filename = f"user_{file_id}.pcm"
+        pcm_filepath = os.path.join(Config.UPLOAD_FOLDER, pcm_filename)
+        with open(pcm_filepath, 'wb') as pcm_file:
+            pcm_file.write(audio_data)
+        
+        # 将音频数据保存为WAV文件（用于播放和音高分析）
         with wave.open(wav_filepath, 'wb') as wav_file:
             wav_file.setnchannels(session.audio_format['channels'])
             wav_file.setsampwidth(session.audio_format['sample_width'])
@@ -2435,6 +2441,341 @@ def detect_vot_api():
         return jsonify(result)
         
     except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+# === 语音识别API端点（国内服务商）===
+
+@app.route('/api/speech/recognize', methods=['POST'])
+def recognize_speech():
+    """
+    语音识别API - 使用国内服务商（阿里云/百度等）
+    替代浏览器的 Web Speech API（依赖 Google）
+    
+    支持两种格式：
+    1. PCM 原始数据（format=pcm）- 快速，无需格式转换
+    2. 其他音频格式（webm/mp3/wav 等）- 需要转换
+    """
+    try:
+        # 获取音频数据
+        audio_file = request.files.get('audio')
+        provider = request.form.get('provider', 'baidu')  # 默认使用百度
+        audio_format = request.form.get('format', 'auto')  # 格式标记
+        
+        if not audio_file:
+            return jsonify({
+                'success': False,
+                'error': '未上传音频文件'
+            }), 400
+        
+        # 最终的 WAV 文件路径
+        temp_filename = f'temp_speech_{uuid.uuid4().hex}.wav'
+        temp_path = os.path.join(Config.TEMP_FOLDER, temp_filename)
+        
+        # ========== 处理 PCM 格式（新方法，快速无转换） ==========
+        pcm_data = None  # 保存原始 PCM 数据用于百度识别
+        pcm_sample_rate = 16000  # PCM 采样率
+        
+        if audio_format == 'pcm':
+            try:
+                import wave
+                
+                # 获取 PCM 参数
+                sample_rate = int(request.form.get('sample_rate', 16000))
+                channels = int(request.form.get('channels', 1))
+                sample_width = int(request.form.get('sample_width', 2))  # 2 = 16-bit
+                
+                print(f"🎤 接收 PCM 数据: {sample_rate}Hz, {channels}ch, {sample_width*8}bit")
+                
+                # 读取 PCM 数据
+                pcm_data = audio_file.read()
+                pcm_sample_rate = sample_rate
+                
+                # 直接写入 WAV 文件（只需添加文件头）
+                with wave.open(temp_path, 'wb') as wav_file:
+                    wav_file.setnchannels(channels)
+                    wav_file.setsampwidth(sample_width)
+                    wav_file.setframerate(sample_rate)
+                    wav_file.writeframes(pcm_data)
+                
+                print(f"✓ PCM 数据已准备（直接识别，零转换）")
+                print(f"   同时保存 WAV 文件用于播放（仅添加44字节文件头）")
+                print(f"   时长: {len(pcm_data) / (sample_rate * sample_width):.2f}s")
+                print(f"   大小: {len(pcm_data)} bytes")
+                
+                # 检查音频能量
+                pcm_array = np.frombuffer(pcm_data, dtype=np.int16)
+                avg_energy = np.mean(np.abs(pcm_array))
+                max_amplitude = np.max(np.abs(pcm_array))
+                print(f"   音频能量: 平均 {avg_energy:.0f}, 最大 {max_amplitude}")
+                
+                if avg_energy < 100:
+                    print(f"   ⚠️ 警告：音频能量过低，可能为静音或噪音")
+                
+            except Exception as e:
+                print(f"❌ PCM 转换失败: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': f'PCM 转换失败: {str(e)}'
+                }), 500
+        
+        # ========== 处理其他音频格式（旧方法，需要编解码） ==========
+        else:
+            # 保存上传的原始音频文件
+            original_filename = audio_file.filename or 'audio.webm'
+            file_ext = os.path.splitext(original_filename)[1].lower()
+            
+            temp_original = f'temp_original_{uuid.uuid4().hex}{file_ext}'
+            temp_original_path = os.path.join(Config.TEMP_FOLDER, temp_original)
+            audio_file.save(temp_original_path)
+            
+            if file_ext in ['.webm', '.ogg', '.mp3', '.m4a']:
+                # 需要转换格式
+                try:
+                    from pydub import AudioSegment
+                    
+                    print(f"🔄 转换音频格式: {file_ext} → .wav")
+                    
+                    # 读取原始音频
+                    audio = AudioSegment.from_file(temp_original_path)
+                    
+                    # 转换为 16kHz, 单声道 WAV（语音识别标准格式）
+                    audio = audio.set_frame_rate(16000).set_channels(1)
+                    audio.export(temp_path, format='wav')
+                    
+                    print(f"✓ 音频转换成功")
+                    
+                    # 删除原始文件
+                    try:
+                        os.remove(temp_original_path)
+                    except:
+                        pass
+                        
+                except Exception as e:
+                    print(f"❌ 音频格式转换失败: {e}")
+                    # 清理临时文件
+                    try:
+                        os.remove(temp_original_path)
+                    except:
+                        pass
+                    return jsonify({
+                        'success': False,
+                        'error': f'音频格式转换失败: {str(e)}'
+                    }), 500
+            else:
+                # 已经是 WAV 格式，直接重命名
+                os.rename(temp_original_path, temp_path)
+        
+        try:
+            result_text = ''
+            
+            if provider == 'dashscope':
+                # 使用阿里云 DashScope（推荐）
+                from config.speech_config import DASHSCOPE_API_KEY
+                from config.dashscope_speech import DashScopeSpeechRecognizer
+                
+                if not DASHSCOPE_API_KEY or not DASHSCOPE_API_KEY.startswith('sk-'):
+                    return jsonify({
+                        'success': False,
+                        'error': 'DashScope API Key 未配置或格式错误'
+                    }), 500
+                
+                recognizer = DashScopeSpeechRecognizer(DASHSCOPE_API_KEY)
+                result_text = recognizer.recognize(temp_path)
+                
+            elif provider == 'baidu':
+                # 使用百度语音识别
+                from speech_recognition.baidu_speech import BaiduSpeech, BAIDU_SDK_AVAILABLE
+                from config.speech_config import BAIDU_APP_ID, BAIDU_API_KEY, BAIDU_SECRET_KEY
+                
+                if not BAIDU_SDK_AVAILABLE:
+                    return jsonify({
+                        'success': False,
+                        'error': '百度语音 SDK 未安装，请运行: pip install baidu-aip'
+                    }), 500
+                
+                if not all([BAIDU_APP_ID, BAIDU_API_KEY, BAIDU_SECRET_KEY]):
+                    return jsonify({
+                        'success': False,
+                        'error': '百度语音配置不完整，请在 config/speech_config.py 中配置密钥'
+                    }), 500
+                
+                baidu = BaiduSpeech(BAIDU_APP_ID, BAIDU_API_KEY, BAIDU_SECRET_KEY)
+                
+                # 🎯 优先使用 PCM 格式（百度推荐格式，无需转换）
+                if pcm_data is not None:
+                    print(f"🚀 使用 PCM 格式直接识别（百度推荐格式）")
+                    result_text = baidu.recognize_bytes(pcm_data, format='pcm', rate=pcm_sample_rate)
+                else:
+                    print(f"📝 使用 WAV 文件识别")
+                    result_text = baidu.recognize_file(temp_path, format='wav', rate=16000)
+                
+            elif provider == 'aliyun':
+                # 使用阿里云语音识别（传统API）
+                from speech_recognition.aliyun_speech import AliyunSpeechSimple, ALIYUN_SDK_AVAILABLE
+                from config.speech_config import ALIYUN_ACCESS_KEY_ID, ALIYUN_ACCESS_KEY_SECRET, ALIYUN_APP_KEY
+                
+                if not ALIYUN_SDK_AVAILABLE:
+                    return jsonify({
+                        'success': False,
+                        'error': '阿里云 SDK 未安装，请运行: pip install aliyun-python-sdk-core aliyun-nls-python3-sdk'
+                    }), 500
+                
+                if not all([ALIYUN_ACCESS_KEY_ID, ALIYUN_ACCESS_KEY_SECRET, ALIYUN_APP_KEY]):
+                    return jsonify({
+                        'success': False,
+                        'error': '阿里云配置不完整，请在 config/speech_config.py 中配置密钥'
+                    }), 500
+                
+                aliyun = AliyunSpeechSimple(ALIYUN_ACCESS_KEY_ID, ALIYUN_ACCESS_KEY_SECRET, ALIYUN_APP_KEY)
+                result_text = aliyun.recognize_file(temp_path)
+                
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'不支持的服务商: {provider}'
+                }), 400
+            
+            # 清理临时文件
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+            
+            if result_text:
+                print(f"✓ 识别成功: {result_text}")
+                return jsonify({
+                    'success': True,
+                    'text': result_text,
+                    'provider': provider
+                })
+            else:
+                print(f"⚠️ 识别失败: API 返回空结果")
+                print(f"   音频文件: {temp_path}")
+                print(f"   服务商: {provider}")
+                
+                # 检查音频文件信息
+                try:
+                    import wave
+                    with wave.open(temp_path, 'rb') as wf:
+                        print(f"   WAV 信息: {wf.getnchannels()}ch, {wf.getframerate()}Hz, {wf.getnframes()} frames, {wf.getnframes()/wf.getframerate():.2f}s")
+                except:
+                    pass
+                
+                return jsonify({
+                    'success': False,
+                    'error': '识别失败，未能识别到语音内容。可能原因：音频太短、无有效语音、或 API 配置问题'
+                })
+                
+        except Exception as e:
+            # 清理临时文件
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+            raise
+            
+    except Exception as e:
+        print(f"语音识别错误: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/speech/recognize_whisper', methods=['POST'])
+def recognize_speech_whisper():
+    """
+    Whisper API 已移除 - 系统现在使用百度/阿里云语音识别
+    保留此端点是为了向后兼容，会返回错误提示
+    """
+    return jsonify({
+        'success': False,
+        'error': 'Whisper 离线识别已从系统中移除，请使用百度或阿里云语音识别服务'
+    }), 410  # 410 Gone - 资源已永久删除
+
+
+@app.route('/api/speech/providers', methods=['GET'])
+def get_speech_providers():
+    """获取可用的语音识别服务商列表"""
+    try:
+        from speech_recognition.baidu_speech import BAIDU_SDK_AVAILABLE
+        from speech_recognition.aliyun_speech import ALIYUN_SDK_AVAILABLE
+        from config.speech_config import (
+            BAIDU_APP_ID, BAIDU_API_KEY, BAIDU_SECRET_KEY,
+            ALIYUN_ACCESS_KEY_ID, ALIYUN_ACCESS_KEY_SECRET, ALIYUN_APP_KEY,
+            DASHSCOPE_API_KEY
+        )
+        
+        providers = []
+        
+        # 检查百度（优先使用）
+        if BAIDU_SDK_AVAILABLE and all([BAIDU_APP_ID, BAIDU_API_KEY, BAIDU_SECRET_KEY]):
+            providers.append({
+                'id': 'baidu',
+                'name': '百度语音',
+                'available': True
+            })
+        else:
+            providers.append({
+                'id': 'baidu',
+                'name': '百度语音',
+                'available': False,
+                'reason': '未配置或SDK未安装'
+            })
+        
+        # 检查 DashScope（阿里云新API，备选）
+        dashscope_available = False
+        if DASHSCOPE_API_KEY and DASHSCOPE_API_KEY.startswith('sk-'):
+            try:
+                from config.dashscope_speech import DashScopeSpeechRecognizer
+                recognizer = DashScopeSpeechRecognizer(DASHSCOPE_API_KEY)
+                dashscope_available = recognizer.is_available()
+            except Exception as e:
+                print(f"DashScope 检查失败: {e}")
+        
+        if dashscope_available:
+            providers.append({
+                'id': 'dashscope',
+                'name': '阿里云 DashScope',
+                'available': True
+            })
+        else:
+            providers.append({
+                'id': 'dashscope',
+                'name': '阿里云 DashScope',
+                'available': False,
+                'reason': '未配置或API Key无效'
+            })
+        
+        # 检查阿里云传统API
+        if ALIYUN_SDK_AVAILABLE and all([ALIYUN_ACCESS_KEY_ID, ALIYUN_ACCESS_KEY_SECRET, ALIYUN_APP_KEY]):
+            providers.append({
+                'id': 'aliyun',
+                'name': '阿里云语音（传统）',
+                'available': True
+            })
+        else:
+            providers.append({
+                'id': 'aliyun',
+                'name': '阿里云语音（传统）',
+                'available': False,
+                'reason': '未配置或SDK未安装'
+            })
+        
+        # Whisper 离线识别已移除，系统现在使用百度/阿里云语音识别
+        
+        return jsonify({
+            'success': True,
+            'providers': providers
+        })
+        
+    except Exception as e:
+        print(f"获取服务商列表错误: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
