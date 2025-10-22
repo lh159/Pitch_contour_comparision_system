@@ -79,6 +79,30 @@ class SpectrogramMirror {
             });
         }
         
+        // 锁定共振峰按钮
+        const lockFormantsBtn = document.getElementById('lock-formants');
+        const lockFormantsIcon = lockFormantsBtn?.querySelector('.btn-icon');
+        const lockFormantsText = document.getElementById('lock-formants-text');
+        
+        if (lockFormantsBtn) {
+            lockFormantsBtn.addEventListener('click', () => {
+                const isLocked = this.toggleLockFormants();
+                
+                // 更新按钮状态
+                if (isLocked) {
+                    lockFormantsIcon.textContent = '🔒';
+                    lockFormantsText.textContent = '解锁共振峰';
+                    lockFormantsBtn.classList.remove('btn-secondary');
+                    lockFormantsBtn.classList.add('btn-warning');
+                } else {
+                    lockFormantsIcon.textContent = '🔓';
+                    lockFormantsText.textContent = '锁定共振峰';
+                    lockFormantsBtn.classList.remove('btn-warning');
+                    lockFormantsBtn.classList.add('btn-secondary');
+                }
+            });
+        }
+        
         // 拼音显示开关
         const pinyinToggle = document.getElementById('pinyin-toggle');
         const clearPinyinBtn = document.getElementById('clear-pinyin');
@@ -113,6 +137,14 @@ class SpectrogramMirror {
         if (this.realtimeRenderer) {
             this.realtimeRenderer.toggleFormants(show);
         }
+    }
+    
+    toggleLockFormants() {
+        console.log('切换共振峰锁定状态');
+        if (this.realtimeRenderer) {
+            return this.realtimeRenderer.toggleLockFormants();
+        }
+        return false;
     }
     
     togglePinyin(show) {
@@ -174,6 +206,13 @@ class SpectrogramMirror {
             if (success) {
                 this.isMonitoring = true;
                 console.log('✓ 实时监测模式已启动');
+                
+                // 显示锁定共振峰按钮
+                const lockFormantsBtn = document.getElementById('lock-formants');
+                if (lockFormantsBtn) {
+                    lockFormantsBtn.style.display = 'inline-flex';
+                }
+                
                 return true;
             } else {
                 // 恢复占位符
@@ -215,6 +254,19 @@ class SpectrogramMirror {
         // 停止实时渲染
         if (this.realtimeRenderer) {
             this.realtimeRenderer.stop();
+        }
+        
+        // 隐藏锁定共振峰按钮并重置状态
+        const lockFormantsBtn = document.getElementById('lock-formants');
+        const lockFormantsIcon = lockFormantsBtn?.querySelector('.btn-icon');
+        const lockFormantsText = document.getElementById('lock-formants-text');
+        
+        if (lockFormantsBtn) {
+            lockFormantsBtn.style.display = 'none';
+            lockFormantsIcon.textContent = '🔓';
+            lockFormantsText.textContent = '锁定共振峰';
+            lockFormantsBtn.classList.remove('btn-warning');
+            lockFormantsBtn.classList.add('btn-secondary');
         }
         
         this.isMonitoring = false;

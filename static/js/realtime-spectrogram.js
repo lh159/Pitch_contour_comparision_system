@@ -46,6 +46,12 @@ class RealtimeSpectrogramRenderer {
         // 共振峰检测
         this.formants = [];  // 存储当前检测到的共振峰
         this.showFormants = true;  // 是否显示共振峰标注
+        this.lockedFormants = null;  // 锁定的共振峰（用于观察）
+        this.isFormantsLocked = false;  // 是否锁定共振峰
+        this.isVoicing = false;  // 当前是否正在发声
+        this.voicingFormants = null;  // 发声时的共振峰
+        this.lastVoicingTime = 0;  // 上次发声时间
+        this.formantHoldTime = 5000;  // 共振峰保持显示时间（毫秒）
         
         // 拼音识别
         this.showPinyin = false;  // 是否显示拼音标注
@@ -216,7 +222,7 @@ class RealtimeSpectrogramRenderer {
         
         // 共振峰检测
         if (this.showFormants) {
-            this.detectFormants(this.dataArray);
+            this.detectFormants(this.dataArray, energy);
         }
         
         // 只有在未暂停时才添加新帧和滚动
@@ -470,7 +476,7 @@ class RealtimeSpectrogramRenderer {
      * 检测共振峰频率
      * 共振峰是频谱中的能量峰值，代表声道的共振特性
      */
-    detectFormants(spectrumData) {
+    detectFormants(spectrumData, currentEnergy) {
         if (!spectrumData || spectrumData.length === 0) return;
         
         const nyquist = this.audioContext.sampleRate / 2;
@@ -511,6 +517,21 @@ class RealtimeSpectrogramRenderer {
                     magnitude: formant.magnitude,
                     color: range.color
                 });
+            }
+        }
+        
+        // 检测当前是否正在发声（基于能量阈值）
+        const wasVoicing = this.isVoicing;
+        this.isVoicing = currentEnergy > this.energyThreshold && this.formants.length >= 2;
+        
+        // 如果正在发声且有共振峰，更新发声时的共振峰
+        if (this.isVoicing && this.formants.length > 0) {
+            this.voicingFormants = JSON.parse(JSON.stringify(this.formants));
+            this.lastVoicingTime = Date.now();
+            
+            // 发声开始时的提示
+            if (!wasVoicing) {
+                console.log('🎤 检测到发声，共振峰已捕获');
             }
         }
     }
@@ -555,16 +576,32 @@ class RealtimeSpectrogramRenderer {
      * 绘制共振峰标注
      */
     drawFormants(ctx, height) {
-        if (!this.formants || this.formants.length === 0) return;
+        // 决定显示哪个共振峰：锁定的 > 发声时的 > 当前实时的
+        let displayFormants = null;
+        let statusText = '';
         
-        // const nyquist = this.audioContext.sampleRate / 2;
+        if (this.isFormantsLocked && this.lockedFormants) {
+            displayFormants = this.lockedFormants;
+            statusText = '🔒 已锁定';
+        } else if (this.voicingFormants && (Date.now() - this.lastVoicingTime < this.formantHoldTime)) {
+            displayFormants = this.voicingFormants;
+            const elapsed = Date.now() - this.lastVoicingTime;
+            const remaining = Math.ceil((this.formantHoldTime - elapsed) / 1000);
+            statusText = this.isVoicing ? '🎤 发声中' : `⏱️ 保持 ${remaining}s`;
+        } else {
+            displayFormants = this.formants;
+            statusText = '🔄 实时';
+        }
+        
+        if (!displayFormants || displayFormants.length === 0) return;
+        
         const maxDisplayFreq = this.options.maxFrequency;
         
         // 在频谱图右侧绘制共振峰标注
         const rightX = this.width - 150;
         
-        for (let i = 0; i < this.formants.length; i++) {
-            const formant = this.formants[i];
+        for (let i = 0; i < displayFormants.length; i++) {
+            const formant = displayFormants[i];
             
             // 计算频率对应的Y坐标
             const y = height * (1 - formant.frequency / maxDisplayFreq);
@@ -604,21 +641,26 @@ class RealtimeSpectrogramRenderer {
         
         // 在左上角显示共振峰信息汇总
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fillRect(5, 5, 180, 25 + this.formants.length * 18);
+        ctx.fillRect(5, 5, 180, 45 + displayFormants.length * 18);
         
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 14px Arial';
         ctx.textAlign = 'left';
         ctx.fillText('共振峰检测', 10, 20);
         
+        // 显示状态
         ctx.font = '11px Arial';
-        for (let i = 0; i < this.formants.length; i++) {
-            const formant = this.formants[i];
+        ctx.fillStyle = '#ffff00';
+        ctx.fillText(statusText, 10, 35);
+        
+        ctx.font = '11px Arial';
+        for (let i = 0; i < displayFormants.length; i++) {
+            const formant = displayFormants[i];
             ctx.fillStyle = formant.color;
             ctx.fillText(
                 `${formant.name}: ${Math.round(formant.frequency)} Hz`, 
                 10, 
-                40 + i * 18
+                55 + i * 18
             );
         }
     }
@@ -1329,6 +1371,25 @@ class RealtimeSpectrogramRenderer {
         this.showFormants = show !== undefined ? show : !this.showFormants;
         console.log('共振峰显示:', this.showFormants ? '开启' : '关闭');
         return this.showFormants;
+    }
+    
+    // 公共方法：锁定/解锁共振峰
+    toggleLockFormants() {
+        this.isFormantsLocked = !this.isFormantsLocked;
+        
+        if (this.isFormantsLocked) {
+            // 锁定当前显示的共振峰
+            if (this.voicingFormants && (Date.now() - this.lastVoicingTime < this.formantHoldTime)) {
+                this.lockedFormants = JSON.parse(JSON.stringify(this.voicingFormants));
+            } else {
+                this.lockedFormants = JSON.parse(JSON.stringify(this.formants));
+            }
+            console.log('🔒 共振峰已锁定:', this.lockedFormants);
+        } else {
+            console.log('🔓 共振峰已解锁');
+        }
+        
+        return this.isFormantsLocked;
     }
     
     // 公共方法：切换拼音显示
