@@ -28,6 +28,14 @@
                 <span class="btn-icon">🎤</span>
                 开始实时监测
             </button>
+            <button id="pause-monitoring" class="btn btn-warning btn-large" style="display: none;">
+                <span class="btn-icon">⏸️</span>
+                暂停
+            </button>
+            <button id="resume-monitoring" class="btn btn-success btn-large" style="display: none;">
+                <span class="btn-icon">▶️</span>
+                继续
+            </button>
             <button id="stop-monitoring" class="btn btn-danger btn-large" style="display: none;">
                 <span class="btn-icon">⏹️</span>
                 停止监测
@@ -35,6 +43,10 @@
             <div id="monitoring-indicator" class="monitoring-indicator" style="display: none;">
                 <span class="pulse-dot"></span>
                 <span>实时监测中...</span>
+            </div>
+            <div id="paused-indicator" class="monitoring-indicator" style="display: none; background: rgba(255, 193, 7, 0.1); border-color: #ffc107;">
+                <span class="pulse-dot" style="background: #ffc107;"></span>
+                <span style="color: #ffc107;">已暂停</span>
             </div>
             
             <!-- 共振峰显示控制 -->

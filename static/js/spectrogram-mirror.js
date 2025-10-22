@@ -21,17 +21,41 @@ class SpectrogramMirror {
     setupEventListeners() {
         // 开始监测按钮
         const startBtn = document.getElementById('start-monitoring');
+        const pauseBtn = document.getElementById('pause-monitoring');
+        const resumeBtn = document.getElementById('resume-monitoring');
         const stopBtn = document.getElementById('stop-monitoring');
         const indicator = document.getElementById('monitoring-indicator');
+        const pausedIndicator = document.getElementById('paused-indicator');
         
         if (startBtn) {
             startBtn.addEventListener('click', async () => {
                 const success = await this.startMonitoring();
                 if (success) {
                     startBtn.style.display = 'none';
+                    pauseBtn.style.display = 'inline-flex';
                     stopBtn.style.display = 'inline-flex';
                     indicator.style.display = 'flex';
                 }
+            });
+        }
+        
+        if (pauseBtn) {
+            pauseBtn.addEventListener('click', () => {
+                this.pauseMonitoring();
+                pauseBtn.style.display = 'none';
+                resumeBtn.style.display = 'inline-flex';
+                indicator.style.display = 'none';
+                pausedIndicator.style.display = 'flex';
+            });
+        }
+        
+        if (resumeBtn) {
+            resumeBtn.addEventListener('click', () => {
+                this.resumeMonitoring();
+                resumeBtn.style.display = 'none';
+                pauseBtn.style.display = 'inline-flex';
+                pausedIndicator.style.display = 'none';
+                indicator.style.display = 'flex';
             });
         }
         
@@ -39,8 +63,11 @@ class SpectrogramMirror {
             stopBtn.addEventListener('click', () => {
                 this.stopMonitoring();
                 stopBtn.style.display = 'none';
+                pauseBtn.style.display = 'none';
+                resumeBtn.style.display = 'none';
                 startBtn.style.display = 'inline-flex';
                 indicator.style.display = 'none';
+                pausedIndicator.style.display = 'none';
             });
         }
         
@@ -160,6 +187,26 @@ class SpectrogramMirror {
             alert('启动实时监测失败: ' + error.message);
             return false;
         }
+    }
+
+    pauseMonitoring() {
+        console.log('暂停实时监测...');
+        
+        if (this.realtimeRenderer) {
+            this.realtimeRenderer.pause();
+        }
+        
+        console.log('✓ 实时监测已暂停');
+    }
+    
+    resumeMonitoring() {
+        console.log('继续实时监测...');
+        
+        if (this.realtimeRenderer) {
+            this.realtimeRenderer.resume();
+        }
+        
+        console.log('✓ 实时监测已继续');
     }
 
     stopMonitoring() {

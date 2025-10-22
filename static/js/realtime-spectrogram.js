@@ -25,6 +25,7 @@ class RealtimeSpectrogramRenderer {
         
         // 状态
         this.isRunning = false;
+        this.isPaused = false;  // 暂停状态
         this.animationId = null;
         this.spectrogramData = [];  // 存储历史频谱数据
         this.maxFrames = Math.ceil(this.width / this.options.scrollSpeed);
@@ -137,12 +138,31 @@ class RealtimeSpectrogramRenderer {
         }
     }
     
+    pause() {
+        if (!this.isRunning || this.isPaused) {
+            return;
+        }
+        
+        this.isPaused = true;
+        console.log('✓ 频谱图滚动已暂停');
+    }
+    
+    resume() {
+        if (!this.isRunning || !this.isPaused) {
+            return;
+        }
+        
+        this.isPaused = false;
+        console.log('✓ 频谱图滚动已继续');
+    }
+    
     stop() {
         if (!this.isRunning) {
             return;
         }
         
         this.isRunning = false;
+        this.isPaused = false;
         
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
@@ -199,13 +219,16 @@ class RealtimeSpectrogramRenderer {
             this.detectFormants(this.dataArray);
         }
         
-        // 添加当前帧到历史
-        this.spectrogramData.push(new Uint8Array(this.dataArray));
-        if (this.spectrogramData.length > this.maxFrames) {
-            this.spectrogramData.shift();
+        // 只有在未暂停时才添加新帧和滚动
+        if (!this.isPaused) {
+            // 添加当前帧到历史
+            this.spectrogramData.push(new Uint8Array(this.dataArray));
+            if (this.spectrogramData.length > this.maxFrames) {
+                this.spectrogramData.shift();
+            }
         }
         
-        // 绘制
+        // 绘制（暂停时也继续绘制，只是不滚动）
         this.draw();
         
         // 继续下一帧
